@@ -1,0 +1,3 @@
+pytube # For audio downloading
+langchain
+--upgrade faiss-gpu==1.7.1
