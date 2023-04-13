@@ -6,12 +6,12 @@ DOWNLOAD_ROOT = "/tmp"
 model_size = "small"
 # model_size = "large-v2"
 
-# Run on GPU with FP16
+# Run on GPU with FP16 - requires cuda dependencies
 # model = WhisperModel(model_size, device="cuda", compute_type="float16")
 
-
-# or run on GPU with INT8
+# or run on GPU with INT8 - requires cuda dependencies
 # model = WhisperModel(model_size, device="cuda", compute_type="int8_float16")
+
 # or run on CPU with INT8
 model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
