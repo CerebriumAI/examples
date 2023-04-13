@@ -1,45 +1,45 @@
-import pytube 
-from pydantic import BaseModel
-from typing import Optional
-import whisper
+import os
 from datetime import datetime
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores.faiss import FAISS
+
+import faiss
+import pytube
+import whisper
 from langchain.chains import VectorDBQAWithSourcesChain
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.llms import CerebriumAI
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores.faiss import FAISS
+from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
-import requests
-import faiss
-import os
 
 model = whisper.load_model("small")
-sentanceTransformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+sentenceTransformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 os.environ["CEREBRIUMAI_API_KEY"] = "c_api_key-3f1bc409f7e9e6103cdd554e3737a870c445499f"
+
 
 class Item(BaseModel):
     url: str
     question: str
 
 def store_segments(segments):
-  texts = []
-  start_times = []
+    texts = []
+    start_times = []
 
-  for segment in segments:
-    text = segment['text']
-    start = segment['start']
+    for segment in segments:
+        text = segment['text']
+        start = segment['start']
 
-    # Convert the starting time to a datetime object
-    start_datetime = datetime.fromtimestamp(start)
+        # Convert the starting time to a datetime object
+        start_datetime = datetime.fromtimestamp(start)
 
-    # Format the starting time as a string in the format "00:00:00"
-    formatted_start_time = start_datetime.strftime('%H:%M:%S')
+        # Format the starting time as a string in the format "00:00:00"
+        formatted_start_time = start_datetime.strftime('%H:%M:%S')
 
-    texts.append("".join(text))
-    start_times.append(formatted_start_time)
+        texts.append("".join(text))
+        start_times.append(formatted_start_time)
 
-  return texts, start_times
+    return texts, start_times
+
 
 def create_embeddings(texts, start_times):
     text_splitter = CharacterTextSplitter(chunk_size=1500, separator="\n")
@@ -51,8 +51,8 @@ def create_embeddings(texts, start_times):
         metadatas.extend([{"source": start_times[i]}] * len(splits))
     return metadatas, docs
 
-def predict(item: Item, run_id, logger):
 
+def predict(item: Item, run_id, logger):
     video = pytube.YouTube(item.url)
     video.streams.get_highest_resolution().filesize
     audio = video.streams.get_audio_only()

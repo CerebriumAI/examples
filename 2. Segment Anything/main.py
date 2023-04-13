@@ -1,19 +1,21 @@
-from segment_anything import SamPredictor, sam_model_registry, SamAutomaticMaskGenerator
-from pydantic import BaseModel
-from typing import Optional
-import requests
-from PIL import Image
-from io import BytesIO
 import base64
-from models.common.decorators import worker
-from transformers import ViTImageProcessor, ViTForImageClassification
+from io import BytesIO
+from typing import Optional
+
 import cv2
 import numpy as np
+import requests
+from PIL import Image
+from pydantic import BaseModel
+from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+from transformers import ViTImageProcessor, ViTForImageClassification
+
 
 class Item(BaseModel):
     image: Optional[str]
     file_url: Optional[str]
     cursor: list
+
 
 sam = sam_model_registry["default"](checkpoint="./sam_vit_h_4b8939.pth")
 sam.to("cuda")
@@ -29,6 +31,7 @@ mask_generator = SamAutomaticMaskGenerator(
 processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
 model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
 
+
 def find_annotation_by_coordinates(annotations, x, y):
     for ann in annotations:
         bbox_x, bbox_y, bbox_w, bbox_h = ann['bbox']
@@ -36,15 +39,17 @@ def find_annotation_by_coordinates(annotations, x, y):
             return ann
     return None
 
-def create_image(image, ann):
-  m = ann['segmentation']
-  resized_original_image = cv2.resize(image, (m.shape[1], m.shape[0]))
-  mask = np.ones((m.shape[0], m.shape[1], 3), dtype=np.uint8) *255
-  mask[m] = resized_original_image[m]  # Set the segmented area to white
-  x, y, w, h = ann['bbox']
-  cropped_image = mask[y:y+h, x:x+w]
 
-  return cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
+def create_image(image, ann):
+    m = ann['segmentation']
+    resized_original_image = cv2.resize(image, (m.shape[1], m.shape[0]))
+    mask = np.ones((m.shape[0], m.shape[1], 3), dtype=np.uint8) * 255
+    mask[m] = resized_original_image[m]  # Set the segmented area to white
+    x, y, w, h = ann['bbox']
+    cropped_image = mask[y:y + h, x:x + w]
+
+    return cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
+
 
 def classify(image):
     inputs = processor(images=image, return_tensors="pt")
@@ -54,6 +59,7 @@ def classify(image):
     predicted_class_idx = logits.argmax(-1).item()
     return model.config.id2label[predicted_class_idx]
 
+
 def download_image(url):
     if url:
         r = requests.get(url)
@@ -62,10 +68,10 @@ def download_image(url):
 
     return Image.open(BytesIO(r.content))
 
-@worker
-def predict(item: Item):
 
-    if (not item.image and not item.file_url): return ""
+def predict(item: Item):
+    if not item.image and not item.file_url:
+        return "image or file_url field is required."
 
     if item.image:
         image = Image.open(BytesIO(base64.b64decode(item.image)))
@@ -82,5 +88,4 @@ def predict(item: Item):
 
     return {"result": result}
 
-
-##first about creating image from mask then downloading image then classifying it 
+# first about creating image from mask then downloading image then classifying it
