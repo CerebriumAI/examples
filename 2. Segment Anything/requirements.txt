@@ -1,3 +1,6 @@
 git+https://github.com/facebookresearch/segment-anything.git
 opencv-python
 pycocotools
+torch
+torchvision
+transformers

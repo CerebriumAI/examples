@@ -21,6 +21,7 @@ class Item(BaseModel):
     url: str
     question: str
 
+
 def store_segments(segments):
     texts = []
     start_times = []
