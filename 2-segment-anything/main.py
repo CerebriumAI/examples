@@ -10,26 +10,20 @@ from pydantic import BaseModel
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 from transformers import ViTImageProcessor, ViTForImageClassification
 
+processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
+model = ViTForImageClassification.from_pretrained("google/vit-base-patch16-224")
+
+print('Downloading file...')
+response = requests.get("https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth")
+with open("sam_vit_h_4b8939.pth", "wb") as f:
+    f.write(response.content)
+print('Download complete')
+
 
 class Item(BaseModel):
     image: Optional[str]
     file_url: Optional[str]
     cursor: list
-
-
-sam = sam_model_registry["default"](checkpoint="./sam_vit_h_4b8939.pth")
-sam.to("cuda")
-mask_generator = SamAutomaticMaskGenerator(
-    model=sam,
-    points_per_side=32,
-    pred_iou_thresh=0.96,
-    stability_score_thresh=0.92,
-    crop_n_layers=1,
-    crop_n_points_downscale_factor=2,
-    min_mask_region_area=100,  # Requires open-cv to run post-processing
-)
-processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
-model = ViTForImageClassification.from_pretrained("google/vit-base-patch16-224")
 
 
 def find_annotation_by_coordinates(annotations, x, y):
@@ -46,7 +40,7 @@ def create_image(image, ann):
     mask = np.ones((m.shape[0], m.shape[1], 3), dtype=np.uint8) * 255
     mask[m] = resized_original_image[m]  # Set the segmented area to white
     x, y, w, h = ann["bbox"]
-    cropped_image = mask[y : y + h, x : x + w]
+    cropped_image = mask[y: y + h, x: x + w]
 
     return cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
 
@@ -69,8 +63,21 @@ def download_image(url):
     return Image.open(BytesIO(r.content))
 
 
-def predict(item):
+def predict(item, run_id, logger):
     item = Item(**item)
+
+    sam = sam_model_registry["default"](checkpoint="./sam_vit_h_4b8939.pth")
+    sam.to("cuda")
+    mask_generator = SamAutomaticMaskGenerator(
+        model=sam,
+        points_per_side=32,
+        pred_iou_thresh=0.96,
+        stability_score_thresh=0.92,
+        crop_n_layers=1,
+        crop_n_points_downscale_factor=2,
+        min_mask_region_area=100,  # Requires open-cv to run post-processing
+    )
+
     if not item.image and not item.file_url:
         return "image or file_url field is required."
 
@@ -90,6 +97,5 @@ def predict(item):
     result = classify(segmented_image)
 
     return {"result": result}
-
 
 # first about creating image from mask then downloading image then classifying it
