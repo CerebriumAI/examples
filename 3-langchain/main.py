@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
 model = whisper.load_model("small")
-sentenceTransformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+sentenceTransformer = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 os.environ["CEREBRIUMAI_API_KEY"] = "c_api_key-3f1bc409f7e9e6103cdd554e3737a870c445499f"
 
 
@@ -27,14 +27,14 @@ def store_segments(segments):
     start_times = []
 
     for segment in segments:
-        text = segment['text']
-        start = segment['start']
+        text = segment["text"]
+        start = segment["start"]
 
         # Convert the starting time to a datetime object
         start_datetime = datetime.fromtimestamp(start)
 
         # Format the starting time as a string in the format "00:00:00"
-        formatted_start_time = start_datetime.strftime('%H:%M:%S')
+        formatted_start_time = start_datetime.strftime("%H:%M:%S")
 
         texts.append("".join(text))
         start_times.append(formatted_start_time)
@@ -53,14 +53,16 @@ def create_embeddings(texts, start_times):
     return metadatas, docs
 
 
-def predict(item: Item, run_id, logger):
+def predict(item, run_id, logger):
+    item = Item(**item)
+
     video = pytube.YouTube(item.url)
     video.streams.get_highest_resolution().filesize
     audio = video.streams.get_audio_only()
     fn = audio.download(output_path="/content/clips/")
 
-    transcription = model.transcribe('/content/tmp.mp3')
-    res = transcription['segments']
+    transcription = model.transcribe("/content/tmp.mp3")
+    res = transcription["segments"]
 
     texts, start_times = store_segments(res)
 
@@ -68,7 +70,9 @@ def predict(item: Item, run_id, logger):
     embeddings = HuggingFaceEmbeddings()
     store = FAISS.from_texts(docs, embeddings, metadatas=metadatas)
     faiss.write_index(store.index, "docs.index")
-    llm = CerebriumAI(endpoint_url="https://run.cerebrium.ai/flan-t5-xl-webhook/predict")
+    llm = CerebriumAI(
+        endpoint_url="https://run.cerebrium.ai/flan-t5-xl-webhook/predict"
+    )
     chain = VectorDBQAWithSourcesChain.from_llm(llm=llm, vectorstore=store)
 
     result = chain({"question": item.question})

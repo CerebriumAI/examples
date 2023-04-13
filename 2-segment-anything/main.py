@@ -28,25 +28,25 @@ mask_generator = SamAutomaticMaskGenerator(
     crop_n_points_downscale_factor=2,
     min_mask_region_area=100,  # Requires open-cv to run post-processing
 )
-processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
-model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
+processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
+model = ViTForImageClassification.from_pretrained("google/vit-base-patch16-224")
 
 
 def find_annotation_by_coordinates(annotations, x, y):
     for ann in annotations:
-        bbox_x, bbox_y, bbox_w, bbox_h = ann['bbox']
+        bbox_x, bbox_y, bbox_w, bbox_h = ann["bbox"]
         if bbox_x <= x <= bbox_x + bbox_w and bbox_y <= y <= bbox_y + bbox_h:
             return ann
     return None
 
 
 def create_image(image, ann):
-    m = ann['segmentation']
+    m = ann["segmentation"]
     resized_original_image = cv2.resize(image, (m.shape[1], m.shape[0]))
     mask = np.ones((m.shape[0], m.shape[1], 3), dtype=np.uint8) * 255
     mask[m] = resized_original_image[m]  # Set the segmented area to white
-    x, y, w, h = ann['bbox']
-    cropped_image = mask[y:y + h, x:x + w]
+    x, y, w, h = ann["bbox"]
+    cropped_image = mask[y : y + h, x : x + w]
 
     return cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
 
@@ -69,7 +69,8 @@ def download_image(url):
     return Image.open(BytesIO(r.content))
 
 
-def predict(item: Item):
+def predict(item):
+    item = Item(**item)
     if not item.image and not item.file_url:
         return "image or file_url field is required."
 
@@ -79,7 +80,9 @@ def predict(item: Item):
         image = download_image(item.file_url)
 
     masks = mask_generator.generate(image)
-    selected_annotation = find_annotation_by_coordinates(masks, item.cursor[0], item.cursor[1])
+    selected_annotation = find_annotation_by_coordinates(
+        masks, item.cursor[0], item.cursor[1]
+    )
 
     if not selected_annotation:
         return {"message": "No annotation found at the given coordinates."}
@@ -87,5 +90,6 @@ def predict(item: Item):
     result = classify(segmented_image)
 
     return {"result": result}
+
 
 # first about creating image from mask then downloading image then classifying it

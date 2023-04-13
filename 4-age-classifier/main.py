@@ -27,8 +27,9 @@ def download_image(image):
 
 
 def predict(item, run_id, logger):
+    item = Item(**item)
     # Get example image from official fairface repo + read it in as an image
-    image = download_image(item["image"])
+    image = download_image(item.image)
 
     # Transform our image and pass it through the model
     inputs = transforms(image, return_tensors="pt")

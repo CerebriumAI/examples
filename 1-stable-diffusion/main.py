@@ -25,12 +25,13 @@ pipe = pipe.to("cuda")
 
 
 def predict(item, run_id, logger):
+    item = Item(**item)
     images = pipe(
-        prompt=item["prompt"],
+        prompt=item.prompt,
         height=getattr(item, "height", 512),
         width=getattr(item, "width", 512),
         num_images_per_prompt=getattr(item, "num_images_per_prompt", 1),
-        num_inference_steps=getattr(item, "num_inference_steps", 25)
+        num_inference_steps=getattr(item, "num_inference_steps", 25),
     ).images
 
     finished_images = []

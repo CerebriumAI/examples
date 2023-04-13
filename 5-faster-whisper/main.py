@@ -41,7 +41,8 @@ def download_file_from_url(url: str, filename: str):
 
 
 def predict(item, run_id, logger):
-    file = download_file_from_url(item["file_url"], run_id)
+    item = Item(**item)
+    file = download_file_from_url(item.file_url, run_id)
 
     segments, info = model.transcribe(file, beam_size=5)
 
