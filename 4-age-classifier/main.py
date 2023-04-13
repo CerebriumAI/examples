@@ -11,8 +11,8 @@ class Item(BaseModel):
 
 
 # Init model, transforms
-model = ViTForImageClassification.from_pretrained("nateraw/vit-4-age-classifier")
-transforms = ViTFeatureExtractor.from_pretrained("nateraw/vit-4-age-classifier")
+model = ViTForImageClassification.from_pretrained("nateraw/vit-age-classifier")
+transforms = ViTFeatureExtractor.from_pretrained("nateraw/vit-age-classifier")
 
 
 def download_image(image):
