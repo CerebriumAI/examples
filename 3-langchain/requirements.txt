@@ -1,7 +1,8 @@
-cerebrium
-faiss-gpu==1.7.1
-ffmpeg
-langchain
-openai-whisper
 pytube # For audio downloading
-sentence-transformers
+langchain
+faiss-gpu
+ffmpeg
+openai-whisper
+transformers
+sentence_transformers
+cerebrium

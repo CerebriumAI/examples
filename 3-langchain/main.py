@@ -59,9 +59,9 @@ def predict(item, run_id, logger):
     video = pytube.YouTube(item.url)
     video.streams.get_highest_resolution().filesize
     audio = video.streams.get_audio_only()
-    fn = audio.download(output_path="/content/clips/")
+    fn = audio.download(output_path="./")
 
-    transcription = model.transcribe("/content/tmp.mp3")
+    transcription = model.transcribe(f"./{video.title}.mp3")
     res = transcription["segments"]
 
     texts, start_times = store_segments(res)
