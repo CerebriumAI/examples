@@ -9,10 +9,10 @@ from pydantic import BaseModel
 
 class Item(BaseModel):
     prompt: str
-    height: Optional[int]
-    width: Optional[int]
-    num_inference_steps: Optional[int]
-    num_images_per_prompt: Optional[int]
+    height: Optional[int] = 512
+    width: Optional[int] = 512
+    num_inference_steps: Optional[int] = 25
+    num_images_per_prompt: Optional[int] = 1
 
 
 model_id = "stabilityai/stable-diffusion-2-1"
@@ -28,12 +28,12 @@ def predict(item, run_id, logger):
     item = Item(**item)
     images = pipe(
         prompt=item.prompt,
-        height=getattr(item, "height", 512),
-        width=getattr(item, "width", 512),
-        num_images_per_prompt=getattr(item, "num_images_per_prompt", 1),
-        num_inference_steps=getattr(item, "num_inference_steps", 25),
+        height=item.height,
+        width=item.width,
+        num_images_per_prompt=item.num_images_per_prompt,
+        num_inference_steps=item.num_inference_steps
     ).images
-
+    logger.info('not here')
     finished_images = []
     for image in images:
         buffered = io.BytesIO()
