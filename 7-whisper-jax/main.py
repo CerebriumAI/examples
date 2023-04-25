@@ -2,11 +2,17 @@ import io
 from typing import Optional
 import base64
 
-import torch
 from pydantic import BaseModel
 
 from whisper_jax import FlaxWhisperPipline
 import jax.numpy as jnp
+
+import jax
+
+num_devices = jax.device_count()
+device_type = jax.devices()[0].device_kind
+
+print(f"Found {num_devices} JAX devices of type {device_type}.")
 
 pipeline = FlaxWhisperPipline("openai/whisper-large-v2", dtype=jnp.bfloat16, batch_size=16)
 
@@ -40,10 +46,11 @@ def download_file_from_url(logger, url: str, uuid: str):
     if response.status_code == 200:
         logger.info("Download was successful")
 
-        with open(f"./{uuid}", "wb") as f:
+        filename = f"/models/{uuid}.mp3"
+        with open(filename, "wb") as f:
             f.write(response.content)
 
-        return f"./{uuid}"
+        return filename
 
     else:
         logger.info(response)
@@ -61,7 +68,10 @@ def predict(item, run_id, logger):
     elif item.file_url:
         file = download_file_from_url(logger, item.file_url, run_id)
 
+    logger.info("We here")
+    logger.info(file)
     outputs = pipeline(file,  task="transcribe", return_timestamps=True)
+    logger.info('here?')
 
     return {"results": outputs}
 
