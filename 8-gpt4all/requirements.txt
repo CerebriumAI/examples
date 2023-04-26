@@ -1,0 +1,15 @@
+torch --extra-index-url https://download.pytorch.org/whl/cu119
+sentencepiece
+git+https://github.com/mbehm/transformers
+peft
+click
+jsonlines
+loguru
+rich
+requests
+numpy
+pydantic
+wonderwords
+tqdm
+cohere
+pyarrow

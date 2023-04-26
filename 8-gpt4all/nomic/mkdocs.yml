@@ -1,0 +1,94 @@
+site_name: Atlas Documentation
+repo_url: https://github.com/nomic-ai/nomic
+repo_name: nomic-ai/nomic
+site_url: https://docs.nomic.ai
+edit_uri: edit/main/docs/
+site_description: Interact with Massive Datasets and Embedding Spaces In Your Web Browser
+copyright: Copyright &copy; 2023 Nomic, Inc
+use_directory_urls: false
+
+nav:
+    - 'index.md'
+    - 'map_your_data.md'
+    - 'map_your_text.md'
+    - 'dynamic_maps.md'
+    - 'map_your_images.md'
+    - 'API Reference':
+      - 'atlas_api.md'
+      - Pytorch Lightning Callback: pytorch_embedding_explorer.ipynb
+    - 'Tutorials':
+#      - 'data_cleaning_in_atlas.md'
+      - Data Exploration, Labeling and Cleaning: data_exploration_cleaning_tagging_in_atlas.ipynb
+      - Monitoring Text Over Time: chatbot_observability.ipynb
+      - Pytorch Latent Space Debugging: pytorch_embedding_explorer.ipynb
+      - 'vector_search_in_atlas.md'
+      - Building a Semantic Search App: 'https://github.com/nomic-ai/semantic-search-app-template'
+    - 'FAQ and Releases':
+      - 'how_does_atlas_work.md'
+      - 'collection_of_maps.md'
+      - 'mapping_faq.md'
+      - 'release_notes.md'
+
+
+theme:
+  name: material
+  palette:
+    primary: white
+  logo: assets/nomic.png
+  favicon: assets/favicon.ico
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+#    - navigation.tabs
+#    - navigation.tabs.sticky
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+      options:
+        custom_icons:
+          - docs/overrides/.icons
+  - tables
+  - admonition
+  - codehilite:
+      css_class: highlight
+
+extra_css:
+    - css/custom.css
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: True
+            heading_level: 4
+            show_root_full_path: false
+            docstring_section_style: list
+  - material/social:
+      cards_font: Roboto
+
+  - mkdocs-jupyter:
+      ignore_h1_titles: True
+      show_input: True
+
+extra:
+  generator: false
+  analytics:
+    provider: google
+    property: G-NPXC8BYHJV
+  social:
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/nomic_ai
+    - icon: material/fruit-pineapple
+      link: https://www.youtube.com/watch?v=628eVJgHD6I
