@@ -11,9 +11,9 @@ class Item(BaseModel):
     temperature: Optional[float] = 0.7
     do_sample: Optional[bool] = True,
 
-tokenizer = AutoTokenizer.from_pretrained("StabilityAI/stablelm-tuned-alpha-7b")
-model = AutoModelForCausalLM.from_pretrained("StabilityAI/stablelm-tuned-alpha-7b")
-model.half().cuda()
+tokenizer = AutoTokenizer.from_pretrained("StabilityAI/stablelm-tuned-alpha-3b")
+model = AutoModelForCausalLM.from_pretrained("StabilityAI/stablelm-tuned-alpha-3b")
+model.half().to(torch.cuda.current_device())
 
 class StopOnTokens(StoppingCriteria):
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
@@ -37,10 +37,10 @@ def predict(item, run_id, logger):
 
     inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
     tokens = model.generate(
-    **inputs,
-    max_new_tokens=item.max_new_tokens,
-    temperature=item.temperature,
-    do_sample=item.do_sample,
-    stopping_criteria=StoppingCriteriaList([StopOnTokens()])
+        **inputs,
+        max_new_tokens=item.max_new_tokens,
+        temperature=item.temperature,
+        do_sample=item.do_sample,
+        stopping_criteria=StoppingCriteriaList([StopOnTokens()])
     )
     return {"result": tokenizer.decode(tokens[0], skip_special_tokens=True)}
