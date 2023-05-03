@@ -1,9 +1,8 @@
-deepfloyd-if==1.0.1
-xformers==0.0.16
 torch
 requests
-diffusers
-accelerate
-transformers
+git+https://github.com/huggingface/diffusers
+git+https://github.com/huggingface/transformers
 safetensors
 sentencepiece
+deepfloyd-if==1.0.1
+xformers
