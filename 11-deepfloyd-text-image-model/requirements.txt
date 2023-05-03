@@ -1,0 +1,8 @@
+deepfloyd-if==1.0.1
+xformers==0.0.16
+torch
+diffusers
+accelerate
+transformers
+safetensors
+sentencepiece
