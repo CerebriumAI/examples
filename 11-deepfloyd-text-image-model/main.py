@@ -55,26 +55,31 @@ def predict(item, run_id, logger):
     prompt_embeds, negative_embeds = stage_1.encode_prompt(Item.prompt)
 
     # stages = []
+    logger.info(f'Starting with prompt: {Item.prompt}')
 
     # Running stage 1
     generator = torch.manual_seed(0)
     image = stage_1(prompt_embeds=prompt_embeds, negative_prompt_embeds=negative_embeds,
                      generator=generator, output_type="pt").images
     # stages.append(pt_to_pil(image)[0])
+    logger.info('Run stage 1')
 
     # Running stage 2
     image = stage_2(image=image, prompt_embeds=prompt_embeds, negative_prompt_embeds=negative_embeds,
                     generator=generator, output_type="pt").images
     # stages.append(pt_to_pil(image)[0])
+    logger.info('Run stage 2')
 
     # Running stage 3
     image = stage_3(prompt=Item.prompt, image=image, generator=generator, noise_level=100).images
     # stages.append(image[0])
+    logger.info('Run stage 3')
 
     # Converting and returning the finished image.
-
+    logger.info('Converting')
     buffered = io.BytesIO()
     image[0].save(buffered, format="PNG")
     finished_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
+    logger.info('Returning image')
     return finished_image
