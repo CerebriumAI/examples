@@ -68,10 +68,7 @@ def predict(item, run_id, logger):
     elif item.file_url:
         file = download_file_from_url(logger, item.file_url, run_id)
 
-    logger.info("We here")
-    logger.info(file)
-    outputs = pipeline(file,  task="transcribe", return_timestamps=True)
-    logger.info('here?')
+    outputs = pipeline(file,  task=item.task, return_timestamps=True)
 
     return {"results": outputs}
 

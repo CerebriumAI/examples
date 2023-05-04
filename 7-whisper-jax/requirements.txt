@@ -1,2 +1,3 @@
 git+https://github.com/sanchit-gandhi/whisper-jax.git
-jax[cuda11_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.4.7+cuda11.cudnn86-cp310-cp310-manylinux2014_x86_64.whl
+jax[cuda11_pip]==0.4.7
