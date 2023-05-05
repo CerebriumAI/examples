@@ -19,8 +19,8 @@ class Item(BaseModel):
     max_length: Optional[int] = 100
     repetition_penalty: Optional[float] = 2.0
 
-tokenizer = AutoTokenizer.from_pretrained("databricks/dolly-v2-7b", padding_side="left")
-model = AutoModelForCausalLM.from_pretrained("databricks/dolly-v2-7b", device_map="auto", torch_dtype=torch.float16, load_in_8bit=True)
+tokenizer = AutoTokenizer.from_pretrained("databricks/dolly-v2-3b", padding_side="left")
+model = AutoModelForCausalLM.from_pretrained("databricks/dolly-v2-3b", device_map="auto", torch_dtype=torch.float16)
 generate_text = InstructionTextGenerationPipeline(model=model, tokenizer=tokenizer)
 
 def predict(item, run_id, logger):
