@@ -4,5 +4,3 @@ git+https://github.com/huggingface/diffusers
 git+https://github.com/huggingface/transformers
 safetensors
 sentencepiece
-deepfloyd-if==1.0.1
-xformers

@@ -3,7 +3,6 @@ from io import BytesIO
 from diffusers import DiffusionPipeline
 from diffusers.utils import pt_to_pil
 import torch
-import requests
 
 from pydantic import BaseModel
 
@@ -46,12 +45,6 @@ stage_3 = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-x4-ups
 # stage_3.enable_xformers_memory_efficient_attention()  # remove line if torch.__version__ >= 2.0.0
 # stage_3.enable_model_cpu_offload()
 stage3 = stage_3.to("cuda")
-
-
-
-# def download_image(image):
-#     r = requests.get(image)
-#     return Image.open(BytesIO(r.content))
 
 
 
