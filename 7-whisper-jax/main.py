@@ -14,7 +14,7 @@ device_type = jax.devices()[0].device_kind
 
 print(f"Found {num_devices} JAX devices of type {device_type}.")
 
-pipeline = FlaxWhisperPipline("openai/whisper-large-v2", dtype=jnp.bfloat16, batch_size=16)
+pipeline = FlaxWhisperPipline("openai/whisper-large-v2")
 
 
 class Item(BaseModel):
