@@ -14,7 +14,7 @@ from sentence_transformers import SentenceTransformer
 
 model = whisper.load_model("small")
 sentenceTransformer = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-os.environ["CEREBRIUMAI_API_KEY"] = "c_api_key-3f1bc409f7e9e6103cdd554e3737a870c445499f"
+os.environ["CEREBRIUMAI_API_KEY"] = "c_api_key-xxx"
 
 
 class Item(BaseModel):
