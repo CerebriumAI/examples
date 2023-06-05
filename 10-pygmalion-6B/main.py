@@ -7,8 +7,8 @@ class Item(BaseModel):
 
 model_id = "PygmalionAI/pygmalion-6b"
 
-tokenizer = AutoTokenizer.from_pretrained(model_id,cache_dir='weights')
-model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", cache_dir='weights', low_cpu_mem_usage=True, load_in_8bit=True, torch_dtype=torch.float16)        
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", low_cpu_mem_usage=True, load_in_8bit=True, torch_dtype=torch.float16)        
 
 def predict(item, run_id, logger):
     item = Item(**item)
