@@ -1,0 +1,4 @@
+torch --extra-index-url https://download.pytorch.org/whl/cu119
+transformers
+accelerate
+xformers
