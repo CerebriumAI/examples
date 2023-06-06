@@ -16,10 +16,6 @@ sys.path.remove(str(models_path.resolve()))
 
 class Item(BaseModel):
     prompt: str
-    num_beams: Optional[int] = 2
-    min_new_tokens: Optional[int] = 10
-    max_length: Optional[int] = 100
-    repetition_penalty: Optional[float] = 2.0
 
 tokenizer = AutoTokenizer.from_pretrained("databricks/dolly-v2-12b",
                                           padding_side="left")
