@@ -1,0 +1,6 @@
+torch
+requests
+git+https://github.com/huggingface/diffusers
+git+https://github.com/huggingface/transformers
+safetensors
+sentencepiece

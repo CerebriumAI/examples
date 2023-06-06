@@ -10,6 +10,7 @@ class Item(BaseModel):
 model_id = "PygmalionAI/pygmalion-6b"
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
+
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
     device_map="auto",
