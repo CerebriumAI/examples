@@ -1,13 +1,9 @@
-import io
-from typing import Optional
 import base64
-
-from pydantic import BaseModel
-
-from whisper_jax import FlaxWhisperPipline
-import jax.numpy as jnp
+from typing import Optional
 
 import jax
+from pydantic import BaseModel
+from whisper_jax import FlaxWhisperPipline
 
 num_devices = jax.device_count()
 device_type = jax.devices()[0].device_kind
@@ -36,6 +32,7 @@ def save_base64_string_to_file(logger, audio: str, uuid: str):
     logger.info("Decoding base64 to file was successful")
     return filename
 
+
 # Downloads a file from a given URL and saves it to a given filename
 def download_file_from_url(logger, url: str, uuid: str):
     logger.info("Downloading file...")
@@ -62,13 +59,12 @@ def predict(item, run_id, logger):
 
     if not item.audio and not item.file_url:
         return "audio or file_url field is required."
-    
+
     if item.audio:
         file = save_base64_string_to_file(logger, item.audio, run_id)
     elif item.file_url:
         file = download_file_from_url(logger, item.file_url, run_id)
 
-    outputs = pipeline(file,  task=item.task, return_timestamps=True)
+    outputs = pipeline(file, task=item.task, return_timestamps=True)
 
     return {"results": outputs}
-

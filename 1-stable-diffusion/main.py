@@ -31,9 +31,9 @@ def predict(item, run_id, logger):
         height=item.height,
         width=item.width,
         num_images_per_prompt=item.num_images_per_prompt,
-        num_inference_steps=item.num_inference_steps
+        num_inference_steps=item.num_inference_steps,
     ).images
-    logger.info('not here')
+    logger.info("not here")
     finished_images = []
     for image in images:
         buffered = io.BytesIO()

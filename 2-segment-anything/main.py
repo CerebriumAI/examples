@@ -85,7 +85,7 @@ def predict(item, run_id, logger):
         image = cv2.cvtColor(np.array(Image.open(BytesIO(base64.b64decode(item.image)))), cv2.COLOR_BGR2RGB)
     elif item.file_url:
         image = download_image(item.file_url)
-        image = cv2.cvtColor(np.array(image),cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
 
     masks = mask_generator.generate(image)
     selected_annotation = find_annotation_by_coordinates(

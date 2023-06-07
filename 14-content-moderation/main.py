@@ -1,9 +1,9 @@
-from typing import Optional
-from pydantic import BaseModel
+import base64
 from io import BytesIO
-from PIL import Image
-import base64 
+from typing import Optional
 
+from PIL import Image
+from pydantic import BaseModel
 from transformers import CLIPProcessor, CLIPModel
 
 
@@ -16,13 +16,14 @@ model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
 classes = [
-    "drugs", 
-    "nudity", 
-    "women naked", 
+    "drugs",
+    "nudity",
+    "women naked",
     "guns",
     "violence",
     "killing"
 ]
+
 
 def download_file_from_url(logger, url: str, filename: str):
     logger.info("Downloading file...")
@@ -41,6 +42,7 @@ def download_file_from_url(logger, url: str, filename: str):
     else:
         logger.info(response)
         raise Exception("Download failed")
+
 
 def predict(item, run_id, logger):
     item = Item(**item)

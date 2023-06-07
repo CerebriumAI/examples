@@ -1,13 +1,9 @@
-import pandas as pd
 from pydantic import BaseModel
-import sys
-import os.path as osp
-import os
-from typing import TypedDict, Optional
-from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig
-from pathlib import Path
+from typing import Optional
 
 import torch
+from pydantic import BaseModel
+from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig
 
 # Loading in base model and tokenizer
 base_model_name = "decapoda-research/llama-7b-hf"  # Hugging Face Model Id
@@ -33,7 +29,6 @@ class Item(BaseModel):
     max_new_tokens: Optional[int] = 256
 
 
-
 def tokenize(prompt, cutoff_len, add_eos_token=True):
     print("tokenizing: ", prompt)
     return tokenizer(
@@ -43,6 +38,7 @@ def tokenize(prompt, cutoff_len, add_eos_token=True):
         padding=False,
         return_tensors="pt",
     )
+
 
 def generate(params: Item):
     print("Placing prompt in template")

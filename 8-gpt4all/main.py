@@ -1,14 +1,15 @@
-import textwrap
-from typing import Optional
-from pydantic import BaseModel
 import sys
 from pathlib import Path
+from typing import Optional
+
+from pydantic import BaseModel
 
 models_path = Path("..") / "models"
 sys.path.append(str(models_path.resolve()))
 from nomic.gpt4all.gpt4all import GPT4AllGPU
 
 sys.path.remove(str(models_path.resolve()))
+
 
 class Item(BaseModel):
     prompt: str
@@ -17,7 +18,9 @@ class Item(BaseModel):
     max_length: Optional[int] = 100
     repetition_penalty: Optional[float] = 2.0
 
+
 model = GPT4AllGPU("decapoda-research/llama-7b-hf")
+
 
 def predict(item, run_id, logger):
     item = Item(**item)

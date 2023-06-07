@@ -6,5 +6,5 @@ evaluate
 numpy
 sentencepiece
 datasets
-torch 
+torch
 scipy
