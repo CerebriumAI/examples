@@ -1,3 +1,12 @@
+"""
+This file serves as an example to using a finetuned adapter for inference with Llama.
+
+In this example, the adapter is obtained through finetunining on Cerebrium using the`cerebrium train` command
+Adapter files that have been obtained from the AdapterHub can be used in the same way.
+
+Note: the cerebrium finetuning is still in alpha testing. If you would like access to this, please contact the team.
+"""
+
 from pydantic import BaseModel
 from typing import Optional
 import torch
@@ -9,6 +18,7 @@ import transformers
 import peft
 
 
+transformers.logging.set_verbosity_info()
 
 print("need transformers>=4.29.0,  got :", transformers.__version__)
 print("Peft version is :", peft.__version__)
@@ -24,9 +34,9 @@ tokenizer = LlamaTokenizer.from_pretrained(base_model_name)
 tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 tokenizer.padding_side = "left"  # Allow batched inference
 
-results_path = "results/"
+adapter_path = "training-output/"
 print("Loading in PEFT model")
-peft_model = PeftModel.from_pretrained(base_model, results_path)
+peft_model = PeftModel.from_pretrained(base_model, adapter_path)
 
 # Get input params
 class Item(BaseModel):
