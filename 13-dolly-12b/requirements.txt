@@ -1,0 +1,5 @@
+transformers
+accelerate
+xformers
+bitsandbytes[gpu]
+torch --extra-index-url https://download.pytorch.org/whl/cu119
