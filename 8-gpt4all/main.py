@@ -26,10 +26,10 @@ def predict(item, run_id, logger):
     item = Item(**item)
 
     config = {
-        'num_beams': item.num_beams,
-        'min_new_tokens': item.min_new_tokens,
-        'max_length': item.max_length,
-        'repetition_penalty': item.repetition_penalty
+        "num_beams": item.num_beams,
+        "min_new_tokens": item.min_new_tokens,
+        "max_length": item.max_length,
+        "repetition_penalty": item.repetition_penalty,
     }
     out = model.generate(item.prompt, config)
 

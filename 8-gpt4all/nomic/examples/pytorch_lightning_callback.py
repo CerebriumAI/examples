@@ -13,8 +13,7 @@ PATH_DATASETS = os.environ.get("PATH_DATASETS", ".")
 BATCH_SIZE = 256 if torch.cuda.is_available() else 64
 torch.manual_seed(0)
 # #api key to a limited demo account. Make your own account at atlas.nomic.ai
-nomic.login('7xDPkYXSYDc1_ErdTPIcoAR9RNd8YDlkS3nVNXcVoIMZ6')
-
+nomic.login("7xDPkYXSYDc1_ErdTPIcoAR9RNd8YDlkS3nVNXcVoIMZ6")
 
 
 class MNISTModel(LightningModule):
@@ -37,10 +36,12 @@ class MNISTModel(LightningModule):
         logits = self(x)
         prediction = torch.argmax(logits, dim=1)
 
-        #an image for each embedding
-        image_links = [f'https://s3.amazonaws.com/static.nomic.ai/mnist/eval/{label}/{batch_idx*BATCH_SIZE+idx}.jpg'
-                       for idx, label in enumerate(y)]
-        metadata = {'label': y, 'prediction': prediction, 'url': image_links}
+        # an image for each embedding
+        image_links = [
+            f"https://s3.amazonaws.com/static.nomic.ai/mnist/eval/{label}/{batch_idx*BATCH_SIZE+idx}.jpg"
+            for idx, label in enumerate(y)
+        ]
+        metadata = {"label": y, "prediction": prediction, "url": image_links}
         self.atlas.log(embeddings=logits, metadata=metadata)
 
     def configure_optimizers(self):
@@ -50,8 +51,12 @@ class MNISTModel(LightningModule):
 mnist_model = MNISTModel()
 
 # Init DataLoader from MNIST Dataset
-train_ds = MNIST(PATH_DATASETS, train=True, download=True, transform=transforms.ToTensor())
-test_ds = MNIST(PATH_DATASETS, train=False, download=True, transform=transforms.ToTensor())
+train_ds = MNIST(
+    PATH_DATASETS, train=True, download=True, transform=transforms.ToTensor()
+)
+test_ds = MNIST(
+    PATH_DATASETS, train=False, download=True, transform=transforms.ToTensor()
+)
 train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE)
 test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE)
 
@@ -59,17 +64,18 @@ test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE)
 max_epochs = 20
 
 # Initialize the Embedding Explorer 🗺️ hook
-embedding_explorer = AtlasEmbeddingExplorer(max_points=10_000,
-                                            name="MNIST Validation Latent Space",
-                                            description="MNIST Validation Latent Space",
-                                            overwrite_on_validation=True)
+embedding_explorer = AtlasEmbeddingExplorer(
+    max_points=10_000,
+    name="MNIST Validation Latent Space",
+    description="MNIST Validation Latent Space",
+    overwrite_on_validation=True,
+)
 trainer = Trainer(
     accelerator="auto",
     devices=1 if torch.cuda.is_available() else None,
     max_epochs=max_epochs,
     check_val_every_n_epoch=10,
-    callbacks=[TQDMProgressBar(refresh_rate=20),
-               embedding_explorer],
+    callbacks=[TQDMProgressBar(refresh_rate=20), embedding_explorer],
 )
 
 # Train the model ⚡

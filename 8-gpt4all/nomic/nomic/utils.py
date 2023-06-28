@@ -31,7 +31,11 @@ def get_object_size_in_bytes(obj):
 
         # Filter object that are already marked.
         # Using dict notation will prevent repeated objects.
-        new_refr = {o_id: o for o_id, o in all_refr if o_id not in marked and not isinstance(o, type)}
+        new_refr = {
+            o_id: o
+            for o_id, o in all_refr
+            if o_id not in marked and not isinstance(o, type)
+        }
 
         # The new obj_q will be the ones that were not marked,
         # and we will update marked with their ids so we will

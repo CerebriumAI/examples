@@ -6,18 +6,20 @@ from tqdm import tqdm
 
 
 class CohereEmbedder:
-    '''Embeds text with the Cohere embedding API'''
+    """Embeds text with the Cohere embedding API"""
 
     def __init__(self, cohere_api_key: str):
-        '''
+        """
         Args:
             cohere_api_key: Your Cohere API key
-        '''
+        """
 
         self.client = cohere.Client(cohere_api_key)
 
-    def embed(self, texts: List[str], model: str = 'small', shard_size=-1, num_workers=1):
-        '''
+    def embed(
+        self, texts: List[str], model: str = "small", shard_size=-1, num_workers=1
+    ):
+        """
         Embeds text with the Cohere API.
 
         **Parameters:**
@@ -28,7 +30,7 @@ class CohereEmbedder:
         * **num_workers** - The numbers of parallel embedding jobs to send to the Cohere embedding API
 
         **Returns:** A list containing an embedding vector for each given text string.
-        '''
+        """
         if shard_size == -1:
             shard_size == len(texts)
             num_workers = 1
@@ -42,8 +44,13 @@ class CohereEmbedder:
 
         responses = {}
         with tqdm(total=len(texts) // shard_size) as pbar:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-                futures = {executor.submit(send_request, i): i for i in range(0, len(texts), shard_size)}
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=num_workers
+            ) as executor:
+                futures = {
+                    executor.submit(send_request, i): i
+                    for i in range(0, len(texts), shard_size)
+                }
                 for future in concurrent.futures.as_completed(futures):
                     response = future.result()
                     responses[int(futures[future])] = response.embeddings

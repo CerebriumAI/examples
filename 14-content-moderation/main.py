@@ -15,14 +15,7 @@ class Item(BaseModel):
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
-classes = [
-    "drugs",
-    "nudity",
-    "women naked",
-    "guns",
-    "violence",
-    "killing"
-]
+classes = ["drugs", "nudity", "women naked", "guns", "violence", "killing"]
 
 
 def download_file_from_url(logger, url: str, filename: str):
@@ -58,12 +51,14 @@ def predict(item, run_id, logger):
     inputs = processor(text=classes, images=image, return_tensors="pt", padding=True)
 
     outputs = model(**inputs)
-    logits_per_image = outputs.logits_per_image  # this is the image-text similarity score
+    logits_per_image = (
+        outputs.logits_per_image
+    )  # this is the image-text similarity score
     probs = logits_per_image.softmax(dim=1).tolist()
     max_value = max(probs)
     index_of_max = probs.index(max_value)
 
-    if (index_of_max < 6 and max_value[0] > 0.5):
+    if index_of_max < 6 and max_value[0] > 0.5:
         return {"safe": False, "probability": max_value[0]}
     else:
         return {"safe": True}

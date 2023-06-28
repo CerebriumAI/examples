@@ -14,6 +14,7 @@ from .project import AtlasProject
 from .settings import *
 from .utils import get_random_name
 
+
 def map_embeddings(
     embeddings: np.array,
     data: List[Dict] = None,
@@ -33,7 +34,7 @@ def map_embeddings(
     projection_epochs: int = DEFAULT_PROJECTION_EPOCHS,
     projection_spread: float = DEFAULT_PROJECTION_SPREAD,
 ) -> AtlasProject:
-    '''
+    """
 
     Args:
         embeddings: An [N,d] numpy array containing the batch of N embeddings to add.
@@ -55,9 +56,9 @@ def map_embeddings(
     Returns:
         An AtlasProject that now contains your map.
 
-    '''
+    """
 
-    assert isinstance(embeddings, np.ndarray), 'You must pass in a numpy array'
+    assert isinstance(embeddings, np.ndarray), "You must pass in a numpy array"
 
     if embeddings.size == 0:
         raise Exception("Your embeddings cannot be empty")
@@ -67,7 +68,7 @@ def map_embeddings(
 
     project_name = get_random_name()
     if description is None:
-        description = 'A description for your map.'
+        description = "A description for your map."
     index_name = project_name
 
     if name:
@@ -77,15 +78,15 @@ def map_embeddings(
         description = description
 
     if data is None:
-        data = [{
-            ATLAS_DEFAULT_ID_FIELD: str(uuid.uuid4())
-        } for _ in range(len(embeddings))]
+        data = [
+            {ATLAS_DEFAULT_ID_FIELD: str(uuid.uuid4())} for _ in range(len(embeddings))
+        ]
 
     project = AtlasProject(
         name=project_name,
         description=description,
         unique_id_field=id_field,
-        modality='embedding',
+        modality="embedding",
         is_public=is_public,
         organization_name=organization_name,
         reset_project_if_exists=reset_project_if_exists,
@@ -101,9 +102,13 @@ def map_embeddings(
 
     embeddings = embeddings.astype(np.float16)
     if shard_size is not None:
-        logger.warning("Passing `shard_size` is deprecated and will raise an error in a future release")
+        logger.warning(
+            "Passing `shard_size` is deprecated and will raise an error in a future release"
+        )
     if num_workers is not None:
-        logger.warning("Passing `num_workers` is deprecated and will raise an error in a future release")
+        logger.warning(
+            "Passing `num_workers` is deprecated and will raise an error in a future release"
+        )
 
     try:
         project.add_embeddings(
@@ -112,7 +117,9 @@ def map_embeddings(
         )
     except BaseException as e:
         if number_of_datums_before_upload == 0:
-            logger.info(f"{project.name}: Deleting project due to failure in initial upload.")
+            logger.info(
+                f"{project.name}: Deleting project due to failure in initial upload."
+            )
             project.delete()
         raise e
 
@@ -157,7 +164,7 @@ def map_text(
     projection_epochs: int = DEFAULT_PROJECTION_EPOCHS,
     projection_spread: float = DEFAULT_PROJECTION_SPREAD,
 ) -> AtlasProject:
-    '''
+    """
     Generates or updates a map of the given text.
 
     Args:
@@ -180,14 +187,14 @@ def map_text(
     Returns:
         The AtlasProject containing your map.
 
-    '''
+    """
     if id_field is None:
         id_field = ATLAS_DEFAULT_ID_FIELD
 
     project_name = get_random_name()
 
     if description is None:
-        description = 'A description for your map.'
+        description = "A description for your map."
     index_name = project_name
 
     if name:
@@ -198,22 +205,28 @@ def map_text(
         name=project_name,
         description=description,
         unique_id_field=id_field,
-        modality='text',
+        modality="text",
         is_public=is_public,
         organization_name=organization_name,
         reset_project_if_exists=reset_project_if_exists,
         add_datums_if_exists=add_datums_if_exists,
     )
 
-    project._validate_map_data_inputs(colorable_fields=colorable_fields, id_field=id_field, data=data)
+    project._validate_map_data_inputs(
+        colorable_fields=colorable_fields, id_field=id_field, data=data
+    )
 
     number_of_datums_before_upload = project.total_datums
 
     logger.info("Uploading text to Atlas.")
     if shard_size is not None:
-        logger.warning("Passing 'shard_size' is deprecated and will be removed in a future release.")
+        logger.warning(
+            "Passing 'shard_size' is deprecated and will be removed in a future release."
+        )
     if num_workers is not None:
-        logger.warning("Passing 'num_workers' is deprecated and will be removed in a future release.")
+        logger.warning(
+            "Passing 'num_workers' is deprecated and will be removed in a future release."
+        )
     try:
         project.add_text(
             data,
@@ -221,7 +234,9 @@ def map_text(
         )
     except BaseException as e:
         if number_of_datums_before_upload == 0:
-            logger.info(f"{project.name}: Deleting project due to failure in initial upload.")
+            logger.info(
+                f"{project.name}: Deleting project due to failure in initial upload."
+            )
             project.delete()
         raise e
 

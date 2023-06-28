@@ -13,11 +13,13 @@ from transformers import ViTImageProcessor, ViTForImageClassification
 processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
 model = ViTForImageClassification.from_pretrained("google/vit-base-patch16-224")
 
-print('Downloading file...')
-response = requests.get("https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth")
+print("Downloading file...")
+response = requests.get(
+    "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth"
+)
 with open("sam_vit_h_4b8939.pth", "wb") as f:
     f.write(response.content)
-print('Download complete')
+print("Download complete")
 
 
 class Item(BaseModel):
@@ -40,7 +42,7 @@ def create_image(image, ann):
     mask = np.ones((m.shape[0], m.shape[1], 3), dtype=np.uint8) * 255
     mask[m] = resized_original_image[m]  # Set the segmented area to white
     x, y, w, h = ann["bbox"]
-    cropped_image = mask[y: y + h, x: x + w]
+    cropped_image = mask[y : y + h, x : x + w]
 
     return cv2.cvtColor(cropped_image, cv2.COLOR_RGB2BGR)
 
@@ -82,7 +84,10 @@ def predict(item, run_id, logger):
         return "image or file_url field is required."
 
     if item.image:
-        image = cv2.cvtColor(np.array(Image.open(BytesIO(base64.b64decode(item.image)))), cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(
+            np.array(Image.open(BytesIO(base64.b64decode(item.image)))),
+            cv2.COLOR_BGR2RGB,
+        )
     elif item.file_url:
         image = download_image(item.file_url)
         image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
@@ -98,5 +103,6 @@ def predict(item, run_id, logger):
     result = classify(segmented_image)
 
     return {"result": result}
+
 
 # first about creating image from mask then downloading image then classifying it

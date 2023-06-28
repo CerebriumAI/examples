@@ -38,6 +38,7 @@ adapter_path = "training-output/"
 print("Loading in PEFT model")
 peft_model = PeftModel.from_pretrained(base_model, adapter_path)
 
+
 # Get input params
 class Item(BaseModel):
     prompt: str
@@ -77,14 +78,13 @@ def generate(params: Item):
     )
     with torch.no_grad():
         outputs = peft_model.generate(
-        # outputs = base_model.generate(
+            # outputs = base_model.generate(
             input_ids=input_ids,
             generation_config=generation_config,
             return_dict_in_generate=True,
             output_scores=True,
         )
     return tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
-
 
 
 def predict(item, run_id, logger):
@@ -94,5 +94,5 @@ def predict(item, run_id, logger):
 
     print("Generating")
     result = generate(params=item)
-    
+
     return {"Prediction": result}
