@@ -1,0 +1,10 @@
+git+https://github.com/huggingface/peft@86290e9660d24ef0d0cedcf57710da249dd1f2f4
+git+https://github.com/huggingface/transformers@e84bf1f734f87aa2bedc41b9b9933d00fc6add98
+accelerate==0.20.3
+bitsandbytes
+evaluate
+numpy
+sentencepiece
+datasets
+torch 
+scipy
