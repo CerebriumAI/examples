@@ -4,7 +4,7 @@ This file serves as an example to using a finetuned adapter for inference with L
 In this example, the adapter is obtained through finetunining on Cerebrium using the`cerebrium train` command
 Adapter files that have been obtained from the AdapterHub can be used in the same way.
 
-Note: the cerebrium finetuning is still in alpha testing. If you would like access to this, please contact the team.
+Note: the cerebrium finetuning is still in beta testing. If you have any issues, please don't hesitate to contact the team.
 """
 import json
 from pydantic import BaseModel
