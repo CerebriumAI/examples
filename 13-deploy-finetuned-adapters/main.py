@@ -6,7 +6,7 @@ Adapter files that have been obtained from the AdapterHub can be used in the sam
 
 Note: the cerebrium finetuning is still in alpha testing. If you would like access to this, please contact the team.
 """
-
+import json
 from pydantic import BaseModel
 from typing import Optional
 import torch
@@ -62,7 +62,14 @@ def tokenize(prompt, cutoff_len, add_eos_token=True):
 
 def generate(params: Item):
     print("Placing prompt in template")
-    prompt_input = tokenize(prompt=params.prompt, cutoff_len=params.cutoff_len)
+    template =  "### Instruction:\n{instruction}\n\n### Response:\n"
+    
+    # read in contents of template.json
+    with open("template.json", "r") as f:
+        template = json.load(f)
+    instruction = template["prompt_no_input"].format(instruction=params.prompt)
+
+    prompt_input = tokenize(prompt=instruction, cutoff_len=params.cutoff_len)
     input_ids = prompt_input["input_ids"]
     input_ids = input_ids.to(peft_model.device)
     # input_ids = input_ids.to(base_model.device)
