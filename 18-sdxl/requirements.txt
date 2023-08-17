@@ -1,0 +1,8 @@
+torch
+numpy
+pydantic
+invisible_watermark
+transformers
+accelerate
+safetensors
+diffusers
