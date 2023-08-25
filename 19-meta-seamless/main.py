@@ -65,11 +65,10 @@ def convert_chunks_to_file(task, target_lang, src_lang, output_directory):
 
         translated_text, wav, sr = translator.predict(
             input=segment_path,
-            task_str=task,#'s2st',
-            tgt_lang=target_lang,#'eng',
-            src_lang=src_lang,#'spa',
+            task_str=task,
+            tgt_lang=target_lang,
+            src_lang=src_lang,
         )
-        print(translated_text)
 
         if task == 's2st':
             torchaudio.save(
@@ -85,11 +84,9 @@ def convert_chunks_to_file(task, target_lang, src_lang, output_directory):
             
             
     if task == 's2st':
-        print('here')
         combined_audio = sum(segments)
         return combined_audio.export(f'{output_directory}audio.wav', format="wav")
     else:
-        print(type(segments[0]))
         return ''.join(segments)
         
 
@@ -130,16 +127,12 @@ def save_to_s3(file_url, run_id):
 def predict(item, run_id, logger):
     item = Item(**item)
     
-    ##1. Is this a STT or a TTS
-    ##Task has to be s2st,t2st, s2t
-    print(item.task)
     if item.task == 's2st' or item.task == 's2tt':
         filename = download_file_from_url(logger, item.url, run_id)
         split_audio_with_max_duration(filename, f"/persistent-storage/split_segments/{run_id}")
         result = convert_chunks_to_file(item.task, item.target_lang, item.src_lang, f"/persistent-storage/{run_id}/")
 
         if item.task == 's2tt':
-            print('here')
             return {"translation": result}
             
     elif item.task == "t2st" or item.task == "t2tt":
