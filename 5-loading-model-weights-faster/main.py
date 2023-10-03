@@ -46,7 +46,7 @@ def setup_model():
 start = time.time()
 # What the user would call.
 model = fast_load(
-    model_id=model_path, load_weights_func=setup_model, ludicriousness=True
+    model_id=model_path, load_weights_func=setup_model,faster=True
 )
 # print out the timing
 print((f"Tensoriser loaded model in: {time.time() - start} seconds"),  file=sys. stderr)
