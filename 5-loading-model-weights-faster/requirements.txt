@@ -1,0 +1,10 @@
+torch
+numpy
+accelerate
+diffusers
+ftfy
+scipy
+bitsandbytes[gpu]
+transformers
+tensorizer
+huggingface_hub
