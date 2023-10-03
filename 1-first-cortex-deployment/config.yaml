@@ -1,0 +1,11 @@
+%YAML 1.2
+---
+# A config file containing all the information to deploy your model
+# You can initialise one with the `cerebrium init-cortex` command.
+cpu: 2
+disable_animation: false
+exclude: '[./.*, ./__*]'
+hardware: AMPERE_A5000
+include: '[./*, main.py, requirements.txt, pkglist.txt, conda_pkglist.txt]'
+log_level: INFO
+memory: 14.5

@@ -1,0 +1,14 @@
+ray
+transformers
+bitsandbytes
+peft
+torch
+numpy
+pydantic
+huggingface_hub
+safetensors
+accelerate
+scipy
+sentencepiece
+hf_transfer
+optimum

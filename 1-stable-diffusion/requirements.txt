@@ -1,6 +1,0 @@
-diffusers
-transformers
-accelerate
-scipy
-safetensors
-xformers
