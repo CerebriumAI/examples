@@ -1,8 +1,0 @@
-
-torch
-numpy
-pydantic
-git+https://github.com/facebookresearch/seamless_communication.git
-cerebrium
-boto3
-pydub
