@@ -14,13 +14,13 @@ Load your model, setup datasets, pull in secrets, etc. here
 """
 
 
-def predict(params, run_id, logger):
-    params = Item(**params)
+def predict(item, run_id, logger):
+    params = Item(**item)
     # This code is run on every inference inference request.
 
     # Access the parameters from your inference request
     prompt = params.prompt
-    logger.info(f"Recieved a prompt of: `{prompt}`")
+    logger.info(f"Received a prompt of: `{prompt}`")
     
     if params.your_optional_param is not None:
         logger.info(f"You sent an optional param of: {params.your_optional_param}")
