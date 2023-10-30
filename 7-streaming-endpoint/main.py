@@ -19,7 +19,6 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=True,
     device_map="auto",
 )
-model.to("cuda")
 
 class Item(BaseModel):
     prompt: str
