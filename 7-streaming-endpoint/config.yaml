@@ -1,0 +1,12 @@
+%YAML 1.2
+---
+hardware: AMPERE_A5000
+cpu: 2
+memory: 14.5
+gpu_count: 1
+min_replicas: 0
+cooldown: 60
+log_level: INFO
+include: '[./*, main.py, requirements.txt, pkglist.txt, conda_pkglist.txt]'
+exclude: '[./.*, ./__*]'
+disable_animation: false
