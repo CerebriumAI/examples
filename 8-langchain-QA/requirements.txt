@@ -1,0 +1,8 @@
+pytube # For audio downloading
+langchain
+faiss-gpu
+ffmpeg
+openai-whisper
+transformers
+sentence_transformers
+cerebrium

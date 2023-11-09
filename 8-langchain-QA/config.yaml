@@ -1,0 +1,10 @@
+%YAML 1.2
+---
+hardware: TURING_4000
+cpu: 2
+min_replicas: 0
+log_level: INFO
+include: '[./*, main.py, requirements.txt, pkglist.txt, conda_pkglist.txt]'
+exclude: '[./.*, ./__*]'
+cooldown: 60
+disable_animation: false
