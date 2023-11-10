@@ -2,9 +2,10 @@
 A little utility to view or clear files from your persistent storage.
 Use it to view or clear out folders
 """
-from typing import Optional
-from pydantic import BaseModel
 import os
+from typing import Optional
+
+from pydantic import BaseModel
 
 
 class Item(BaseModel):

@@ -1,7 +1,5 @@
-from pydantic import BaseModel
 from typing import Optional
 
-import torch
 from pydantic import BaseModel
 
 # From vLLM, you need to import the following
@@ -17,7 +15,6 @@ llm = LLM(model="mistralai/Mistral-7B-Instruct-v0.1", dtype="bfloat16")
 """
 
 
-
 class Item(BaseModel):
     prompt: str
     temperature: Optional[float] = 0.8
@@ -31,9 +28,15 @@ def predict(item, run_id, logger):
     item = Item(**item)
 
     # Now jusst setup your sampling parameters for inference:
-    sampling_params = SamplingParams(temperature=item.temperature, top_p=item.top_p, top_k=item.top_k, max_tokens=item.max_token, frequency_penalty=item.frequency_penalty)
-    
-    # And feed your prompt and sampling params into your LLM pipeline as follows. 
+    sampling_params = SamplingParams(
+        temperature=item.temperature,
+        top_p=item.top_p,
+        top_k=item.top_k,
+        max_tokens=item.max_tokens,
+        frequency_penalty=item.frequency_penalty,
+    )
+
+    # And feed your prompt and sampling params into your LLM pipeline as follows.
     outputs = llm.generate([item.prompt], sampling_params)
 
     # Extract your text outputs:
