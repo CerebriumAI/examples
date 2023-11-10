@@ -22,6 +22,9 @@ def predict(item, run_id, logger):
         file = save_base64_string_to_file(logger, item.audio)
     elif item.file_url is not None:
         file = download_file_from_url(logger, item.file_url, input_filename)
+    else:
+        return {"statusCode": 500, "message": "Either audio or file_url must be provided"}
+    
     logger.info("Transcribing file...")
 
     result = transcribe(model, audio=file)
