@@ -1,26 +1,26 @@
-from typing import Optional
-from pydantic import BaseModel
-import whisper
-import pytube
 from datetime import datetime
 
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores.faiss import FAISS
+import faiss
+import pytube
+import whisper
 from langchain.chains import VectorDBQAWithSourcesChain
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.llms import CerebriumAI
-import openai
-import faiss
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores.faiss import FAISS
+from pydantic import BaseModel
 
 sentenceTransformer = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 os.environ["CEREBRIUMAI_API_KEY"] = "private-XXXXXXXXXXXX"
+
 
 class Item(BaseModel):
     url: str
     question: str
 
+
 model = whisper.load_model("small")
+
 
 def store_segments(segments):
     texts = []
@@ -41,6 +41,7 @@ def store_segments(segments):
 
     return texts, start_times
 
+
 def create_embeddings(texts, start_times):
     text_splitter = CharacterTextSplitter(chunk_size=1500, separator="\n")
     docs = []
@@ -51,13 +52,14 @@ def create_embeddings(texts, start_times):
         metadatas.extend([{"source": start_times[i]}] * len(splits))
     return metadatas, docs
 
+
 def predict(item, run_id, logger):
     item = Item(**item)
-    
+
     video = pytube.YouTube(item.url)
     video.streams.get_highest_resolution().filesize
     audio = video.streams.get_audio_only()
-    fn = audio.download(output_path="/models/content/", filename= f"{video.title}.mp4")
+    fn = audio.download(output_path="/models/content/", filename=f"{video.title}.mp4")
 
     transcription = model.transcribe(f"/models/content/{video.title}.mp4")
     res = transcription["segments"]

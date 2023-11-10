@@ -1,36 +1,39 @@
-from pydantic import BaseModel
 from typing import Optional
+
+import huggingface_hub
 import torch
+from cerebrium import get_secret  # <-- import secrets from cerebrium
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, LlamaTokenizer, GenerationConfig
-import huggingface_hub
-from cerebrium import get_secret # <-- import secrets from cerebrium
 
 ########################################
 # Using a Cerebrium secret
 ########################################
-try: 
+try:
     """
     To access your cerebrium secret:
     1. create a secret in your projects dashboard
-    2. Take note of the name, 
+    2. Take note of the name,
         for this example, we'll use a secret called `hf_auth_token`
     3. add the code in the line below to access your secret
     """
-    hf_auth_token = get_secret("hf_auth_token") # load your secret
-    
+    hf_auth_token = get_secret("hf_auth_token")  # load your secret
+
     # And that's all! It's that easy.
 
     if hf_auth_token == "":
-        raise Exception("hf_auth_token is empty. You need a hf_auth_token secret added to your account to access this model.")
+        raise Exception(
+            "hf_auth_token is empty. You need a hf_auth_token secret added to your account to access this model."
+        )
 except Exception as e:
     print("\n\n")
-    print("="*60)
+    print("=" * 60)
     print("Error: ", e)
-    print("="*60)
+    print("=" * 60)
     raise e
 
 huggingface_hub.login(token=hf_auth_token)
+
 
 ########################################
 # User-facing API Parameters
@@ -49,7 +52,7 @@ class Item(BaseModel):
 # Initialize the model
 #######################################
 
-base_model_name =  'meta-llama/Llama-2-7b-hf'  # Hugging Face Model Id
+base_model_name = "meta-llama/Llama-2-7b-hf"  # Hugging Face Model Id
 base_model = AutoModelForCausalLM.from_pretrained(
     base_model_name,
     load_in_8bit=True,
@@ -94,6 +97,7 @@ def generate(params: Item):
             output_scores=True,
         )
     return tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
+
 
 #######################################
 # Prediction

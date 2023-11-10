@@ -1,16 +1,21 @@
 from typing import Optional
-from pydantic import BaseModel, HttpUrl
-from huggingface_hub import hf_hub_download
 
+from huggingface_hub import hf_hub_download
+from pydantic import BaseModel, HttpUrl
 from whisper import load_model, transcribe
+
 from util import download_file_from_url, save_base64_string_to_file
+
 
 class Item(BaseModel):
     audio: Optional[str] = None
     file_url: Optional[HttpUrl] = None
     webhook_endpoint: Optional[HttpUrl] = None
 
-distil_large_v2 = hf_hub_download(repo_id="distil-whisper/distil-large-v2", filename="original-model.bin")
+
+distil_large_v2 = hf_hub_download(
+    repo_id="distil-whisper/distil-large-v2", filename="original-model.bin"
+)
 model = load_model(distil_large_v2)
 
 

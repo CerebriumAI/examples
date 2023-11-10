@@ -1,13 +1,19 @@
-from typing import Optional
-from pydantic import BaseModel
-from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline, AutoencoderKL
-from diffusers.utils import load_image
-from PIL import Image
-import torch
-import numpy as np
-import cv2
-import io
 import base64
+import io
+from typing import Optional
+
+import cv2
+import numpy as np
+import torch
+from PIL import Image
+from diffusers import (
+    ControlNetModel,
+    StableDiffusionXLControlNetPipeline,
+    AutoencoderKL,
+)
+from diffusers.utils import load_image
+from pydantic import BaseModel
+
 
 class Item(BaseModel):
     prompt: str
@@ -20,11 +26,13 @@ class Item(BaseModel):
     guidance_scale: Optional[float] = 7.5
     num_images_per_prompt: Optional[int] = 1
 
+
 controlnet = ControlNetModel.from_pretrained(
-    "diffusers/controlnet-canny-sdxl-1.0",
-    torch_dtype=torch.float16
+    "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=torch.float16
 )
-vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+vae = AutoencoderKL.from_pretrained(
+    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+)
 pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
     "stabilityai/stable-diffusion-xl-base-1.0",
     controlnet=controlnet,
@@ -53,7 +61,7 @@ def predict(item, run_id, logger):
         width=item.width,
         num_inference_steps=item.num_inference_steps,
         guidance_scale=item.guidance_scale,
-        num_images_per_prompt=item.num_images_per_prompt
+        num_images_per_prompt=item.num_images_per_prompt,
     ).images
 
     finished_images = []
