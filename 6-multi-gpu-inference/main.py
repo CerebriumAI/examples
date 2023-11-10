@@ -1,7 +1,7 @@
 """
 This main.py is a brief guide on how to implement multi-gpu using Cerebrium.
 Some prerequisites:
-    - you need to have a "hf_auth_token" seceret added to your account containing your huggingface auth token with access to llama2-70b
+    - you need to have a "hf_auth_token" secret added to your account containing your huggingface auth token with access to llama2-70b
     - You need to have the latest version of cerebrium installed (pip install cerebrium --upgrade)
 
 Note:
@@ -11,32 +11,35 @@ Note:
     - To speedup loading of model weights, take a look at the folder in this repo which shows you how to speedup loading of model weights.
 """
 import os
-from pydantic import BaseModel
-from typing import Optional, List, Union
+from typing import Optional
+
+import huggingface_hub
 import torch
+from accelerate import Accelerator
+from cerebrium import get_secret
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, LlamaTokenizer, GenerationConfig
-import huggingface_hub
-from cerebrium import get_secret
-import time
-from accelerate import Accelerator
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "true" # to enable faster weights download on first time build
 
-# initialise accelerator. We'll use this as an easier way to get some speedup 
+os.environ[
+    "HF_HUB_ENABLE_HF_TRANSFER"
+] = "true"  # to enable faster weights download on first time build
+
+# initialise accelerator. We'll use this as an easier way to get some speedup
 accelerator = Accelerator()
 
-
 # Loading in base model and tokenizer
-base_model_name =  'meta-llama/Llama-2-70b-hf'  # Hugging Face Model Id
-try: 
+base_model_name = "meta-llama/Llama-2-70b-hf"  # Hugging Face Model Id
+try:
     hf_auth_token = get_secret("hf_auth_token")
     if hf_auth_token == "":
-        raise Exception("hf_auth_token is empty. You need a hf_auth_token secret added to your account to access this model.")
+        raise Exception(
+            "hf_auth_token is empty. You need a hf_auth_token secret added to your account to access this model."
+        )
 except Exception as e:
     print("\n\n")
-    print("="*60)
+    print("=" * 60)
     print("Error: ", e)
-    print("="*60)
+    print("=" * 60)
     raise e
 
 huggingface_hub.login(token=hf_auth_token)
@@ -54,6 +57,7 @@ if hasattr(base_model, "to_bettertransformer"):
     print("Converting to BetterTransformer")
     base_model.to_bettertransformer()
 base_model = accelerator.prepare(base_model)
+
 
 ########################################
 # User-facing API Parameters
@@ -104,6 +108,7 @@ def generate(params: Item):
             output_scores=True,
         )
     return tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
+
 
 #######################################
 # Prediction

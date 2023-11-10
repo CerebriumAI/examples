@@ -1,10 +1,12 @@
+import base64
+import io
 from typing import Optional
-from pydantic import BaseModel
+
 import torch
 from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers.utils import load_image
-import io
-import base64
+from pydantic import BaseModel
+
 
 class Item(BaseModel):
     prompt: str
@@ -17,15 +19,19 @@ class Item(BaseModel):
     guidance_scale: Optional[float] = 7.5
     num_images_per_prompt: Optional[int] = 1
 
+
 pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=torch.float16, variant="fp16", use_safetensors=True
+    "stabilityai/stable-diffusion-xl-refiner-1.0",
+    torch_dtype=torch.float16,
+    variant="fp16",
+    use_safetensors=True,
 )
 pipe = pipe.to("cuda")
 
 
 def predict(item, run_id, logger):
     item = Item(**item)
-    
+
     init_image = load_image(item.url).convert("RGB")
     images = pipe(
         item.prompt,
@@ -36,7 +42,7 @@ def predict(item, run_id, logger):
         num_inference_steps=item.num_inference_steps,
         guidance_scale=item.guidance_scale,
         num_images_per_prompt=item.num_images_per_prompt,
-        image=init_image
+        image=init_image,
     ).images
 
     finished_images = []

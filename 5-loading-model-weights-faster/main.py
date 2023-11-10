@@ -1,32 +1,34 @@
+import os
+import sys
 import time
-from typing import Optional
-from pydantic import BaseModel
-from huggingface_hub import hf_api
+
 import torch
+from pydantic import BaseModel
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     StoppingCriteria,
     StoppingCriteriaList,
 )
+
 from fast_load import fast_load
-import os
-import sys
+
 os.environ["HUGGINGFACE_HUB_ENABLE_HF_TRANSFER"] = "1"
 
-print(("\n\n"),  file=sys. stderr)
-print(("#" * 40),  file=sys. stderr)
-print(("Starting main.py"),  file=sys. stderr)
-print(("#" * 40),  file=sys. stderr)
-print(("\n\n"),  file=sys. stderr)
+print("\n\n", file=sys.stderr)
+print(("#" * 40), file=sys.stderr)
+print("Starting main.py", file=sys.stderr)
+print(("#" * 40), file=sys.stderr)
+print("\n\n", file=sys.stderr)
+
 
 class Item(BaseModel):
     # Add your input parameters here
     prompt: str
 
+
 # model_path = "EleutherAI/gpt-neox-20b"
 model_path = "EleutherAI/pythia-14m"
-
 
 
 #########################################################
@@ -43,19 +45,19 @@ def setup_model():
     model.eval()
     return model
 
+
 start = time.time()
 # What the user would call.
-model = fast_load(
-    model_id=model_path, load_weights_func=setup_model,faster=True
-)
+model = fast_load(model_id=model_path, load_weights_func=setup_model, faster=True)
 # print out the timing
-print((f"Tensoriser loaded model in: {time.time() - start} seconds"),  file=sys. stderr)
+print(f"Tensoriser loaded model in: {time.time() - start} seconds", file=sys.stderr)
 #########################################################
 # The rest of the inference code
 #########################################################
 
 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
+
 
 class _SentinelTokenStoppingCriteria(StoppingCriteria):
     def __init__(self, sentinel_token_ids: torch.LongTensor, starting_idx: int):

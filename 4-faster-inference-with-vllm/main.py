@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
 
 # From vLLM, you need to import the following
 from vllm import LLM, SamplingParams
@@ -12,6 +13,7 @@ llm = LLM(model="mistralai/Mistral-7B-Instruct-v0.1", dtype="bfloat16")
     -  Please check to see if your model is supported on vLLM.
     -  we only support single gpu vllm models at this time.
 """
+
 
 class Item(BaseModel):
     prompt: str
@@ -26,9 +28,15 @@ def predict(item, run_id, logger):
     item = Item(**item)
 
     # Now jusst setup your sampling parameters for inference:
-    sampling_params = SamplingParams(temperature=item.temperature, top_p=item.top_p, top_k=item.top_k, max_tokens=item.max_tokens, frequency_penalty=item.frequency_penalty)
-    
-    # And feed your prompt and sampling params into your LLM pipeline as follows. 
+    sampling_params = SamplingParams(
+        temperature=item.temperature,
+        top_p=item.top_p,
+        top_k=item.top_k,
+        max_tokens=item.max_tokens,
+        frequency_penalty=item.frequency_penalty,
+    )
+
+    # And feed your prompt and sampling params into your LLM pipeline as follows.
     outputs = llm.generate([item.prompt], sampling_params)
 
     # Extract your text outputs:
