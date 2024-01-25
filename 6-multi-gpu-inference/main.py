@@ -53,9 +53,6 @@ tokenizer = LlamaTokenizer.from_pretrained(base_model_name)
 tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 tokenizer.padding_side = "left"  # Allow batched inference
 
-if hasattr(base_model, "to_bettertransformer"):
-    print("Converting to BetterTransformer")
-    base_model.to_bettertransformer()
 base_model = accelerator.prepare(base_model)
 
 
