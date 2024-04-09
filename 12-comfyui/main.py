@@ -39,12 +39,9 @@ if side_process is None:
 
 # Load the workflow file as a python dictionary
 with open(
-    os.path.join("./", "workflow.json"), "r"
+    os.path.join("./", "workflow_api.json"), "r"
 ) as json_file:
     json_workflow = json.load(json_file)
-
-print('here')
-print(json_workflow)
 
 # Connect to the ComfyUI server via websockets
 socket_connected = False
@@ -72,8 +69,6 @@ def predict(item, run_id, logger):
     template_values, tempfiles = convert_request_file_url_to_path(template_values)
     json_workflow_copy = copy.deepcopy(json_workflow)
     json_workflow_copy = fill_template(json_workflow_copy, template_values)
-    print(json_workflow_copy)
-
     outputs = {}  # Initialize outputs to an empty dictionary
 
     try:
@@ -82,13 +77,14 @@ def predict(item, run_id, logger):
         )
 
     except Exception as e:
+        print('did it get here')
         print("Error occurred while running Comfy workflow: ", e)
 
     for file in tempfiles:
         file.close()
 
     result = []
-
+    print('here')
     for node_id in outputs:
         for unit in outputs[node_id]:
             file_name = unit.get("filename")
