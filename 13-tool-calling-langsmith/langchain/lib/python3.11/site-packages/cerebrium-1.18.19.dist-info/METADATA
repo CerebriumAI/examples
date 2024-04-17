@@ -1,0 +1,52 @@
+Metadata-Version: 2.1
+Name: cerebrium
+Version: 1.18.19
+Summary: 
+License: AGPL-3.0-only
+Author: Elijah Roussos
+Author-email: elijah@cerebrium.ai
+Requires-Python: >=3.9,<3.13
+Classifier: License :: OSI Approved :: GNU Affero General Public License v3
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Dist: aiofiles (>=23.2.1,<24.0.0)
+Requires-Dist: fastapi (>=0.109.2,<0.110.0)
+Requires-Dist: loguru (>=0.7)
+Requires-Dist: pyflakes (>=3.1.0,<4.0.0)
+Requires-Dist: pyjwt (>=2.8.0,<3.0.0)
+Requires-Dist: pytest (>=8.0.0,<9.0.0)
+Requires-Dist: pyyaml (>=6.0,<7.0)
+Requires-Dist: requests (>=2.30,<3.0)
+Requires-Dist: rich (>=13.7.0,<14.0.0)
+Requires-Dist: tenacity (>=8.2,<8.3)
+Requires-Dist: termcolor (>=2.4.0,<3.0.0)
+Requires-Dist: toml (>=0.10.2,<0.11.0)
+Requires-Dist: tqdm (>=4.64,<4.65)
+Requires-Dist: typer[all] (>=0.9)
+Requires-Dist: uvicorn (>=0.27.0.post1,<0.28.0)
+Requires-Dist: watchdog (>=4.0.0,<5.0.0)
+Requires-Dist: yaspin (>=2.3,<2.4)
+Project-URL: Documentation, https://docs.cerebrium.ai/
+Project-URL: Homepage, https://www.cerebrium.ai
+Description-Content-Type: text/markdown
+
+# Cerebrium CLI
+
+Cerebrium is the Python package built for use with the [Cerebrium](https://www.cerebrium.ai/) platform, which allows you to deploy your machine learning models as a REST API with a single line of code.
+
+For usage consult the [documentation](https://docs.cerebrium.ai/). The repo for the documentation can be found [here](https://github.com/CerebriumAI/docs).
+
+## Releases
+
+The CLI follows semver. Commits should be tagged accordingly:
+
+allowed_types = [
+    "build", "chore", "ci", "docs", "feat", "fix",
+    "perf", "style", "refactor", "test"
+]
+minor_types = ["feat"]
+patch_types = ["fix", "perf"]
+

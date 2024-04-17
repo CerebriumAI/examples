@@ -1,0 +1,3 @@
+[console_scripts]
+cerebrium=cerebrium.main:cli
+
