@@ -32,7 +32,7 @@ def get_availability(fromDate: str, toDate: str) -> float:
     url = "https://api.cal.com/v1/availability"
     params = {
         "apiKey": get_secret("CAL_API_KEY"),
-        "username": "michael-louis-ioje1y",
+        "username": "michael-louis-xxxx",
         "dateFrom": fromDate,
         "dateTo": toDate
     }
@@ -50,8 +50,8 @@ def book_slot(datetime: str, name: str, email: str, title: str, description: str
     url = "https://api.cal.com/v1/bookings"
     params = {
         "apiKey": get_secret("CAL_API_KEY"),
-        "username": "michael-louis-ioje1y",
-        "eventTypeId": "737039",
+        "username": "michael-louis-xxxx",
+        "eventTypeId": "xxxxxx",
         "start": datetime,
         "responses": {
             "name": name,
