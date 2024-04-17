@@ -86,7 +86,7 @@ prompt = ChatPromptTemplate.from_messages([
 tools = [get_availability, book_slot]
 
 
-llm = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0, api_key="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") ##get_secret("OPENAI_API_KEY") )
+llm = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0, api_key=get_secret("OPENAI_API_KEY") )
 agent = create_tool_calling_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 demo_ephemeral_chat_history_for_chain = ChatMessageHistory()
