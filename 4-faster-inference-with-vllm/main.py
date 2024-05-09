@@ -24,8 +24,8 @@ class Item(BaseModel):
     frequency_penalty: Optional[float] = 1
 
 
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(prompt, temperature, top_p, top_k, max_tokens, frequency_penalty):
+    item = Item(prompt=prompt, temperature=temperature, top_p=top_p, top_k=top_k, max_tokens=max_tokens, frequency_penalty=frequency_penalty)
 
     # Now jusst setup your sampling parameters for inference:
     sampling_params = SamplingParams(

@@ -31,8 +31,8 @@ class Item(BaseModel):
     max_new_tokens: Optional[int] = 250
 
 
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(prompt, cutoff_len, temperature, top_p, top_k, max_new_tokens):
+    item = Item(prompt=prompt, cutoff_len=cutoff_len, temperature=temperature, top_p=top_p, top_k=top_k, max_new_tokens=max_new_tokens)
     inputs = tokenizer(
         item.prompt, return_tensors="pt", max_length=512, truncation=True, padding=True
     )

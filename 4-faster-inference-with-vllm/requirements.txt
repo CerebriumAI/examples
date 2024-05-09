@@ -1,6 +1,0 @@
-sentencepiece
-torch
-vllm
-transformers
-accelerate
-xformers
