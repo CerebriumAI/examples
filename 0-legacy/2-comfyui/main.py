@@ -39,7 +39,7 @@ if side_process is None:
 
 # Load the workflow file as a python dictionary
 with open(
-    os.path.join("./", "workflow_api.json"), "r"
+    os.path.join("/", "workflow_api.json"), "r"
 ) as json_file:
     json_workflow = json.load(json_file)
 
