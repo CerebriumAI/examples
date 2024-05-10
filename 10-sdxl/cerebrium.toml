@@ -15,18 +15,18 @@ disable_confirmation = false
 shell_commands = []
 
 [cerebrium.deployment]
-name = "comfyui"
+name = "10-sdxl"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude, ./confyui, ./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors, ./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors]"
+exclude = "[./example_exclude]"
 cuda_version = "12"
 
 [cerebrium.hardware]
 region = "us-east-1"
 provider = "aws"
-gpu = "AMPERE_A10"
-cpu = 3
-memory = 12.0
+gpu = "ADA_L4"
+cpu = 2
+memory = 11.0
 gpu_count = 1
 
 [cerebrium.scaling]
@@ -35,25 +35,19 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-websocket-client = "==1.6.4"
-accelerate = "==0.23.0"
-opencv-python = "latest"
-pydantic = "latest"
-pillow = "latest"
-safetensors = "latest"
-torch = "latest"
-torchvision = "latest"
 transformers = "latest"
-torchsde = "latest"
-einops = "latest"
-aiohttp = "latest"
-pyyaml = "latest"
-Pillow = "latest"
-scipy = "latest"
-tqdm = "latest"
-psutil = "latest"
-kornia = ">=0.7.1"
+torch = ">=2.0.0"
+pydantic = "latest"
+accelerate = "latest"
+"git+https://github.com/basetenlabs/diffusers.git@9a353290b1497023d4745a719ec02c50f680499a" = "latest"
+safetensors = "latest"
+invisible-watermark = ">=0.2.0"
+xformers = "latest"
 
 [cerebrium.dependencies.conda]
+"" = "latest"
 
 [cerebrium.dependencies.apt]
+ffmpeg = "latest"
+libsm6 = "latest"
+libxext6 = "latest"

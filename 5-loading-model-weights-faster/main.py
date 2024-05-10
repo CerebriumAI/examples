@@ -23,17 +23,11 @@ print("\n\n", file=sys.stderr)
 
 
 class Item(BaseModel):
-    # Add your input parameters here
     prompt: str
-
 
 # model_path = "EleutherAI/gpt-neox-20b"
 model_path = "EleutherAI/pythia-14m"
 
-
-#########################################################
-# Start of the fast_load code
-#########################################################
 def setup_model():
     # Load your model here
     model = AutoModelForCausalLM.from_pretrained(
@@ -51,9 +45,6 @@ start = time.time()
 model = fast_load(model_id=model_path, load_weights_func=setup_model, faster=True)
 # print out the timing
 print(f"Tensoriser loaded model in: {time.time() - start} seconds", file=sys.stderr)
-#########################################################
-# The rest of the inference code
-#########################################################
 
 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -98,11 +89,8 @@ def get_stopping_criteria_list(words: list, tokens, device):
     return stopping_criteria_list
 
 
-########################################
-# Prediction
-########################################
-def predict(item, run_id, logger):
-    params = Item(**item)
+def predict(prompt):
+    params = Item(prompt=prompt)
     prompt = params.prompt
     max_new_tokens = params.max_new_tokens
     temperature = params.temperature

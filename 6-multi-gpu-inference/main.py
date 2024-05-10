@@ -56,9 +56,6 @@ tokenizer.padding_side = "left"  # Allow batched inference
 base_model = accelerator.prepare(base_model)
 
 
-########################################
-# User-facing API Parameters
-########################################
 class Item(BaseModel):
     prompt: str
     cutoff_len: Optional[int] = 256
@@ -69,9 +66,6 @@ class Item(BaseModel):
     max_new_tokens: Optional[int] = 256
 
 
-#######################################
-# Initialize the model
-#######################################
 def tokenize(prompt, cutoff_len, add_eos_token=True):
     print("tokenizing: ", prompt)
     return tokenizer(
@@ -107,10 +101,7 @@ def generate(params: Item):
     return tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
 
 
-#######################################
-# Prediction
-#######################################
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(promp, cutoff_len, temperature, top_p, top_k, num_beams, max_new_tokens):
+    item = Item(promp=promp, cutoff_len=cutoff_len, temperature=temperature, top_p=top_p, top_k=top_k, num_beams=num_beams, max_new_tokens=max_new_tokens)
     result = generate(params=item)
     return {"Prediction": result}
