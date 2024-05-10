@@ -3,20 +3,18 @@
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
 [cerebrium.build]
-predict_data = "{\"prompt\": \"What is the capital city of England?\"}"
-force_rebuild = true
+predict_data = "{\"prompt\": \"Here is some example predict data for your config.yaml which will be used to test your predict function on build.\"}"
 hide_public_endpoint = false
 disable_animation = false
 disable_build_logs = false
-disable_syntax_check = true
+disable_syntax_check = false
 disable_predict = true
-log_level = "debug"
+log_level = "INFO"
 disable_confirmation = false
-shell_commands = [ "pip install tensorrt_llm -U --pre --extra-index-url https://pypi.nvidia.com", "wget https://raw.githubusercontent.com/NVIDIA/TensorRT-LLM/71d8d4d3dc655671f32535d6d2b60cab87f36e87/examples/llama/convert_checkpoint.py -O ./convert_checkpoint.py",]
 
 [cerebrium.deployment]
-name = "kats-tensor-rt-2"
-python_version = "3.10"
+name = "distil-whisper"
+python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
 cuda_version = "12"
@@ -26,7 +24,7 @@ region = "us-east-1"
 provider = "aws"
 gpu = "AMPERE_A10"
 cpu = 3
-memory = 40.0
+memory = 12.0
 gpu_count = 1
 
 [cerebrium.scaling]
@@ -35,25 +33,12 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-transformers = "latest"
-torch = ">=2.0.0"
+accelerate = "latest"
+transformers = ">=4.35.0"
+openai-whisper = "latest"
 pydantic = "latest"
-huggingface-hub = "latest"
-flax = "latest"
-h5py = "latest"
-sentencepiece = "latest"
-easydict = "latest"
-mpmath = "==1.3.0"
 
 [cerebrium.dependencies.conda]
 
 [cerebrium.dependencies.apt]
-software-properties-common = "latest"
-gcc = "latest"
-"g++" = "latest"
-aria2 = "latest"
-git = "latest"
-git-lfs = "latest"
-wget = "latest"
-openmpi-bin = "latest"
-libopenmpi-dev = "latest"
+"ffmpeg" = "latest"

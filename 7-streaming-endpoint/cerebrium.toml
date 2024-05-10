@@ -4,28 +4,27 @@
 
 [cerebrium.build]
 predict_data = "{\"prompt\": \"Here is some example predict data for your config.yaml which will be used to test your predict function on build.\"}"
-force_rebuild = true
 hide_public_endpoint = false
 disable_animation = false
 disable_build_logs = false
 disable_syntax_check = false
-disable_predict = true
+disable_predict = false
 log_level = "INFO"
 disable_confirmation = false
 
 [cerebrium.deployment]
-name = "sdxl-refiner"
+name = "streaming-falcon"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./.*, ./__*]"
+exclude = "[./example_exclude]"
 cuda_version = "12"
 
 [cerebrium.hardware]
 region = "us-east-1"
 provider = "aws"
 gpu = "AMPERE_A10"
-cpu = 3
-memory = 12.0
+cpu = 2
+memory = 16.0
 gpu_count = 1
 
 [cerebrium.scaling]
@@ -34,14 +33,14 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-accelerate = "latest"
+peft = "git+https://github.com/huggingface/peft.git"
+transformers = "git+https://github.com/huggingface/transformers.git"
+accelerate = "git+https://github.com/huggingface/accelerate.git"
+bitsandbytes = "latest"
+sentencepiece = "latest"
 pydantic = "latest"
-transformers = ">=4.35.0"
-safetensors = "latest"
-opencv-python = "latest"
-diffusers = "latest"
+torch = "2.1.0"
 
 [cerebrium.dependencies.conda]
 
 [cerebrium.dependencies.apt]
-ffmpeg = "latest"
