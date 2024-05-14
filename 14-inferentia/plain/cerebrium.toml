@@ -3,7 +3,7 @@
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
 [cerebrium.build]
-predict_data = "{\"prompt\": \"Here is some example predict data for your config.yaml which will be used to test your predict function on build.\"}"
+predict_data = "{\"prompts\": [\"Hello, my name is\", \"The president of the United States is\",\"The capital of France is\", \"The future of AI is\", \"What is your favourite holiday destination\"]}"
 force_rebuild = false
 hide_public_endpoint = false
 disable_animation = false
@@ -12,11 +12,13 @@ disable_syntax_check = false
 disable_predict = false
 log_level = "INFO"
 disable_confirmation = false
-shell_commands = []
+shell_commands = [
+    "pip install transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com"
+]
 
 [cerebrium.deployment]
-name = "inferentia"
-python_version = "3.11"
+name = "11-inferentia-plain"
+python_version = "3.10"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
 cuda_version = "12"
@@ -24,9 +26,9 @@ cuda_version = "12"
 [cerebrium.hardware]
 region = "us-east-1"
 provider = "aws"
-gpu = "AMPERE_A10"
-cpu = 3
-memory = 12.0
+gpu = "INF2"
+cpu = 6
+memory = 120.0
 gpu_count = 1
 
 [cerebrium.scaling]
@@ -35,12 +37,12 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-transformers = "latest"
-torch = ">=2.0.0"
 pydantic = "latest"
+huggingface_hub = "latest"
+sentencepiece = "latest"
+
 
 [cerebrium.dependencies.conda]
-"" = "latest"
 
 [cerebrium.dependencies.apt]
-"" = "latest"
+wget = "latest"
