@@ -15,7 +15,7 @@ disable_confirmation = false
 shell_commands = [
   "pip install torch==2.1.* --index-url https://download.pytorch.org/whl/cpu",
   "pip install neuronx-cc torch-neuronx transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com",
-  "pip install ray huggingface_hub pydantic",
+  "pip install ray huggingface_hub pydantic triton",
   "git clone https://github.com/vllm-project/vllm.git",
   "cd vllm",
   "pip install -U -r requirements-neuron.txt",
