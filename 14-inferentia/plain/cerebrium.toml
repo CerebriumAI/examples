@@ -13,7 +13,9 @@ disable_predict = false
 log_level = "INFO"
 disable_confirmation = false
 shell_commands = [
-    "pip install transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com"
+  "pip install neuronx-cc torch-neuronx transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com",
+  "pip install sentencepiece huggingface_hub pydantic",
+  "export LD_LIBRARY_PATH=$MICROMAMBA_DIR/envs/$BUILD_ENV:$LD_LIBRARY_PATH",
 ]
 
 [cerebrium.deployment]
@@ -37,9 +39,6 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-pydantic = "latest"
-huggingface_hub = "latest"
-sentencepiece = "latest"
 
 
 [cerebrium.dependencies.conda]
