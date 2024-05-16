@@ -4,7 +4,7 @@
 
 [cerebrium.build]
 predict_data = "{\"prompts\": [\"Hello, my name is\", \"The president of the United States is\",\"The capital of France is\", \"The future of AI is\", \"What is your favourite holiday destination\"]}"
-force_rebuild = true
+force_rebuild = false
 hide_public_endpoint = false
 disable_animation = false
 disable_build_logs = false
@@ -14,13 +14,12 @@ log_level = "INFO"
 disable_confirmation = false
 shell_commands = [
   "pip install torch==2.1.* --index-url https://download.pytorch.org/whl/cpu",
-  "pip install neuronx-cc torch-neuronx transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com",
-  "pip install ray huggingface_hub pydantic",
+  "pip install wget",
+  "pip install awscli",
+  "pip install neuronx-cc==2.* torch-neuronx==2.1.* torchvision transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com",
+  "pip install ray huggingface_hub pydantic triton",
   "git clone https://github.com/vllm-project/vllm.git",
-  "cd vllm",
-  "pip install -U -r requirements-neuron.txt",
-  "pip install .",
-  "cd ..",
+  "cd vllm && git checkout 6ef09b08f88b675f84b7140238286e5d4c5304c8 && pip install -U -r requirements-neuron.txt --extra-index-url=https://pip.repos.neuron.amazonaws.com && pip install . --extra-index-url=https://pip.repos.neuron.amazonaws.com && cd ..",
 ]
 
 [cerebrium.deployment]
@@ -35,7 +34,7 @@ region = "us-east-1"
 provider = "aws"
 gpu = "INF2"
 cpu = 6
-memory = 40.0
+memory = 60.0
 gpu_count = 1
 
 [cerebrium.scaling]

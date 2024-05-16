@@ -6,8 +6,9 @@ from transformers import AutoTokenizer
 import time
 import os
 from huggingface_hub import login
+from cerebrium import get_secret
 
-os.environ['NEURON_COMPILE_CACHE_URL'] = '/persistent-storage/neuron-compile-cache'
+os.environ['NEURON_COMPILE_CACHE_URL'] = '/persistent-storage/vllm-neuron-cache'
 
 
 class Item(BaseModel):
@@ -15,9 +16,9 @@ class Item(BaseModel):
     temperature: Optional[float] = 0.8
     top_p: Optional[float] = 0.95
 
-login(token = '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')
+login(token=get_secret("HF_AUTH_TOKEN"))
 
-model_id = "mistralai/Mistral-7B-Instruct-v0.2"
+model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
 llm = LLM(
     model=model_id,
     max_num_seqs=1,
@@ -48,10 +49,12 @@ def predict(
     end_time = time.time()
 
     total_tokens = 0
+    generated_texts = []  # List to store all generated texts
     for output in outputs:
         prompt = output.prompt
         generated_text = output.outputs[0].text
         print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
+        generated_texts.append(generated_text)
 
         # Assuming you have a way to count tokens, e.g., a function count_tokens(text)
         total_tokens += count_tokens(prompt) + count_tokens(generated_text)
@@ -62,7 +65,7 @@ def predict(
 
     print(f"Processed {total_tokens} tokens in {duration:.2f} seconds ({tokens_per_second:.2f} tokens/second)")
 
-    return {"outputs": outputs, "tokens_per_second": tokens_per_second}
+    return {"outputs": generated_texts, "tokens_per_second": tokens_per_second}
 
 def count_tokens(text):
     return len(tokenizer.tokenize(text))
