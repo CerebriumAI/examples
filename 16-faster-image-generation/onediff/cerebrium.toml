@@ -11,6 +11,12 @@ disable_syntax_check = false
 disable_predict = false
 log_level = "INFO"
 disable_confirmation = false
+shell_commands = [
+    "pip install -U --pre oneflow -f https://github.com/siliconflow/oneflow_releases/releases/expanded_assets/community_cu121",
+    "pip install --pre onediff",
+    "git clone https://github.com/siliconflow/onediff.git",
+    "cd onediff/onediff_diffusers_extensions && python3 -m pip install -e ."
+]
 
 [cerebrium.deployment]
 name = "onediff"
@@ -24,7 +30,7 @@ region = "us-east-1"
 provider = "aws"
 gpu = "AMPERE_A10"
 cpu = 3
-memory = 12.0
+memory = 16.0
 gpu_count = 1
 
 [cerebrium.scaling]
@@ -33,12 +39,11 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-transformers = "latest"
 torch = ">=2.0.0"
+transformers = "4.27.1"
+"diffusers[torch]" = "0.19.3"
 pydantic = "latest"
 
 [cerebrium.dependencies.conda]
-"" = "latest"
 
 [cerebrium.dependencies.apt]
-"" = "latest"
