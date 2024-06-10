@@ -1,0 +1,29 @@
+[cerebrium.deployment]
+name = "winston"
+python_version = "3.11"
+cuda_version = "12"
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[.*]"
+shell_commands = []
+
+[cerebrium.hardware]
+cpu = 4
+memory = 90.0
+gpu = "AMPERE_A6000"
+gpu_count = 1
+provider = "coreweave"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 5
+cooldown = 60
+
+[cerebrium.dependencies.pip]
+"transformers" = "latest"
+"torch" = "latest"
+"outlines" = "latest"
+"huggingface_hub" = "latest"
+"sentencepiece" = "latest"
+"protobuf" = "latest"
+"pydantic" = "latest"
