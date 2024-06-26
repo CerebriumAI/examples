@@ -6,13 +6,13 @@ You can visit the full documentation [here](https://docs.cerebrium.ai/v4/example
 
 ## Overview
 
-In order to create this application, we use PipeCat, an open source framework for voice and multimodal conversational AI that handles some of the functionality we might need such as handling user interruptions, dealing with audio data etc. We will speak with our voice AI agent via a WebRTC transport, using Daily (the creators of Pipecat) and will deploy this application on Cerebrium to show how it handles deploying and scaling our application seamlessly.
+In order to create this application, we use Pipecat, an open source framework for voice and multimodal conversational AI that handles some of the functionality we might need such as handling user interruptions, dealing with audio data etc. We will speak with our voice AI agent via a WebRTC transport, using Daily (the creators of Pipecat) and will deploy this application on Cerebrium to show how it handles deploying and scaling our application seamlessly.
 
 ## Features
 
 - Real-time voice interaction with response times around 500ms
 - Flexible integration with various Large Language Models (LLMs), TTS, and STT models
-- Utilizes PipeCat for handling voice and multimodal conversational AI
+- Utilizes Pipecat for handling voice and multimodal conversational AI
 - WebRTC transport using Daily for communication
 - Seamless deployment and scaling with Cerebrium
 
@@ -22,7 +22,7 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 
 ## Acknowledgements
 
-- [PipeCat](https://github.com/daily-co/pipecat) - Open source framework for voice and multimodal conversational AI
+- [Pipecat](https://github.com/daily-co/pipecat) - Open source framework for voice and multimodal conversational AI
 - [Daily](https://www.daily.co/) - WebRTC platform for real-time video and audio communication
 - [Cerebrium](https://www.cerebrium.ai/) - Platform for deploying and scaling AI applications
 
