@@ -35,6 +35,7 @@ logger.add(sys.stderr, level="DEBUG")
 
 os.environ['SSL_CERT'] = ''
 os.environ['SSL_KEY'] = ''
+os.environ['OUTLINES_CACHE_DIR'] = '/tmp/.outlines'
 
 deepgram_voice: str = "aura-asteria-en"
 
@@ -43,15 +44,16 @@ login(token=get_secret('HF_TOKEN'))
 def start_server():
     while True:
         process = subprocess.Popen(
-            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model meta-llama/Meta-Llama-3-8B --dtype bfloat16 --api-key {get_secret('HF_TOKEN')} --download-dir /persistent-storage/",
+            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model NousResearch/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {get_secret('HF_TOKEN')}",
             shell=True
         )
         process.wait()  # Wait for the process to complete
         logger.error("Server process ended unexpectedly. Restarting in 5 seconds...")
-        time.sleep(5)  # Wait before restarting
+        time.sleep(7)  # Wait before restarting
+
 
 # Start the server in a separate process
-server_process = Process(target=start_server)
+server_process = Process(target=start_server, daemon=True)
 server_process.start()
 
 async def main(room_url: str, token: str):
@@ -89,14 +91,14 @@ async def main(room_url: str, token: str):
         llm = OpenAILLMService(
             name="LLM",
             api_key=get_secret("HF_TOKEN"),
-            model="meta-llama/Meta-Llama-3-8B",
-            base_url="http://0.0.0.0:5000/v1"
+            model="NousResearch/Meta-Llama-3-8B-Instruct",
+            base_url="http://127.0.0.1:5000/v1"
         )
 
         messages = [
             {
                 "role": "system",
-                "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+                "content": "You are a fast, low-latency chatbot. Your goal is to demonstrate voice-driven AI capabilities at human-like speeds. The technology powering you is Daily for transport, Cerebrium for serverless infrastructure, Llama 3 (8-B version) LLM, and Deepgram for speech-to-text and text-to-speech. You are hosted on the east coast of the United States. Respond to what the user said in a creative and helpful way, but keep responses short and legible. Ensure responses contain only words. Check again that you have not included special characters other than '?' or '!'.",
             },
         ]
 
@@ -130,15 +132,10 @@ async def main(room_url: str, token: str):
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):
             # Kick off the conversation.
+            time.sleep(1.5)
             messages.append(
-                {"role": "system", "content": "Please introduce yourself to the user."})
+                {"role": "system", "content": "Introduce yourself by saying 'hello, I'm FastBot, how can I help you today?'"})
             await task.queue_frame(LLMMessagesFrame(messages))
-
-        # When a participant joins, start transcription for that participant so the
-        # bot can "hear" and respond to them.
-        @transport.event_handler("on_participant_joined")
-        async def on_participant_joined(transport, participant):
-            transport.capture_participant_transcription(participant["id"])
 
         # When the participant leaves, we exit the bot.
         @transport.event_handler("on_participant_left")
@@ -155,21 +152,9 @@ async def main(room_url: str, token: str):
 
         await runner.run(task)
         await session.close()
-        
-  
-
-def check_deepgram_model_status():
-    url = "http://127.0.0.1:8082/v2/models"
-    max_retries = 8
-    for _ in range(max_retries):
-        response = requests.get(url)
-        if response.status_code == 200:
-            return True
-        time.sleep(8)
-    return False
 
 def check_vllm_model_status():
-    url = "http://0.0.0.0:5000/v1/models"
+    url = "http://127.0.0.1:5000/v1/models"
     headers = {
         "Authorization": f"Bearer {get_secret('HF_TOKEN')}"
     }
@@ -178,7 +163,7 @@ def check_vllm_model_status():
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             return True
-        time.sleep(12)
+        time.sleep(15)
     return False
 
 def start_bot(room_url: str, token: str = None):
@@ -186,9 +171,8 @@ def start_bot(room_url: str, token: str = None):
     def target():
         asyncio.run(main(room_url, token))
 
-    check_deepgram_model_status()
     check_vllm_model_status()
-    process = Process(target=target)
+    process = Process(target=target, daemon=True)
     process.start()
     process.join()  # Wait for the process to complete
     return {"message": "session finished"}
@@ -217,6 +201,10 @@ def create_room():
             return {"message": 'There was an error creating your room', "status_code": 500}
         return room_info
     else:
+        data = response.json()
+        if data.get("error") == "invalid-request-error" and "rooms reached" in data.get("info", ""):
+            logger.error("We are currently at capacity for this demo. Please try again later.")
+            return {"message": "We are currently at capacity for this demo. Please try again later.", "status_code": 429}
         logger.error(f"Failed to create room: {response.status_code}")
         return {"message": 'There was an error creating your room', "status_code": 500}
 
