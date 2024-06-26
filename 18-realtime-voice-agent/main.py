@@ -43,7 +43,7 @@ login(token=get_secret('HF_TOKEN'))
 def start_server():
     while True:
         process = subprocess.Popen(
-            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model casperhansen/llama-3-8b-instruct-awq --quantization awq --api-key {get_secret('HF_TOKEN')} --download-dir /persistent-storage/",
+            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model meta-llama/Meta-Llama-3-8B --dtype bfloat16 --api-key {get_secret('HF_TOKEN')} --download-dir /persistent-storage/",
             shell=True
         )
         process.wait()  # Wait for the process to complete
@@ -60,7 +60,7 @@ async def main(room_url: str, token: str):
         transport = DailyTransport(
             room_url,
             token,
-            "Respond bots",
+            "Respond bot",
             DailyParams(
                 audio_out_enabled=True,
                 transcription_enabled=False,
@@ -89,7 +89,7 @@ async def main(room_url: str, token: str):
         llm = OpenAILLMService(
             name="LLM",
             api_key=get_secret("HF_TOKEN"),
-            model="casperhansen/llama-3-8b-instruct-awq",
+            model="meta-llama/Meta-Llama-3-8B",
             base_url="http://0.0.0.0:5000/v1"
         )
 
@@ -158,9 +158,9 @@ async def main(room_url: str, token: str):
         
   
 
-def check_model_status():
+def check_deepgram_model_status():
     url = "http://127.0.0.1:8082/v2/models"
-    max_retries = 4
+    max_retries = 8
     for _ in range(max_retries):
         response = requests.get(url)
         if response.status_code == 200:
@@ -168,12 +168,26 @@ def check_model_status():
         time.sleep(8)
     return False
 
+def check_vllm_model_status():
+    url = "http://0.0.0.0:5000/v1/models"
+    headers = {
+        "Authorization": f"Bearer {get_secret('HF_TOKEN')}"
+    }
+    max_retries = 8
+    for _ in range(max_retries):
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return True
+        time.sleep(12)
+    return False
+
 def start_bot(room_url: str, token: str = None):
 
     def target():
         asyncio.run(main(room_url, token))
 
-    # check_model_status()
+    check_deepgram_model_status()
+    check_vllm_model_status()
     process = Process(target=target)
     process.start()
     process.join()  # Wait for the process to complete

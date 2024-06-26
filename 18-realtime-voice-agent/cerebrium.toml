@@ -13,7 +13,7 @@ log_level = "INFO"
 disable_confirmation = false
 
 [cerebrium.deployment]
-name = "17-pipecat"
+name = "18-realtime-agent"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
@@ -23,12 +23,12 @@ cuda_version = "12"
 region = "us-east-1"
 provider = "aws"
 gpu = "AMPERE_A10"
-cpu = 3
-memory = 12.0
+cpu = 4
+memory = 18.0
 gpu_count = 1
 
 [cerebrium.scaling]
-min_replicas = 6
+min_replicas = 3
 max_replicas = 12
 cooldown = 60
 
