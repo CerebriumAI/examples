@@ -18,6 +18,7 @@ python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
 cuda_version = "12"
+docker_base_image_url = "registry.cerebrium.ai/daily:latest"
 
 [cerebrium.hardware]
 region = "us-east-1"
