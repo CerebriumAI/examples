@@ -1,48 +1,47 @@
-from typing import Optional
-
 from pydantic import BaseModel
-
-# From vLLM, you need to import the following
 from vllm import LLM, SamplingParams
+from huggingface_hub import login
+from cerebrium import get_secret
 
-# then simply initialise your vLLM model as follows:
-llm = LLM(model="mistralai/Mistral-7B-Instruct-v0.1", dtype="bfloat16")
-"""
-- vLLM will handle the setup of the model as well as the tokenization/de-tokenization automatically
-- Some things to note:
-    -  Please check to see if your model is supported on vLLM.
-    -  we only support single gpu vllm models at this time.
-"""
+# Your huggingface token (HF_AUTH_TOKEN) should be stored in your project secrets on your dashboard
+login(token=get_secret("HF_AUTH_TOKEN"))
+
+# Initialize the model
+llm = LLM(model="mistralai/Mistral-7B-Instruct-v0.1", dtype="bfloat16", max_model_len=20000, gpu_memory_utilization=0.9)
 
 
+# Set up pydantic model
 class Item(BaseModel):
     prompt: str
-    temperature: Optional[float] = 0.8
-    top_p: Optional[float] = 0.75
-    top_k: Optional[float] = 40
-    max_tokens: Optional[int] = 256
-    frequency_penalty: Optional[float] = 1
+    temperature: float
+    top_p: float
+    top_k: float
+    max_tokens: int
+    frequency_penalty: float
 
 
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(prompt, temperature=0.8, top_p=0.75, top_k=40, max_tokens=256, frequency_penalty=1):
+    item = Item(
+        prompt=prompt,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        max_tokens=max_tokens,
+        frequency_penalty=frequency_penalty
+    )
 
-    # Now jusst setup your sampling parameters for inference:
     sampling_params = SamplingParams(
         temperature=item.temperature,
         top_p=item.top_p,
         top_k=item.top_k,
         max_tokens=item.max_tokens,
-        frequency_penalty=item.frequency_penalty,
+        frequency_penalty=item.frequency_penalty
     )
 
-    # And feed your prompt and sampling params into your LLM pipeline as follows.
     outputs = llm.generate([item.prompt], sampling_params)
 
-    # Extract your text outputs:
     generated_text = []
     for output in outputs:
         generated_text.append(output.outputs[0].text)
 
-    # And return the result
     return {"result": generated_text}

@@ -1,2 +1,0 @@
-numpy
-# Add any other packages you may need here

@@ -23,7 +23,7 @@ For this example, we provide a simple delay script to serve as your deployment.
 Deploy the Cortex deployment in `delay` with the command
 
 ```bash
-cerebrium deploy webhook-delay-example --config-file config.yaml
+cerebrium deploy
 ```
 
 ## 3. Making a request using the webhook endpoint:
@@ -34,9 +34,9 @@ parameter `webhook_endpoint` to your request data.
 For example:
 
 ```bash
-curl -X POST https://run.cerebrium.ai/v3/p-1234567/webhook-delay-example/predict \
+curl -X POST https://api.cortex.cerebrium.ai/v4/p-1234567/webhook-delay-example/predict \
      -H 'Content-Type: application/json' \
-     -H 'Authorization: public-xxxxxxxxxxxxxxx' \
+     -H 'Authorization: Bearer <YOUR_JWT_TOKEN>' \
      --data '{"delayMins": 0, "webhook_endpoint": "https://webhook.site/your-webhook-endpoint-you-got-here"}'
 ```
 

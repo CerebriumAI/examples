@@ -1,4 +1,3 @@
-
 from typing import Optional
 from pydantic import BaseModel
 
@@ -61,8 +60,8 @@ print("Successfully connected to the ComfyUI server!")
 class Item(BaseModel):
     workflow_values: Optional[Dict] = None
 
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(workflow_values):
+    item = Item(workflow_values=workflow_values)
 
     template_values = item.workflow_values
 
