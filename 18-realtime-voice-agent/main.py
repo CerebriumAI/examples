@@ -44,7 +44,7 @@ login(token=get_secret('HF_TOKEN'))
 def start_server():
     while True:
         process = subprocess.Popen(
-            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model NousResearch/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {get_secret('HF_TOKEN')}",
+            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model meta-llama/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {get_secret('HF_TOKEN')}",
             shell=True
         )
         process.wait()  # Wait for the process to complete
@@ -91,7 +91,7 @@ async def main(room_url: str, token: str):
         llm = OpenAILLMService(
             name="LLM",
             api_key=get_secret("HF_TOKEN"),
-            model="NousResearch/Meta-Llama-3-8B-Instruct",
+            model="meta-llama/Meta-Llama-3-8B-Instruct",
             base_url="http://127.0.0.1:5000/v1"
         )
 
