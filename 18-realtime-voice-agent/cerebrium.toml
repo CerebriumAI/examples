@@ -29,8 +29,8 @@ memory = 18.0
 gpu_count = 1
 
 [cerebrium.scaling]
-min_replicas = 12
-max_replicas = 50
+min_replicas = 1
+max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
