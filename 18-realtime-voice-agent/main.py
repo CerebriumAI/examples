@@ -163,7 +163,7 @@ def check_vllm_model_status():
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             return True
-        time.sleep(15)
+        time.sleep(25)
     return False
 
 def start_bot(room_url: str, token: str = None):
