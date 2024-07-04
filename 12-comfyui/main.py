@@ -61,8 +61,10 @@ print("Successfully connected to the ComfyUI server!")
 class Item(BaseModel):
     workflow_values: Optional[Dict] = None
 
-def predict(workflow_values, run_id):
-    item = Item(**item)
+def predict(workflow_values=None, run_id):
+    item = Item(workflow_values=workflow_values)
+
+    template_values = item.workflow_values
 
     template_values, tempfiles = convert_request_file_url_to_path(workflow_values)
     json_workflow_copy = copy.deepcopy(json_workflow)
