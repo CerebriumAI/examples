@@ -2,28 +2,16 @@
 # You can edit it as you wish.
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
-[cerebrium.build]
-predict_data = "{\"prompts\": [\"Hello, my name is\", \"The president of the United States is\",\"The capital of France is\", \"The future of AI is\", \"What is your favourite holiday destination\"]}"
-force_rebuild = false
-hide_public_endpoint = false
-disable_animation = false
-disable_build_logs = false
-disable_syntax_check = false
-disable_predict = false
-log_level = "INFO"
-disable_confirmation = false
-shell_commands = [
-  "pip install torch==2.1.* --index-url https://download.pytorch.org/whl/cpu",
-  "pip install --upgrade neuronx-cc==2.* --pre torch-neuronx==2.1.* transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com",
-  "pip install huggingface_hub pydantic",
-]
-
 [cerebrium.deployment]
 name = "11-inferentia-plain"
 python_version = "3.10"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
-cuda_version = "12"
+shell_commands = [
+  "pip install torch==2.1.* --index-url https://download.pytorch.org/whl/cpu",
+  "pip install --upgrade neuronx-cc==2.* --pre torch-neuronx==2.1.* transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com",
+  "pip install huggingface_hub pydantic",
+]
 
 [cerebrium.hardware]
 region = "us-east-1"

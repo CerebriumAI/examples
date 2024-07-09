@@ -2,16 +2,11 @@
 # You can edit it as you wish.
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
-[cerebrium.build]
-predict_data = "{\"prompts\": [\"Hello, my name is\", \"The president of the United States is\",\"The capital of France is\", \"The future of AI is\", \"What is your favourite holiday destination\"]}"
-force_rebuild = false
-hide_public_endpoint = false
-disable_animation = false
-disable_build_logs = false
-disable_syntax_check = false
-disable_predict = false
-log_level = "INFO"
-disable_confirmation = false
+[cerebrium.deployment]
+name = "11-inferentia"
+python_version = "3.10"
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[./example_exclude]"
 shell_commands = [
   "pip install torch==2.1.* --index-url https://download.pytorch.org/whl/cpu",
   "pip install wget",
@@ -21,13 +16,6 @@ shell_commands = [
   "git clone https://github.com/vllm-project/vllm.git",
   "cd vllm && git checkout 6ef09b08f88b675f84b7140238286e5d4c5304c8 && pip install -U -r requirements-neuron.txt --extra-index-url=https://pip.repos.neuron.amazonaws.com && pip install . --extra-index-url=https://pip.repos.neuron.amazonaws.com && cd ..",
 ]
-
-[cerebrium.deployment]
-name = "11-inferentia"
-python_version = "3.10"
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude]"
-cuda_version = "12"
 
 [cerebrium.hardware]
 region = "us-east-1"

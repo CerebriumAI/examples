@@ -2,23 +2,11 @@
 # You can edit it as you wish.
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
-[cerebrium.build]
-predict_data = "{\"prompt\": \"Here is some example predict data for your config.yaml which will be used to test your predict function on build.\"}"
-hide_public_endpoint = false
-disable_animation = false
-disable_build_logs = false
-disable_syntax_check = false
-disable_predict = false
-log_level = "INTERNAL"
-disable_confirmation = false
-
 [cerebrium.deployment]
 name = "18-realtime-agent"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
-cuda_version = "12"
-docker_base_image_url = "registry.cerebrium.ai/daily:latest"
 
 [cerebrium.hardware]
 region = "us-east-1"

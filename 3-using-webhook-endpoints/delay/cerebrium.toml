@@ -1,14 +1,13 @@
 [cerebrium.deployment]
-name = "openai-compatible-vllm"
-python_version = "3.11"
-
+name = "3-using-webhook-endpoints"
+python_version = "3.12"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[.*]"
 shell_commands = []
 
 [cerebrium.hardware]
 cpu = 3
-memory = 14.0
+memory = 5.0
 gpu = "AMPERE_A10"
 gpu_count = 1
 provider = "aws"
@@ -17,7 +16,4 @@ region = "us-east-1"
 [cerebrium.scaling]
 min_replicas = 0
 max_replicas = 5
-cooldown = 60
-
-[cerebrium.dependencies.pip]
-vllm = "latest"
+cooldown = 10

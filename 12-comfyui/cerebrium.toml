@@ -2,24 +2,11 @@
 # You can edit it as you wish.
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
-[cerebrium.build]
-predict_data = "{\"prompt\": \"Here is some example predict data for your config.yaml which will be used to test your predict function on build.\"}"
-force_rebuild = false
-hide_public_endpoint = false
-disable_animation = false
-disable_build_logs = false
-disable_syntax_check = true
-disable_predict = true
-log_level = "INFO"
-disable_confirmation = false
-shell_commands = []
-
 [cerebrium.deployment]
 name = "comfyui"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude, ./confyui, ./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors, ./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors]"
-cuda_version = "12"
 
 [cerebrium.hardware]
 region = "us-east-1"
@@ -53,6 +40,7 @@ scipy = "latest"
 tqdm = "latest"
 psutil = "latest"
 kornia = ">=0.7.1"
+
 
 [cerebrium.dependencies.conda]
 

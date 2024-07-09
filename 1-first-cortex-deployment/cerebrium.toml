@@ -1,7 +1,6 @@
 [cerebrium.deployment]
-name = "openai-compatible-vllm"
-python_version = "3.11"
-
+name = "1-first-cortex-deployment"
+python_version = "3.12"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[.*]"
 shell_commands = []
@@ -17,7 +16,5 @@ region = "us-east-1"
 [cerebrium.scaling]
 min_replicas = 0
 max_replicas = 5
-cooldown = 60
+cooldown = 10
 
-[cerebrium.dependencies.pip]
-vllm = "latest"

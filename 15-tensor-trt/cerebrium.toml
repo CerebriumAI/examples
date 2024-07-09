@@ -2,24 +2,12 @@
 # You can edit it as you wish.
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
-[cerebrium.build]
-predict_data = "{\"prompt\": \"What is the capital city of England?\"}"
-force_rebuild = true
-hide_public_endpoint = false
-disable_animation = false
-disable_build_logs = false
-disable_syntax_check = true
-disable_predict = true
-log_level = "debug"
-disable_confirmation = false
-shell_commands = [ "pip install tensorrt_llm -U --pre --extra-index-url https://pypi.nvidia.com", "wget https://raw.githubusercontent.com/NVIDIA/TensorRT-LLM/71d8d4d3dc655671f32535d6d2b60cab87f36e87/examples/llama/convert_checkpoint.py -O ./convert_checkpoint.py",]
-
 [cerebrium.deployment]
 name = "kats-tensor-rt-2"
 python_version = "3.10"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
-cuda_version = "12"
+shell_commands = [ "pip install tensorrt_llm -U --pre --extra-index-url https://pypi.nvidia.com", "wget https://raw.githubusercontent.com/NVIDIA/TensorRT-LLM/71d8d4d3dc655671f32535d6d2b60cab87f36e87/examples/llama/convert_checkpoint.py -O ./convert_checkpoint.py",]
 
 [cerebrium.hardware]
 region = "us-east-1"
