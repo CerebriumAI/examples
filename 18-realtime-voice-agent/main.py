@@ -160,10 +160,14 @@ def check_vllm_model_status():
     }
     max_retries = 8
     for _ in range(max_retries):
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return True
-        time.sleep(25)
+        print('Trying vllm server')
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                return True
+        except requests.ConnectionError:
+            print("Connection refused, retrying...")
+        time.sleep(15)
     return False
 
 def start_bot(room_url: str, token: str = None):
