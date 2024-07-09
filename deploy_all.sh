@@ -14,7 +14,7 @@ dirs=(
   "11-whisper-transcription"
   "12-comfyui"
   "13-tool-calling-langsmith"
-  "14-inferentia"
+  "14-inferentia/plain"
   "16-faster-image-generation"
   "17-winston"
   "18-realtime-voice-agent"

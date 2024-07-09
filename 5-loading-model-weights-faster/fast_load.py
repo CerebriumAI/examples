@@ -16,7 +16,7 @@ def fast_load(model_id, load_weights_func, faster=False):
     Args:
         model_id (str): The model id in the form of org/model_name
         load_weights_func (function): Some function where you load your model, send it to GPU and prep it for inference
-        faster (bool, optional): Whether to use the faster method of loading the. Defaults to False.
+        faster (bool, optional): Whether to use the faster method of loading the model. Defaults to False.
     """
     org, model_name = model_id.split("/")
     model_path = private_model_path.format(org=org, model_name=model_name)

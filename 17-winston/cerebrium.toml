@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "winston"
+name = "17-winston"
 python_version = "3.11"
 
 include = "[./*, main.py, cerebrium.toml]"

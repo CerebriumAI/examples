@@ -1,11 +1,16 @@
 from typing import Optional
-from pydantic import BaseModel, HttpUrl
+
 from huggingface_hub import hf_hub_download
+from pydantic import BaseModel, HttpUrl
 from whisper import load_model, transcribe
+
 from util import download_file_from_url, save_base64_string_to_file
 
-distil_large_v2 = hf_hub_download(repo_id="distil-whisper/distil-large-v2", filename="original-model.bin")
+distil_large_v2 = hf_hub_download(
+    repo_id="distil-whisper/distil-large-v2", filename="original-model.bin"
+)
 model = load_model(distil_large_v2)
+
 
 class Item(BaseModel):
     audio: Optional[str]
@@ -18,7 +23,7 @@ def predict(run_id, audio=None, file_url=None, webhook_endpoint=None):
     input_filename = f"{run_id}.mp3"
 
     if audio is None and file_url is None:
-        raise 'Either audio or file_url must be provided'
+        raise "Either audio or file_url must be provided"
     else:
         if item.audio is not None:
             file = save_base64_string_to_file(item.audio)

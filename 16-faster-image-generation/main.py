@@ -1,22 +1,21 @@
-
-from typing import Optional
-from pydantic import BaseModel
-import os
 import base64
 import io
+import os
+from typing import Optional
+
 import torch
 from diffusers import StableDiffusionXLPipeline
 from onediffx import compile_pipe, save_pipe, load_pipe
+from pydantic import BaseModel
 
 pipe = StableDiffusionXLPipeline.from_pretrained(
-        "stabilityai/stable-diffusion-xl-base-1.0",
-        torch_dtype=torch.float16,
-        variant="fp16",
-        use_safetensors=True
-    )
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    torch_dtype=torch.float16,
+    variant="fp16",
+    use_safetensors=True,
+)
 pipe.to("cuda")
 pipe = compile_pipe(pipe)
-
 
 if not os.path.isdir("/persistent-storage/cached_pipe"):
     ##Run before saving
@@ -35,19 +34,19 @@ else:
     print("Pipe loaded:", pipe)
 
 
-
 class Item(BaseModel):
     prompt: str
     height: Optional[int] = 512
     width: Optional[int] = 512
     num_inference_steps: Optional[int] = 30
 
+
 def predict(prompt, height=512, width=512, num_inference_steps=30):
     item = Item(
         prompt=prompt,
         height=height,
         width=width,
-        num_inference_steps=num_inference_steps
+        num_inference_steps=num_inference_steps,
     )
 
     # run once to trigger compilation

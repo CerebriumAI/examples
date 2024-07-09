@@ -102,6 +102,14 @@ def generate(params: Item):
 
 
 def predict(promp, cutoff_len, temperature, top_p, top_k, num_beams, max_new_tokens):
-    item = Item(promp=promp, cutoff_len=cutoff_len, temperature=temperature, top_p=top_p, top_k=top_k, num_beams=num_beams, max_new_tokens=max_new_tokens)
+    item = Item(
+        promp=promp,
+        cutoff_len=cutoff_len,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        num_beams=num_beams,
+        max_new_tokens=max_new_tokens,
+    )
     result = generate(params=item)
     return {"Prediction": result}

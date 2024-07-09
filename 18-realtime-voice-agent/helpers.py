@@ -1,13 +1,11 @@
-from loguru import logger
 import asyncio
-import math
 import struct
 import time
 from dataclasses import dataclass, field
 from typing import List
 
-
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+import math
+from loguru import logger
 from pipecat.frames.frames import (
     Frame,
     AudioRawFrame,
@@ -17,12 +15,12 @@ from pipecat.frames.frames import (
     StartInterruptionFrame,
     LLMFullResponseStartFrame,
     TTSStoppedFrame,
-    MetricsFrame
+    MetricsFrame,
 )
-
-from pipecat.vad.vad_analyzer import VADAnalyzer, VADState
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.deepgram import DeepgramTTSService
 from pipecat.services.openai import OpenAILLMContext, OpenAILLMContextFrame
+from pipecat.vad.vad_analyzer import VADAnalyzer, VADState
 
 
 class GreedyLLMAggregator(FrameProcessor):
@@ -41,7 +39,10 @@ class GreedyLLMAggregator(FrameProcessor):
 
             if isinstance(frame, TranscriptionFrame):
                 # append transcribed text to last "user" frame
-                if self.context.messages and self.context.messages[-1]["role"] == "user":
+                if (
+                    self.context.messages
+                    and self.context.messages[-1]["role"] == "user"
+                ):
                     last_frame = self.context.messages.pop()
                 else:
                     last_frame = {"role": "user", "content": ""}
@@ -77,12 +78,12 @@ class BufferedSentence:
 
 
 class VADGate(FrameProcessor):
-
     def __init__(
-            self,
-            vad_analyzer: VADAnalyzer = None,
-            context: OpenAILLMContext = None,
-            **kwargs):
+        self,
+        vad_analyzer: VADAnalyzer = None,
+        context: OpenAILLMContext = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.vad_analyzer = vad_analyzer
         self.context = context
@@ -106,7 +107,6 @@ class VADGate(FrameProcessor):
         await super().process_frame(frame, direction)
 
         try:
-
             # A TTSService will emit a series of AudioRawFrame objects, then a TTSStoppedFrame,
             # then a TextFrame.
 
@@ -120,7 +120,9 @@ class VADGate(FrameProcessor):
                 return
             else:
                 if isinstance(frame, TextFrame):
-                    logger.error(f"XXXXXXXXXXXXXXXXXXX received a text frame, wasn't expecting it.")
+                    logger.error(
+                        f"XXXXXXXXXXXXXXXXXXX received a text frame, wasn't expecting it."
+                    )
 
             if isinstance(frame, AudioRawFrame):
                 # if our buffer is empty or has a "finished" sentence at the end,
@@ -139,8 +141,9 @@ class VADGate(FrameProcessor):
             # There are two ways we can be interrupted. During greedy inference, a new
             # LLM response can start. Or, during playout, we can get a traditional
             # user interruption frame.
-            if (isinstance(frame, LLMFullResponseStartFrame) or
-                    isinstance(frame, StartInterruptionFrame)):
+            if isinstance(frame, LLMFullResponseStartFrame) or isinstance(
+                frame, StartInterruptionFrame
+            ):
                 logger.debug(f"{frame} - Handle interruption in VADGate")
                 self._sentences = []
                 if self._audio_pusher_task:
@@ -157,7 +160,9 @@ class VADGate(FrameProcessor):
         try:
             if self._audio_pusher_task:
                 return
-            self._audio_pusher_task = self.get_event_loop().create_task(self.push_audio())
+            self._audio_pusher_task = self.get_event_loop().create_task(
+                self.push_audio()
+            )
 
         except Exception as e:
             logger.debug(f"Exception {e}")
@@ -188,10 +193,14 @@ class VADGate(FrameProcessor):
                     await self.push_frame(frame)
                     # assume linear16 encoding (2 bytes per sample). todo: add some more
                     # metadata to AudioRawFrame, maybe
-                    duration += (len(frame.audio) / 2 / frame.num_channels) / sample_rate
+                    duration += (
+                        len(frame.audio) / 2 / frame.num_channels
+                    ) / sample_rate
                 await asyncio.sleep(duration - 20 / 1000)
                 if self.context:
-                    logger.debug(f"Appending assistant message to context: [{s.text_frame.text}]")
+                    logger.debug(
+                        f"Appending assistant message to context: [{s.text_frame.text}]"
+                    )
                     self.context.messages.append(
                         {"role": "assistant", "content": s.text_frame.text}
                     )
@@ -233,12 +242,16 @@ class AudioVolumeTimer(FrameProcessor):
         if isinstance(frame, AudioRawFrame):
             volume = self.calculate_volume(frame)
             # print(f"Audio volume: {volume:.2f} dB")
-            if (volume >= self._speech_volume_threshold and
-                    self._prev_volume < self._speech_volume_threshold):
+            if (
+                volume >= self._speech_volume_threshold
+                and self._prev_volume < self._speech_volume_threshold
+            ):
                 # logger.debug("transition above speech volume threshold")
                 self.last_transition_ts = time.time()
-            elif (volume < self._speech_volume_threshold and
-                    self._prev_volume >= self._speech_volume_threshold):
+            elif (
+                volume < self._speech_volume_threshold
+                and self._prev_volume >= self._speech_volume_threshold
+            ):
                 # logger.debug("transition below non-speech volume threshold")
                 self.last_transition_ts = time.time()
             self._prev_volume = volume

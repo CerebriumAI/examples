@@ -29,7 +29,9 @@ class Item(BaseModel):
     max_new_tokens: int
 
 
-def predict(prompt, cutoff_len=256, temperature=0.8, top_p=0.75, top_k=40, max_new_tokens=250):
+def predict(
+    prompt, cutoff_len=256, temperature=0.8, top_p=0.75, top_k=40, max_new_tokens=250
+):
     item = Item(
         prompt=prompt,
         cutoff_len=cutoff_len,

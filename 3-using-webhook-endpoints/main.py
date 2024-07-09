@@ -1,6 +1,7 @@
 import time
 from typing import Optional
 
+from loguru import logger
 from pydantic import BaseModel
 
 
@@ -16,7 +17,7 @@ Load your model, setup datasets, pull in secrets, etc. here
 """
 
 
-def predict(item, run_id, logger):
+def predict(item, run_id):
     params = Item(**item)
 
     for i in range(params.delayMins * 10):

@@ -3,7 +3,7 @@
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
 [cerebrium.deployment]
-name = "onediff"
+name = "16-faster-image-generation"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"

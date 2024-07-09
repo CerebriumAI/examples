@@ -76,7 +76,6 @@ def add_custom_node(git_url: str):
 
 
 def setup_comfyui(original_working_directory, data_dir):
-
     try:
         model_json = os.path.join(original_working_directory, data_dir, "model.json")
         with open(model_json, "r") as file:

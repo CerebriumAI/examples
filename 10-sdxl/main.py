@@ -1,12 +1,11 @@
-
-from typing import Optional
-from pydantic import BaseModel
 import base64
 from io import BytesIO
+from typing import Optional
 
 import torch
-from diffusers import AutoencoderKL, DiffusionPipeline, DPMSolverMultistepScheduler
 from PIL import Image
+from diffusers import AutoencoderKL, DiffusionPipeline
+from pydantic import BaseModel
 
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -24,7 +23,6 @@ pipe = DiffusionPipeline.from_pretrained(
 pipe.unet.to(memory_format=torch.channels_last)
 pipe.to("cuda")
 pipe.enable_xformers_memory_efficient_attention()
-
 
 refiner = DiffusionPipeline.from_pretrained(
     "stabilityai/stable-diffusion-xl-refiner-1.0",
@@ -47,7 +45,7 @@ class Item(BaseModel):
     guidance_scale: Optional[float] = 7.5
     num_images_per_prompt: Optional[int] = 1
     use_refiner: Optional[bool] = True
-    denoising_frac: Optional[float] =0.8
+    denoising_frac: Optional[float] = 0.8
     end_cfg_frac: Optional[float] = 0.4
     seed: Optional[int] = None
 
@@ -58,19 +56,20 @@ def convert_to_b64(image: Image) -> str:
     img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
     return img_b64
 
+
 def predict(
-        prompt,
-        negative_prompt,
-        height,
-        width,
-        num_inference_steps,
-        guidance_scale,
-        num_images_per_prompt,
-        use_refiner,
-        denoising_frac,
-        end_cfg_frac,
-        seed
-    )
+    prompt,
+    negative_prompt,
+    height,
+    width,
+    num_inference_steps,
+    guidance_scale,
+    num_images_per_prompt,
+    use_refiner,
+    denoising_frac,
+    end_cfg_frac,
+    seed,
+):
     item = Item(
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -82,7 +81,7 @@ def predict(
         use_refiner=use_refiner,
         denoising_frac=denoising_frac,
         end_cfg_frac=end_cfg_frac,
-        seed=seed
+        seed=seed,
     )
 
     generator = None
@@ -121,6 +120,5 @@ def predict(
         ).images[0]
 
     b64_results = convert_to_b64(image)
-
 
     return {"status": "success", "data": b64_results}

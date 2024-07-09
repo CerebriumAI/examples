@@ -1,20 +1,21 @@
-
-from typing import Optional
-from pydantic import BaseModel
-from vllm import LLM, SamplingParams
-from transformers import AutoTokenizer
-import time
 import os
-from huggingface_hub import login
-from cerebrium import get_secret
+import time
+from typing import Optional
 
-os.environ['NEURON_COMPILE_CACHE_URL'] = '/persistent-storage/vllm-neuron-cache'
+from cerebrium import get_secret
+from huggingface_hub import login
+from pydantic import BaseModel
+from transformers import AutoTokenizer
+from vllm import LLM, SamplingParams
+
+os.environ["NEURON_COMPILE_CACHE_URL"] = "/persistent-storage/vllm-neuron-cache"
 
 
 class Item(BaseModel):
     prompts: list[str] = []
     temperature: Optional[float] = 0.8
     top_p: Optional[float] = 0.95
+
 
 login(token=get_secret("HF_AUTH_TOKEN"))
 
@@ -28,15 +29,12 @@ llm = LLM(
     # The device argument can be either unspecified for automated detection,
     # or explicitly assigned.
     device="neuron",
-    tensor_parallel_size=2)
+    tensor_parallel_size=2,
+)
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 
-def predict(
-        prompts,
-        temperature = 0.8,
-        top_p = 0.95
-    ):
+def predict(prompts, temperature=0.8, top_p=0.95):
     item = Item(prompts=prompts, temperature=temperature, top_p=top_p)
 
     # Start timing
@@ -63,9 +61,12 @@ def predict(
     duration = end_time - start_time
     tokens_per_second = total_tokens / duration if duration > 0 else 0
 
-    print(f"Processed {total_tokens} tokens in {duration:.2f} seconds ({tokens_per_second:.2f} tokens/second)")
+    print(
+        f"Processed {total_tokens} tokens in {duration:.2f} seconds ({tokens_per_second:.2f} tokens/second)"
+    )
 
     return {"outputs": generated_texts, "tokens_per_second": tokens_per_second}
+
 
 def count_tokens(text):
     return len(tokenizer.tokenize(text))

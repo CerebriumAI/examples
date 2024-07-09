@@ -1,10 +1,11 @@
+import base64
+import io
 from typing import Optional
-from pydantic import BaseModel
+
 import torch
 from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers.utils import load_image
-import io
-import base64
+from pydantic import BaseModel
 
 
 class Item(BaseModel):
@@ -20,13 +21,25 @@ class Item(BaseModel):
 
 
 pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=torch.float16, variant="fp16", use_safetensors=True
+    "stabilityai/stable-diffusion-xl-refiner-1.0",
+    torch_dtype=torch.float16,
+    variant="fp16",
+    use_safetensors=True,
 )
 pipe = pipe.to("cuda")
 
 
-def predict(prompt, url, negative_prompt=None, conditioning_scale=0.5, height=512, width=512, num_inference_steps=20,
-            guidance_scale=7.5, num_images_per_prompt=1):
+def predict(
+    prompt,
+    url,
+    negative_prompt=None,
+    conditioning_scale=0.5,
+    height=512,
+    width=512,
+    num_inference_steps=20,
+    guidance_scale=7.5,
+    num_images_per_prompt=1,
+):
     item = Item(
         prompt=prompt,
         url=url,
@@ -36,7 +49,7 @@ def predict(prompt, url, negative_prompt=None, conditioning_scale=0.5, height=51
         width=width,
         num_inference_steps=num_inference_steps,
         guidance_scale=guidance_scale,
-        num_images_per_prompt=num_images_per_prompt
+        num_images_per_prompt=num_images_per_prompt,
     )
 
     init_image = load_image(item.url).convert("RGB")
@@ -49,7 +62,7 @@ def predict(prompt, url, negative_prompt=None, conditioning_scale=0.5, height=51
         num_inference_steps=item.num_inference_steps,
         guidance_scale=item.guidance_scale,
         num_images_per_prompt=item.num_images_per_prompt,
-        image=init_image
+        image=init_image,
     ).images
 
     finished_images = []
