@@ -4,29 +4,27 @@
 
 [cerebrium.build]
 predict_data = "{\"prompt\": \"Here is some example predict data for your config.yaml which will be used to test your predict function on build.\"}"
-force_rebuild = false
 hide_public_endpoint = false
 disable_animation = false
 disable_build_logs = false
-disable_syntax_check = true
-disable_predict = true
+disable_syntax_check = false
+disable_predict = false
 log_level = "INFO"
 disable_confirmation = false
-shell_commands = []
 
 [cerebrium.deployment]
-name = "comfyui"
+name = "streaming-falcon"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude, ./confyui, ./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors, ./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors]"
+exclude = "[./example_exclude]"
 cuda_version = "12"
 
 [cerebrium.hardware]
 region = "us-east-1"
 provider = "aws"
 gpu = "AMPERE_A10"
-cpu = 3
-memory = 12.0
+cpu = 2
+memory = 16.0
 gpu_count = 1
 
 [cerebrium.scaling]
@@ -35,24 +33,13 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-websocket-client = "==1.6.4"
-accelerate = "==0.23.0"
-opencv-python = "latest"
+peft = "git+https://github.com/huggingface/peft.git"
+transformers = "git+https://github.com/huggingface/transformers.git"
+accelerate = "git+https://github.com/huggingface/accelerate.git"
+bitsandbytes = "latest"
+sentencepiece = "latest"
 pydantic = "latest"
-pillow = "latest"
-safetensors = "latest"
-torch = "latest"
-torchvision = "latest"
-transformers = "latest"
-torchsde = "latest"
-einops = "latest"
-aiohttp = "latest"
-pyyaml = "latest"
-Pillow = "latest"
-scipy = "latest"
-tqdm = "latest"
-psutil = "latest"
-kornia = ">=0.7.1"
+torch = "2.1.0"
 
 [cerebrium.dependencies.conda]
 

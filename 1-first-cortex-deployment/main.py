@@ -16,8 +16,8 @@ Load your model, setup datasets, pull in secrets, etc. here
 """
 
 
-def predict(item, run_id, logger):
-    params = Item(**item)
+def predict(prompt, your_optional_param):
+    params = Item(prompt=prompt, your_optional_param=your_optional_param)
     # This code is run on every inference request.
 
     # Access the parameters from your inference request
@@ -36,5 +36,5 @@ def predict(item, run_id, logger):
 
     """
     To deploy your model, run:
-    cerebrium deploy <<YOUR DEPLOYMENT NAME>> --config-file config.yaml
+    cerebrium deploy
     """

@@ -15,18 +15,18 @@ disable_confirmation = false
 shell_commands = []
 
 [cerebrium.deployment]
-name = "comfyui"
+name = "1-first-cortex-deployment"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude, ./confyui, ./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors, ./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors]"
+exclude = "[./example_exclude]"
 cuda_version = "12"
 
 [cerebrium.hardware]
 region = "us-east-1"
-provider = "aws"
-gpu = "AMPERE_A10"
-cpu = 3
-memory = 12.0
+provider = "coreweave"
+gpu = "AMPERE_A6000"
+cpu = 2
+memory = 30
 gpu_count = 1
 
 [cerebrium.scaling]
@@ -35,24 +35,20 @@ max_replicas = 5
 cooldown = 60
 
 [cerebrium.dependencies.pip]
-websocket-client = "==1.6.4"
-accelerate = "==0.23.0"
-opencv-python = "latest"
 pydantic = "latest"
-pillow = "latest"
-safetensors = "latest"
-torch = "latest"
-torchvision = "latest"
+ray = "latest"
 transformers = "latest"
-torchsde = "latest"
-einops = "latest"
-aiohttp = "latest"
-pyyaml = "latest"
-Pillow = "latest"
+bitsandbytes = "latest"
+peft = "latest"
+torch = "latest"
+numpy = "latest"
+huggingface_hub = "latest"
+safetensors = "latest"
+accelerate = "latest"
 scipy = "latest"
-tqdm = "latest"
-psutil = "latest"
-kornia = ">=0.7.1"
+sentencepiece = "latest"
+hf_transfer = "latest"
+optimum = "latest"
 
 [cerebrium.dependencies.conda]
 

@@ -53,8 +53,8 @@ def create_embeddings(texts, start_times):
     return metadatas, docs
 
 
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(url, question):
+    item = Item(url=url, question=question)
 
     video = pytube.YouTube(item.url)
     video.streams.get_highest_resolution().filesize
