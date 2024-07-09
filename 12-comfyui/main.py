@@ -65,7 +65,7 @@ def predict(workflow_values):
 
     template_values = item.workflow_values
 
-    template_values, tempfiles = convert_request_file_url_to_path(template_values)
+    template_values, tempfiles = convert_request_file_url_to_path(workflow_values)
     json_workflow_copy = copy.deepcopy(json_workflow)
     json_workflow_copy = fill_template(json_workflow_copy, template_values)
     outputs = {}  # Initialize outputs to an empty dictionary
