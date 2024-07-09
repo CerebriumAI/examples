@@ -9,7 +9,7 @@ shell_commands = []
 cpu = 4
 memory = 14.0
 gpu = "AMPERE_A10"
-gpu_count = 4
+gpu_count = 1
 provider = "aws"
 region = "us-east-1"
 
@@ -27,3 +27,4 @@ sentencepiece = "latest"
 torch = "latest"
 
 [cerebrium.dependencies.apt]
+git = "latest"

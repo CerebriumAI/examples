@@ -1,28 +1,23 @@
 [cerebrium.deployment]
-name = "10-sdxl-refiner"
-python_version = "3.12"
+name = "20-openai-compatible-vllm"
+python_version = "3.11"
+
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[.*]"
 shell_commands = []
 
 [cerebrium.hardware]
-cpu = 4
+cpu = 3
 memory = 14.0
 gpu = "AMPERE_A10"
-gpu_count = 4
+gpu_count = 1
 provider = "aws"
 region = "us-east-1"
 
 [cerebrium.scaling]
 min_replicas = 0
 max_replicas = 5
-cooldown = 10
+cooldown = 60
 
 [cerebrium.dependencies.pip]
-invisible_watermark = "latest"
-transformers = "latest"
-accelerate = "latest"
-safetensors = "latest"
-diffusers = "latest"
-
-[cerebrium.dependencies.apt]
+vllm = "latest"

@@ -9,9 +9,9 @@ shell_commands = []
 [cerebrium.hardware]
 cpu = 4
 memory = 90.0
-gpu = "AMPERE_A6000"
+gpu = "AMPERE_A10"
 gpu_count = 1
-provider = "coreweave"
+provider = "aws"
 region = "us-east-1"
 
 [cerebrium.scaling]
