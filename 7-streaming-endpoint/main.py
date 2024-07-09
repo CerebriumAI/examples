@@ -1,5 +1,3 @@
-from typing import Optional
-
 import torch
 from pydantic import BaseModel
 from transformers import (
@@ -24,15 +22,22 @@ model = AutoModelForCausalLM.from_pretrained(
 
 class Item(BaseModel):
     prompt: str
-    cutoff_len: Optional[int] = 256
-    temperature: Optional[float] = 0.8
-    top_p: Optional[float] = 0.75
-    top_k: Optional[float] = 40
-    max_new_tokens: Optional[int] = 250
+    cutoff_len: int
+    temperature: float
+    top_p: float
+    top_k: float
+    max_new_tokens: int
 
 
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(prompt, cutoff_len=256, temperature=0.8, top_p=0.75, top_k=40, max_new_tokens=250):
+    item = Item(
+        prompt=prompt,
+        cutoff_len=cutoff_len,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        max_new_tokens=max_new_tokens,
+    )
     inputs = tokenizer(
         item.prompt, return_tensors="pt", max_length=512, truncation=True, padding=True
     )

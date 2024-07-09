@@ -99,8 +99,8 @@ conversational_agent_executor = RunnableWithMessageHistory(
 )
 
 @traceable
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(prompt, session_id):
+    item = Item(prompt=prompt, session_id=session_id)
 
     output = conversational_agent_executor.invoke(
         {

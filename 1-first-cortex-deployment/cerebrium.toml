@@ -6,8 +6,8 @@ exclude = "[.*]"
 shell_commands = []
 
 [cerebrium.hardware]
-cpu = 3
-memory = 14.0
+cpu = 2
+memory = 8.0
 gpu = "AMPERE_A10"
 gpu_count = 1
 provider = "aws"
@@ -18,3 +18,6 @@ min_replicas = 0
 max_replicas = 5
 cooldown = 10
 
+[cerebrium.dependencies.pip]
+pydantic = "latest"
+numpy = "latest"

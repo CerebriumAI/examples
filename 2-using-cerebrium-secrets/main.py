@@ -6,9 +6,7 @@ from cerebrium import get_secret  # <-- import secrets from cerebrium
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, LlamaTokenizer, GenerationConfig
 
-########################################
-# Using a Cerebrium secret
-########################################
+
 try:
     """
     To access your cerebrium secret:
@@ -34,10 +32,6 @@ except Exception as e:
 
 huggingface_hub.login(token=hf_auth_token)
 
-
-########################################
-# User-facing API Parameters
-########################################
 class Item(BaseModel):
     prompt: str
     cutoff_len: Optional[int] = 256
@@ -47,10 +41,6 @@ class Item(BaseModel):
     num_beams: Optional[int] = 4
     max_new_tokens: Optional[int] = 256
 
-
-#######################################
-# Initialize the model
-#######################################
 
 base_model_name = "meta-llama/Llama-2-7b-hf"  # Hugging Face Model Id
 base_model = AutoModelForCausalLM.from_pretrained(
@@ -99,10 +89,7 @@ def generate(params: Item):
     return tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
 
 
-#######################################
-# Prediction
-#######################################
-def predict(item, run_id, logger):
-    item = Item(**item)
+def predict(prompt, cutoff_len, temperature, top_p, top_k, num_beams, max_new_tokens):
+    item = Item(prompt=prompt, cutoff_len=cutoff_len, temperature=temperature, top_p=top_p, top_k=top_k, num_beams=num_beams, max_new_tokens=max_new_tokens)
     result = generate(params=item)
     return {"Prediction": result}
