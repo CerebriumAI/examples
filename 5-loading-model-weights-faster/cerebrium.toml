@@ -4,6 +4,7 @@ python_version = "3.12"
 include = "[./*, main.py, fast_load.py, cerebrium.toml]"
 exclude = "[.*]"
 shell_commands = []
+base_image = "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
 
 [cerebrium.hardware]
 cpu = 4
