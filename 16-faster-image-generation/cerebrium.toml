@@ -36,3 +36,4 @@ pydantic = "latest"
 [cerebrium.dependencies.conda]
 
 [cerebrium.dependencies.apt]
+git = "latest"

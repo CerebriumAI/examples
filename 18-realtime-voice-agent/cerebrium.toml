@@ -24,10 +24,11 @@ cooldown = 180
 
 [cerebrium.dependencies.pip]
 torch = ">=2.0.0"
-"pipecat-ai[silero, daily, openai, deepgram]" = "latest"
-aiohttp = "latest"
-openai = "latest"
-torchaudio = "latest"
+"pipecat-ai[silero, daily, openai, deepgram]" = "==0.0.34"
+aiohttp = ">=3.9.4"
+torchaudio = ">=2.3.0"
+channels = ">=4.0.0"
+requests="==2.32.2"
 vllm = "latest"
 huggingface_hub = "latest"
 

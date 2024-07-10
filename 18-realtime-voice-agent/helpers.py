@@ -121,7 +121,7 @@ class VADGate(FrameProcessor):
             else:
                 if isinstance(frame, TextFrame):
                     logger.error(
-                        f"XXXXXXXXXXXXXXXXXXX received a text frame, wasn't expecting it."
+                        "XXXXXXXXXXXXXXXXXXX received a text frame, wasn't expecting it."
                     )
 
             if isinstance(frame, AudioRawFrame):
