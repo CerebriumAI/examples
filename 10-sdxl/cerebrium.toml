@@ -33,9 +33,9 @@ invisible-watermark = ">=0.2.0"
 xformers = "latest"
 
 [cerebrium.dependencies.conda]
-"" = "latest"
 
 [cerebrium.dependencies.apt]
+git = "latest"
 ffmpeg = "latest"
 libsm6 = "latest"
 libxext6 = "latest"
