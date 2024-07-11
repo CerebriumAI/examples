@@ -7,7 +7,7 @@ Some prerequisites:
 Note:
     - Make sure you deploy using the --config-file flag and point it to the config.yaml file in this directory.
     - larger models by nature have more calculations that need to be performed and will take longer to run.
-    - If you're using GPU's that do not have nvlink, inter-gpu communication will be slower but it will still work.
+    - If you're using GPU's that do not have nvlink, inter-gpu communication will be slower, but it will still work.
     - To speedup loading of model weights, take a look at the folder in this repo which shows you how to speedup loading of model weights.
 """
 import os
@@ -66,7 +66,7 @@ class Item(BaseModel):
     max_new_tokens: Optional[int] = 256
 
 
-def tokenize(prompt, cutoff_len, add_eos_token=True):
+def tokenize(prompt, cutoff_len):
     print("tokenizing: ", prompt)
     return tokenizer(
         prompt,
@@ -101,9 +101,9 @@ def generate(params: Item):
     return tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
 
 
-def predict(promp, cutoff_len, temperature, top_p, top_k, num_beams, max_new_tokens):
+def predict(prompt, cutoff_len, temperature, top_p, top_k, num_beams, max_new_tokens):
     item = Item(
-        promp=promp,
+        promp=prompt,
         cutoff_len=cutoff_len,
         temperature=temperature,
         top_p=top_p,

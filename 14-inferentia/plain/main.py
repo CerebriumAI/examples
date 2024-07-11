@@ -26,7 +26,7 @@ name = "meta-llama/Meta-Llama-3-8B-Instruct"
 model = NeuronAutoModelForCausalLM.from_pretrained(
     name,  # The reference to the huggingface model
     tp_degree=2,
-    # The Number of NeuronCores to shard the model across. Using 8 means 3 replicas can be used on a inf2.48xlarge
+    # The Number of NeuronCores to shard the model across. Using 8 means 3 replicas can be used on an inf2.48xlarge
     amp="bf16",  # Ensure the model weights/compute are bfloat16 for faster compute
 )
 model.to_neuron()

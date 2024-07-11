@@ -21,5 +21,5 @@ async def main(prompt: str, run_id: str):
         prompt = output.outputs
         new_text = prompt[0].text[len(previous_text) :]
         print(new_text)
-        yield (new_text)
+        yield new_text
         previous_text = prompt[0].text

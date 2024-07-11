@@ -35,7 +35,7 @@ def predict(item):
         leave__comment(repo_name, pr_number, summary)
 
         approval = boolean_generator(
-            f"You are a coding assistant reviewing the contents of a pull request on a Github repository. I am providing you both the old and new code where deleted code is denoted by '-' and new code by '+' on the given code changes, do you you think the code changes look good to approve? If you think the PR is good to approve, responsd 'yes' otherwise respond 'no'. If it is a complex PR then respond no even if it looks correct. Here is the code: {json.dumps(files_changed)}"
+            f"You are a coding assistant reviewing the contents of a pull request on a Github repository. I am providing you both the old and new code where deleted code is denoted by '-' and new code by '+' on the given code changes, do you you think the code changes look good to approve? If you think the PR is good to approve, respond 'yes' otherwise respond 'no'. If it is a complex PR then respond no even if it looks correct. Here is the code: {json.dumps(files_changed)}"
         )
         print(approval)
 

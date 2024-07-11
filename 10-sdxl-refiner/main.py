@@ -1,11 +1,14 @@
 import base64
 import io
+import tempfile
 from typing import Optional
 
 import torch
 from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers.utils import load_image
 from pydantic import BaseModel
+
+temp_dir = tempfile.TemporaryDirectory()
 
 
 class Item(BaseModel):
@@ -25,6 +28,7 @@ pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
     torch_dtype=torch.float16,
     variant="fp16",
     use_safetensors=True,
+    cache_dir=temp_dir.name,
 )
 pipe = pipe.to("cuda")
 

@@ -4,7 +4,7 @@ import time
 
 from transformers import AutoModelForCausalLM, AutoConfig
 
-# Setup the paths to the model cache
+# Set up the paths to the model cache
 APP_NAME = os.environ.get(
     "APP_NAME", "default"
 )  # this gets the name of your deployment from the environment variables

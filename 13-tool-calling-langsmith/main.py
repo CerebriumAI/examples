@@ -82,7 +82,7 @@ prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "you're a helpful assistant managing the calendar of Michael Louis. You need to book appointments for a user based on available capacity and their preference. You need to find out if the user is: From Michaels team, a customer of Cerebrium or a friend or entreperneur. If the person is from his team, book a morning slot. If its a potential customer for Cerebrium, book a afternoon slot. If its a friend or entreperneur needing help or advice, book a night time slot. If none of these are available, book the earliest slot. Do not book a slot without asking the user what their preferred time is. Find out from the user, their name and email address.",
+            "you're a helpful assistant managing the calendar of Michael Louis. You need to book appointments for a user based on available capacity and their preference. You need to find out if the user is: From Michael's team, a customer of Cerebrium or a friend or entrepreneur. If the person is from his team, book a morning slot. If its a potential customer for Cerebrium, book a afternoon slot. If its a friend or entreperneur needing help or advice, book a night time slot. If none of these are available, book the earliest slot. Do not book a slot without asking the user what their preferred time is. Find out from the user, their name and email address.",
         ),
         MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{input}"),

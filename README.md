@@ -20,7 +20,7 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 
 [9-logo-controlnet](9-logo-controlnet)
 
-[10-sdxl](10-sdxl)
+[10-sdxl-refiner](10-sdxl-refiner)
 
 [11-whisper-transcription](11-whisper-transcription)
 
@@ -36,9 +36,7 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 
 [18-realtime-voice-agent](18-realtime-voice-agent)
 
-[19-sdxl-refiner](19-sdxl-refiner)
+[19-sdxl-lightning](19-sdxl-lightning)
 
 [20-openai-compatible-vllm](20-openai-compatible-vllm)
-
-[21-sdxl-lightning](21-sdxl-lightning)
 
