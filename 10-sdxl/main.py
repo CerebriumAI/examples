@@ -59,16 +59,16 @@ def convert_to_b64(image: Image) -> str:
 
 def predict(
     prompt,
-    negative_prompt,
-    height,
-    width,
-    num_inference_steps,
-    guidance_scale,
-    num_images_per_prompt,
-    use_refiner,
-    denoising_frac,
-    end_cfg_frac,
-    seed,
+    negative_prompt=None,
+    height=512,
+    width=512,
+    num_inference_steps=20,
+    guidance_scale=7.5,
+    num_images_per_prompt=1,
+    use_refiner=True,
+    denoising_frac=0.8,
+    end_cfg_frac=0.4,
+    seed=None,
 ):
     item = Item(
         prompt=prompt,
