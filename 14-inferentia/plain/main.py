@@ -1,12 +1,13 @@
-from typing import Optional
-from pydantic import BaseModel
-from transformers_neuronx import NeuronAutoModelForCausalLM
-import torch
-import time
-from transformers import AutoTokenizer, TextStreamer
-from huggingface_hub import login
 import os
+import time
+from typing import Optional
+
+import torch
 from cerebrium import get_secret
+from huggingface_hub import login
+from pydantic import BaseModel
+from transformers import AutoTokenizer, TextStreamer
+from transformers_neuronx import NeuronAutoModelForCausalLM
 
 
 class Item(BaseModel):
@@ -16,15 +17,16 @@ class Item(BaseModel):
 
 
 login(token=get_secret("HF_AUTH_TOKEN"))
-os.environ["NEURON_COMPILE_CACHE_URL"] = (
-    "/persistent-storage/plain-neuron-compile-cache"
-)
+os.environ[
+    "NEURON_COMPILE_CACHE_URL"
+] = "/persistent-storage/plain-neuron-compile-cache"
 
 name = "meta-llama/Meta-Llama-3-8B-Instruct"
 
 model = NeuronAutoModelForCausalLM.from_pretrained(
     name,  # The reference to the huggingface model
-    tp_degree=2,  # The Number of NeuronCores to shard the model across. Using 8 means 3 replicas can be used on a inf2.48xlarge
+    tp_degree=2,
+    # The Number of NeuronCores to shard the model across. Using 8 means 3 replicas can be used on an inf2.48xlarge
     amp="bf16",  # Ensure the model weights/compute are bfloat16 for faster compute
 )
 model.to_neuron()
@@ -51,6 +53,6 @@ def predict(prompt, temperature=0.8, top_p=0.95):
 
     print(f"generated_sequences: {generated_sequences}")
 
-    print(f"Processed in {end_time-start_time} seconds")
+    print(f"Processed in {end_time - start_time} seconds")
 
     return {"result": generated_sequences}

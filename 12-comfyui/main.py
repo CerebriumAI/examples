@@ -1,6 +1,3 @@
-from typing import Optional
-from pydantic import BaseModel
-
 import copy
 import json
 import os
@@ -8,8 +5,11 @@ import time
 import uuid
 from multiprocessing import Process
 from typing import Dict
+from typing import Optional
 
 import websocket
+from pydantic import BaseModel
+
 from helpers import (
     convert_outputs_to_base64,
     convert_request_file_url_to_path,
@@ -37,9 +37,7 @@ if side_process is None:
     side_process.start()
 
 # Load the workflow file as a python dictionary
-with open(
-    os.path.join("./", "workflow_api.json"), "r"
-) as json_file:
+with open(os.path.join("./", "workflow_api.json"), "r") as json_file:
     json_workflow = json.load(json_file)
 
 # Connect to the ComfyUI server via websockets
@@ -47,9 +45,7 @@ socket_connected = False
 while not socket_connected:
     try:
         ws = websocket.WebSocket()
-        ws.connect(
-            "ws://{}/ws?clientId={}".format(server_address, client_id)
-        )
+        ws.connect("ws://{}/ws?clientId={}".format(server_address, client_id))
         socket_connected = True
     except Exception as e:
         print("Could not connect to comfyUI server. Trying again...")
@@ -57,8 +53,10 @@ while not socket_connected:
 
 print("Successfully connected to the ComfyUI server!")
 
+
 class Item(BaseModel):
     workflow_values: Optional[Dict] = None
+
 
 def predict(workflow_values):
     item = Item(workflow_values=workflow_values)
@@ -71,19 +69,15 @@ def predict(workflow_values):
     outputs = {}  # Initialize outputs to an empty dictionary
 
     try:
-        outputs = get_images(
-            ws, json_workflow_copy, client_id, server_address
-        )
+        outputs = get_images(ws, json_workflow_copy, client_id, server_address)
 
     except Exception as e:
-        print('did it get here')
         print("Error occurred while running Comfy workflow: ", e)
 
     for file in tempfiles:
         file.close()
 
     result = []
-    print('here')
     for node_id in outputs:
         for unit in outputs[node_id]:
             file_name = unit.get("filename")

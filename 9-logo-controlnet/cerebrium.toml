@@ -1,13 +1,12 @@
 [cerebrium.deployment]
-name = "openai-compatible-vllm"
-python_version = "3.11"
-cuda_version = "12"
+name = "9-logo-controlnet"
+python_version = "3.12"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[.*]"
 shell_commands = []
 
 [cerebrium.hardware]
-cpu = 3
+cpu = 4
 memory = 14.0
 gpu = "AMPERE_A10"
 gpu_count = 1
@@ -16,8 +15,14 @@ region = "us-east-1"
 
 [cerebrium.scaling]
 min_replicas = 0
-max_replicas = 5
-cooldown = 60
+max_replicas = 2
+cooldown = 10
 
 [cerebrium.dependencies.pip]
-vllm = "latest"
+accelerate = "latest"
+transformers = "latest"
+safetensors = "latest"
+opencv-python = "latest"
+diffusers = "latest"
+
+[cerebrium.dependencies.apt]

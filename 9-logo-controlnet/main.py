@@ -42,7 +42,7 @@ pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
 pipe.enable_model_cpu_offload()
 
 
-def predict(item, run_id, logger):
+def predict(item):
     item = Item(**item)
 
     init_image = load_image(item.image_url)

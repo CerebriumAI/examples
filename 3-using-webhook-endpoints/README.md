@@ -5,9 +5,9 @@ description: A short example on how to use webhook endpoints for async and long 
 
 # Webhook Endpoints for Async and Long Running Tasks
 
-This guide presents a short example on how to use webhook endpoints for async and long running tasks on Cerebrium.
+This guide presents a short example on how to use webhook endpoints for async and long-running tasks on Cerebrium.
 
-Webhook endpoints are especially useful when you have tasks that will run for more than the 3 min timeout limit on
+Webhook endpoints are especially useful when you have tasks that will run for more than the 3-minute timeout limit on
 Cerebrium. This allows you to run longer, more demanding tasks on our platform!
 
 ## 1. Getting a webhook endpoint to test:

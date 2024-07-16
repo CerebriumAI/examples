@@ -1,8 +1,10 @@
 import base64
 import uuid
+
 import requests
 
 DOWNLOAD_ROOT = "/tmp/"  # Change this to /persistent-storage/ if you want to save files to the persistent storage
+
 
 def download_file_from_url(url: str, filename: str):
     print("Downloading file...")
@@ -34,4 +36,3 @@ def save_base64_string_to_file(audio: str):
 
     print("Decoding base64 to file was successful")
     return filename
-

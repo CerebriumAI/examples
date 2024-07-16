@@ -6,7 +6,6 @@ from cerebrium import get_secret  # <-- import secrets from cerebrium
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, LlamaTokenizer, GenerationConfig
 
-
 try:
     """
     To access your cerebrium secret:
@@ -31,6 +30,7 @@ except Exception as e:
     raise e
 
 huggingface_hub.login(token=hf_auth_token)
+
 
 class Item(BaseModel):
     prompt: str
@@ -90,6 +90,14 @@ def generate(params: Item):
 
 
 def predict(prompt, cutoff_len, temperature, top_p, top_k, num_beams, max_new_tokens):
-    item = Item(prompt=prompt, cutoff_len=cutoff_len, temperature=temperature, top_p=top_p, top_k=top_k, num_beams=num_beams, max_new_tokens=max_new_tokens)
+    item = Item(
+        prompt=prompt,
+        cutoff_len=cutoff_len,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        num_beams=num_beams,
+        max_new_tokens=max_new_tokens,
+    )
     result = generate(params=item)
     return {"Prediction": result}

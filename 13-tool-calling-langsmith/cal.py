@@ -1,17 +1,22 @@
 from datetime import datetime, timedelta
+
 import pytz
+
 
 def parse_time(time_str):
     """Parse a time string in ISO format to a datetime object in EST timezone."""
     utc_time = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
     utc_time = utc_time.replace(tzinfo=pytz.utc)  # Set the timezone to UTC
-    est_time = utc_time.astimezone(pytz.timezone('America/New_York'))  # Convert to EST
+    est_time = utc_time.astimezone(pytz.timezone("America/New_York"))  # Convert to EST
     return est_time
+
 
 def find_available_slots(api_response, start_date, end_date):
     """Find available time slots within a given date range."""
     busy_times = api_response["busy"]
-    working_hours = api_response["workingHours"][0]  # Assuming one set of working hours for simplicity
+    working_hours = api_response["workingHours"][
+        0
+    ]  # Assuming one set of working hours for simplicity
 
     # Convert start and end times to minutes for easier comparison
     work_start_time = working_hours["startTime"]
@@ -42,9 +47,13 @@ def find_available_slots(api_response, start_date, end_date):
 
                         # Check for overlap and adjust the available slots accordingly
                         if busy_start_minutes > slot_start:
-                            new_day_slots.append((slot_start, min(busy_start_minutes, slot_end)))
+                            new_day_slots.append(
+                                (slot_start, min(busy_start_minutes, slot_end))
+                            )
                         if busy_end_minutes < slot_end:
-                            new_day_slots.append((max(busy_end_minutes, slot_start), slot_end))
+                            new_day_slots.append(
+                                (max(busy_end_minutes, slot_start), slot_end)
+                            )
 
                     day_slots = new_day_slots
 

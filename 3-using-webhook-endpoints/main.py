@@ -1,6 +1,7 @@
 import time
 from typing import Optional
 
+from loguru import logger
 from pydantic import BaseModel
 
 
@@ -9,14 +10,14 @@ class Item(BaseModel):
     delayMins: Optional[int] = 3
 
 
-### Setup your model here.
+# Set up your model here.
 """
 This code will be run once when your replica starts. 
 Load your model, setup datasets, pull in secrets, etc. here
 """
 
 
-def predict(item, run_id, logger):
+def predict(item):
     params = Item(**item)
 
     for i in range(params.delayMins * 10):
@@ -25,7 +26,8 @@ def predict(item, run_id, logger):
 
     return {"result": f"Delayed for {params.delayMins} mins"}  # return your results
 
-    """
-    To deploy your model, run:
-    cerebrium deploy <<YOUR DEPLOYMENT NAME>> --config-file config.yaml
-    """
+
+"""
+To deploy your model, run:
+cerebrium deploy <<YOUR DEPLOYMENT NAME>> --config-file config.yaml
+"""

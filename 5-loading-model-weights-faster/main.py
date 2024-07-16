@@ -25,8 +25,10 @@ print("\n\n", file=sys.stderr)
 class Item(BaseModel):
     prompt: str
 
+
 # model_path = "EleutherAI/gpt-neox-20b"
 model_path = "EleutherAI/pythia-14m"
+
 
 def setup_model():
     # Load your model here
@@ -45,7 +47,6 @@ start = time.time()
 model = fast_load(model_id=model_path, load_weights_func=setup_model, faster=True)
 # print out the timing
 print(f"Tensoriser loaded model in: {time.time() - start} seconds", file=sys.stderr)
-
 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 

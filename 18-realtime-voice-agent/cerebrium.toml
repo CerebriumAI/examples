@@ -2,22 +2,11 @@
 # You can edit it as you wish.
 # If you would like to learn more about your Cerebrium config, please visit https://docs.cerebrium.ai/cerebrium/environments/config-files#config-file-example
 
-[cerebrium.build]
-predict_data = "{\"prompt\": \"Here is some example predict data for your config.yaml which will be used to test your predict function on build.\"}"
-hide_public_endpoint = false
-disable_animation = false
-disable_build_logs = false
-disable_syntax_check = false
-disable_predict = false
-log_level = "INTERNAL"
-disable_confirmation = false
-
 [cerebrium.deployment]
 name = "18-realtime-agent"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"
-cuda_version = "12"
 docker_base_image_url = "registry.cerebrium.ai/daily:latest"
 
 [cerebrium.hardware]
@@ -30,15 +19,16 @@ gpu_count = 1
 
 [cerebrium.scaling]
 min_replicas = 0
-max_replicas = 5
+max_replicas = 2
 cooldown = 180
 
 [cerebrium.dependencies.pip]
 torch = ">=2.0.0"
-"pipecat-ai[silero, daily, openai, deepgram]" = "latest"
-aiohttp = "latest"
-openai = "latest"
-torchaudio = "latest"
+"pipecat-ai[silero, daily, openai, deepgram]" = "==0.0.34"
+aiohttp = ">=3.9.4"
+torchaudio = ">=2.3.0"
+channels = ">=4.0.0"
+requests="==2.32.2"
 vllm = "latest"
 huggingface_hub = "latest"
 

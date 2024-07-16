@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "17-winston"
+name = "20-openai-compatible-vllm"
 python_version = "3.11"
 
 include = "[./*, main.py, cerebrium.toml]"
@@ -7,8 +7,8 @@ exclude = "[.*]"
 shell_commands = []
 
 [cerebrium.hardware]
-cpu = 4
-memory = 90.0
+cpu = 3
+memory = 14.0
 gpu = "AMPERE_A10"
 gpu_count = 1
 provider = "aws"
@@ -20,10 +20,4 @@ max_replicas = 2
 cooldown = 20
 
 [cerebrium.dependencies.pip]
-"transformers" = "latest"
-"torch" = "latest"
-"outlines" = "latest"
-"huggingface_hub" = "latest"
-"sentencepiece" = "latest"
-"protobuf" = "latest"
-"pydantic" = "latest"
+vllm = "latest"

@@ -69,7 +69,7 @@ def predict(url, question):
     embeddings = HuggingFaceEmbeddings()
     store = FAISS.from_texts(docs, embeddings, metadatas=metadatas)
     faiss.write_index(store.index, "docs.index")
-    ##TODO: Add LLM
+    # TODO: Add LLM
     llm = CerebriumAI(
         endpoint_url="https://run.cerebrium.ai/flan-t5-xl-webhook/predict"
     )
