@@ -67,10 +67,10 @@ async def main(room_url: str, token: str):
             "Andrej Karpathy",
             DailyParams(
                 audio_out_enabled=True,
-                transcription_enabled=False, ##For local testing, enable and comment out Deepgram sst
+                transcription_enabled=True, ##For local testing, enable and comment out Deepgram sst
                 vad_enabled=True,
                 vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                vad_audio_passthrough=True,
+                # vad_audio_passthrough=True,
             )
         )
 
@@ -166,19 +166,17 @@ async def main(room_url: str, token: str):
 
         await runner.run(task)
         await session.close()
+    return True
 
-def start_bot(room_url: str, token: str = None):
-    def target():
-        try:
-            asyncio.run(main(room_url, token))
-        except Exception as e:
-            logger.error(f"Exception in main: {e}")
-            sys.exit(1)  # Exit with a non-zero status code
+async def start_bot(room_url: str, token: str = None):
+    await check_deepgram_model_status()
+
+    try:
+        await main(room_url, token)
+    except Exception as e:
+        logger.error(f"Exception in main: {e}")
+        sys.exit(1)  # Exit with a non-zero status code
     
-    check_deepgram_model_status()
-    process = Process(target=target, daemon=True)
-    process.start()
-    process.join()  # Wait for the process to complete
     return {"message": "session finished"}
 
 def create_room():
@@ -220,7 +218,8 @@ def create_token(room_name: str):
     }
     data = {
         "properties": {
-            "room_name": room_name
+            "room_name": room_name,
+            "is_owner": True,
         }
     }
 
@@ -232,20 +231,24 @@ def create_token(room_name: str):
         print(f"Failed to create token: {response.status_code}")
         return None
 
-def check_deepgram_model_status():
-    url = "http://127.0.0.1:8082/v1/status"
+async def check_deepgram_model_status():
+    url = "http://127.0.0.1:8082/v1/status/engine"
     headers = {
         "Content-Type": "application/json"
     }
-    max_retries = 8
-    for _ in range(max_retries):
-        print("Trying deepgram local server")
-        try:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                return True
-        except requests.ConnectionError:
-            print("Connection refused, retrying...")
-        time.sleep(10)
+    max_retries = 5
+    async with aiohttp.ClientSession() as session:
+        for _ in range(max_retries):
+            print("Trying Deepgram local server")
+            try:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        json_response = await response.json()
+                        print(json_response)
+                        if json_response.get('engine_connection_status') == 'Connected':
+                            print("Connected to deepgram local server")
+                            return True
+            except aiohttp.ClientConnectionError:
+                print("Connection refused, retrying...")
+            await asyncio.sleep(10)
     return False
-
