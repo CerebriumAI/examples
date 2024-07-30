@@ -36,7 +36,10 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 
 [18-realtime-voice-agent](18-realtime-voice-agent)
 
-[19-sdxl-lightning](19-sdxl-lightning)
+[19-voice-rag-agent](19-voice-rag-agent)
 
 [20-openai-compatible-vllm](20-openai-compatible-vllm)
+
+[21-sdxl-lightning](21-sdxl-lightning)
+
 
