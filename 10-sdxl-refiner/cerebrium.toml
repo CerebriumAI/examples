@@ -12,7 +12,7 @@ docker_base_image_url = "debian:bookworm-slim"
 [cerebrium.hardware]
 region = "us-east-1"
 provider = "aws"
-gpu = "AMPERE_A10"
+compute = "AMPERE_A10"
 cpu = 2
 memory = 11.0
 gpu_count = 1

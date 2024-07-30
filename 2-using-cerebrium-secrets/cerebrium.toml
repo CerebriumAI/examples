@@ -9,7 +9,7 @@ docker_base_image_url = "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
 [cerebrium.hardware]
 cpu = 3
 memory = 14.0
-gpu = "AMPERE_A10"
+compute = "AMPERE_A10"
 gpu_count = 1
 provider = "aws"
 region = "us-east-1"
