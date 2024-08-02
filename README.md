@@ -42,4 +42,6 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 
 [21-sdxl-lightning](21-sdxl-lightning)
 
+[22-fast-stable-diffusion](22-fast-stable-diffusion)
+
 
