@@ -22,5 +22,7 @@ cooldown = 10
 transformers = "latest"
 accelerate = "latest"
 openai-whisper = "latest"
+pydantic = "latest"
 
 [cerebrium.dependencies.apt]
+ffmpeg = "latest"
