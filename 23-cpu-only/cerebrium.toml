@@ -20,5 +20,4 @@ cooldown = 1
 
 [cerebrium.dependencies.pip]
 pydantic = "latest"
-numpy = "latest"
 loguru = "latest"
