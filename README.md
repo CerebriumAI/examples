@@ -44,4 +44,10 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 
 [22-fast-stable-diffusion](22-fast-stable-diffusion)
 
+[23-cpu-only](23-cpu-only)
 
+[24-twilio-voice-agent](24-twilio-voice-agent)
+
+[25-regular-stable-diffusion](25-regular-stable-diffusion)
+
+[26-cog-migration-sdxl](26-cog-migration-sdxl)
