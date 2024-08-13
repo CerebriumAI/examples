@@ -140,7 +140,7 @@ class ObjectDetection(EventHandler):
     params = {
         "engine": "google_lens",
         "url": url,
-        "api_key": "033736f528db67ebf3b7f6b4d0c1ee859113789907a95acb3841d133a0682e52"
+        "api_key": get_secret("SERP_API")
     }
 
     search = GoogleSearch(params)
