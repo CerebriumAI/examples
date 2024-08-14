@@ -1,24 +1,27 @@
 from daily import *
-from ultralytics import YOLOv10
+from ultralytics import YOLO
 import cv2
-from utils import plot_bboxes
 from PIL import Image
 import numpy as np
 import io
 import queue
 import threading
 import time
-from multiprocessing import Process
 from transformers import AutoTokenizer, AutoModel, AutoImageProcessor
 import torch.nn.functional as F
 import libsql_experimental as libsql
 from supabase import create_client
 from serpapi import GoogleSearch
 from cerebrium import get_secret
-##Load in model weights
-model = YOLOv10.from_pretrained('jameslahm/yolov10m', verbose=False)
-processor = AutoImageProcessor.from_pretrained("nomic-ai/nomic-embed-vision-v1.5")
-vision_model = AutoModel.from_pretrained("nomic-ai/nomic-embed-vision-v1.5", trust_remote_code=True)
+import torch
+
+model = YOLO("./best.pt")  # load a pretrained model (recommended for training)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+# uncomment to use Turso
+# processor = AutoImageProcessor.from_pretrained("nomic-ai/nomic-embed-vision-v1.5")
+# vision_model = AutoModel.from_pretrained("nomic-ai/nomic-embed-vision-v1.5", trust_remote_code=True)
 
 # url = get_secret("TURSO_DB_URL")
 # auth_token = get_secret("TURSO_AUTH_TOKEN")
@@ -35,6 +38,8 @@ class ObjectDetection(EventHandler):
     self.message_sent = False
     self.queue = queue.Queue()
     self.room_url = room_url
+    self.consecutive_detections = {}  # To track consecutive detections
+
 
     self.camera = Daily.create_camera_device("my-camera", width = 1280, height = 720, color_format = "RGB")
     self.client.update_inputs({
@@ -68,16 +73,8 @@ class ObjectDetection(EventHandler):
       self.frame_count = 0
       self.thread_count += 1
 
-      print(f"Width: {frame.width}, Height: {frame.height}")
       self.queue.put({"buffer": frame.buffer, "width": frame.width, "height": frame.height})
 
-    #uncomment to stream your frame to the item detector
-    #  
-    #   image = Image.frombytes('RGBA', (frame.width, frame.height), frame.buffer)
-    #   image = cv2.cvtColor(np.array(image), cv2.COLOR_RGBA2BGR)
-    #   image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    #   pil_image = Image.fromarray(image_rgb)
-    #   self.camera.write_frame(pil_image.tobytes())
       worker_thread = threading.Thread(target=self.process_frame, daemon=True)
       worker_thread.start()
     
@@ -88,42 +85,43 @@ class ObjectDetection(EventHandler):
         image = Image.frombytes('RGBA', (item["width"], item["height"]), item["buffer"])
         image = cv2.cvtColor(np.array(image), cv2.COLOR_RGBA2BGR)
 
-        detections = model.predict(image, imgsz=item["width"], verbose=False)
+        detections = model.predict(image, verbose=False)
         
         if len(detections[0].boxes) > 0:
-            high_confidence_boxes = [box for box in detections[0].boxes if box.conf >= 0.60]
-            if high_confidence_boxes:
-                for box in high_confidence_boxes:
-                        class_id = int(box.cls.item())
-                        class_name = model.names[class_id]
-                        confidence = float(box.conf.item())
-                        x1, y1, x2, y2 = map(int, box.xyxy[0])
-                        width = x2 - x1
-                        height = y2 - y1
-                        
-                        if (width > 200 or height > 200) and class_name not in self.detected_items and class_name.lower() != 'person':
-                            print(class_name.lower())
-                            # Extract the detected object
-                            detected_object = image[y1:y2, x1:x2]
-                            
-                            # Convert to grayscale for blur detection
-                            gray = cv2.cvtColor(detected_object, cv2.COLOR_BGR2GRAY)
-                            
-                            # Calculate the Laplacian variance
-                            laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-                            
-                            # Define a threshold for blur detection (you may need to adjust this)
-                            blur_threshold = 60
-                            
-                            if laplacian_var > blur_threshold:
-                                print(f"Sharp image detected: {class_name}")
-                                self.detected_items.add(class_name)
-                                self.search_image(detected_object)
-                            else:
-                                print(f"Blurry image detected: {class_name}")
+            for box in detections[0].boxes:
+                class_id = int(box.cls.item())
+                class_name = model.names[class_id]
+                confidence = float(box.conf.item())
+
+                if class_name.lower() == 'person':
+                    continue
+                
+                print(f"Detected {class_name} with {confidence:.2%} confidence")
+                if confidence > 0.55:
+                    if class_name not in self.consecutive_detections:
+                        self.consecutive_detections[class_name] = 1
+                    else:
+                        self.consecutive_detections[class_name] += 1
+                else:
+                    self.consecutive_detections[class_name] = 0
+                
+                if self.consecutive_detections.get(class_name, 0) > 3:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    
+                    
+                    if class_name not in self.detected_items and class_name.lower() != 'person':
+                        detected_object = image[y1:y2, x1:x2]
+                        self.detected_items.add(class_name)
+                        self.search_image(detected_object)
+                
+                
+                # Reset counts for classes not detected in this frame
+                for class_name in list(self.consecutive_detections.keys()):
+                    if class_name not in [model.names[int(box.cls.item())] for box in detections[0].boxes]:
+                        self.consecutive_detections[class_name] = 0
 
     except Exception as e:
-      print(f'\nIssue converting image and detecting: {e}')
+        print(f'\nIssue converting image and detecting: {e}')
     
     self.thread_count -= 1
     self.queue.task_done()
@@ -140,7 +138,7 @@ class ObjectDetection(EventHandler):
     params = {
         "engine": "google_lens",
         "url": url,
-        "api_key": get_secret("SERP_API")
+        "api_key": f"{get_secret("SERP_API")}"
     }
 
     search = GoogleSearch(params)
@@ -189,7 +187,6 @@ class ObjectDetection(EventHandler):
                 path=filename,
                 file_options={"content-type": "image/png"}
             )
-# Construct the public URL
         public_url = supabase.storage.from_("products").get_public_url(filename)
         
         return {"result": result, "url": public_url}
@@ -199,7 +196,9 @@ class ObjectDetection(EventHandler):
   
   def search_image(self, image):
     
-    print('SEARChING')
+    #if using Turso uncomment below
+    # self.search_db(image)
+
     #add item to supabase
     image_result = self.uploadImage(image)
     search_result = self.search(image_result['url'])

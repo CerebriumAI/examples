@@ -1,11 +1,10 @@
 from daily import *
 import time
-import asyncio
 from cerebrium import get_secret
 import requests
 from multiprocessing import Process
 
-def predict(room_url: str, run_id: str):
+def predict(room_url: str):
     from detection import ObjectDetection
     bot_name = "Item Detector"
 
@@ -32,13 +31,12 @@ def predict(room_url: str, run_id: str):
 
 
 
-def start(room_url: str, run_id: str):
+def start(room_url: str):
 
-    process = Process(target=predict, args=(room_url, run_id), daemon=True)
+    process = Process(target=predict, args=(room_url), daemon=True)
     process.start()
     process.join()  # Wait for the process to complete
     return {"message": "Call finished"}
-
 
 def create_room():
     url = "https://api.daily.co/v1/rooms/"

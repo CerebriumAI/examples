@@ -2,7 +2,7 @@
 name = "22-ecommerce-live-stream"
 python_version = "3.10"
 docker_base_image_url = "nvidia/cuda:12.1.1-runtime-ubuntu22.04"
-include = "[main.py, cerebrium.toml, detection.py]"
+include = "[main.py, cerebrium.toml, detection.py, best.pt]"
 exclude = "[.*]"
 
 [cerebrium.hardware]
@@ -31,7 +31,6 @@ psutil = "latest"
 py-cpuinfo = "latest"
 huggingface-hub = "latest"
 safetensors = "0.4.4"
-"git+https://github.com/THU-MIG/yolov10.git" = "latest"
 daily-python = "latest"
 pillow = "latest"
 einops = "latest"
@@ -39,6 +38,7 @@ transformers = "latest"
 supabase = "latest"
 libsql_experimental = "latest"
 "google-search-results" = "latest"
+"ultralytics" = "latest"
 
 [cerebrium.dependencies.apt]
 git = "latest"

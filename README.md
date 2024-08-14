@@ -51,3 +51,5 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 [25-regular-stable-diffusion](25-regular-stable-diffusion)
 
 [26-cog-migration-sdxl](26-cog-migration-sdxl)
+
+[27-ecommerce-live-stream](27-ecommerce-live-stream)
