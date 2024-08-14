@@ -26,10 +26,11 @@ MODEL_BASE = "stabilityai/stable-diffusion-xl-base-1.0"
 UNET_CACHE = "/persistent-storage/unet-cache"
 BASE_CACHE = "/persistent-storage/checkpoints"
 SAFETY_CACHE = "/persistent-storage/safety-cache"
-FEATURE_EXTRACTOR = "feature-extractor" 
+FEATURE_EXTRACTOR = "feature-extractor"
 MODEL_URL = "https://weights.replicate.delivery/default/sdxl-lightning/sdxl-1.0-base-lightning.tar"
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 UNET_URL = "https://weights.replicate.delivery/default/comfy-ui/unet/sdxl_lightning_4step_unet.pth.tar"
+
 
 class KarrasDPM:
     def from_config(config):
@@ -47,12 +48,14 @@ SCHEDULERS = {
     "DPM++2MSDE": KDPM2AncestralDiscreteScheduler,
 }
 
+
 def download_weights(url, dest):
     start = time.time()
     print("downloading url: ", url)
     print("downloading to: ", dest)
     subprocess.check_call(["pget", "-x", url, dest], close_fds=False)
     print("downloading took: ", time.time() - start)
+
 
 """Load the model into memory to make running multiple predictions efficient"""
 start = time.time()
@@ -83,15 +86,14 @@ print("setup took: ", time.time() - start)
 
 
 def run_safety_checker(image):
-    safety_checker_input = feature_extractor(image, return_tensors="pt").to(
-        "cuda"
-    )
+    safety_checker_input = feature_extractor(image, return_tensors="pt").to("cuda")
     np_image = [np.array(val) for val in image]
     image, has_nsfw_concept = safety_checker(
         images=np_image,
         clip_input=safety_checker_input.pixel_values.to(torch.float16),
     )
     return image, has_nsfw_concept
+
 
 def predict(
     prompt: str = "A superhero smiling",

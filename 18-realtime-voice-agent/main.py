@@ -158,11 +158,10 @@ async def main(room_url: str, token: str):
         await runner.run(task)
         await session.close()
 
+
 async def check_deepgram_model_status():
     url = "http://127.0.0.1:8082/v1/status/engine"
-    headers = {
-        "Content-Type": "application/json"
-    }
+    headers = {"Content-Type": "application/json"}
     max_retries = 5
     async with aiohttp.ClientSession() as session:
         for _ in range(max_retries):
@@ -172,7 +171,7 @@ async def check_deepgram_model_status():
                     if response.status == 200:
                         json_response = await response.json()
                         print(json_response)
-                        if json_response.get('engine_connection_status') == 'Connected':
+                        if json_response.get("engine_connection_status") == "Connected":
                             print("Connected to deepgram local server")
                             return True
             except aiohttp.ClientConnectionError:
@@ -180,18 +179,19 @@ async def check_deepgram_model_status():
             await asyncio.sleep(10)
     return False
 
+
 async def check_vllm_model_status():
     url = "http://127.0.0.1:5000/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('HF_TOKEN')}"
+        "Authorization": f"Bearer {get_secret('HF_TOKEN')}",
     }
     data = {
         "model": "NousResearch/Meta-Llama-3-8B-Instruct",
         "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Hello, are you working?"}
-        ]
+            {"role": "user", "content": "Hello, are you working?"},
+        ],
     }
     max_retries = 5
     async with aiohttp.ClientSession() as session:
@@ -212,6 +212,7 @@ async def check_vllm_model_status():
     print("Failed to connect to vLLM server after multiple attempts")
     return False
 
+
 async def start_bot(room_url: str, token: str = None):
     await check_vllm_model_status()
     await check_deepgram_model_status()
@@ -221,8 +222,9 @@ async def start_bot(room_url: str, token: str = None):
     except Exception as e:
         logger.error(f"Exception in main: {e}")
         sys.exit(1)  # Exit with a non-zero status code
-    
+
     return {"message": "session finished"}
+
 
 def create_room():
     url = "https://api.daily.co/v1/rooms/"

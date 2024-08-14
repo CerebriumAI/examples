@@ -19,7 +19,9 @@ model_id = "stabilityai/stable-diffusion-2-1"
 
 # Use the DPMSolverMultistepScheduler (DPM-Solver++) scheduler here instead
 print("Loading model...")
-pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16, local_files_only=True)
+pipe = StableDiffusionPipeline.from_pretrained(
+    model_id, torch_dtype=torch.float16, local_files_only=True
+)
 print("Loaded.")
 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 print("Loaded scheduler.")

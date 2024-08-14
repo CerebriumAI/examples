@@ -19,13 +19,23 @@ from pipecat.processors.aggregators.llm_response import (
     LLMAssistantResponseAggregator,
     LLMUserResponseAggregator,
 )
-from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomObject, DailyRoomParams, DailyRoomProperties, DailyRoomSipParams
+from pipecat.transports.services.helpers.daily_rest import (
+    DailyRESTHelper,
+    DailyRoomObject,
+    DailyRoomParams,
+    DailyRoomProperties,
+    DailyRoomSipParams,
+)
 from twilio.twiml.voice_response import Dial, VoiceResponse, Sip
 from twilio.rest import Client
 from pipecat.services.deepgram import DeepgramSTTService
 from pipecat.services.elevenlabs import ElevenLabsTTSService
 from pipecat.services.openai import OpenAILLMService
-from pipecat.transports.services.daily import DailyParams, DailyTransport, DailyDialinSettings
+from pipecat.transports.services.daily import (
+    DailyParams,
+    DailyTransport,
+    DailyDialinSettings,
+)
 from pipecat.vad.silero import SileroVADAnalyzer
 from pipecat.vad.vad_analyzer import VADParams
 
@@ -47,6 +57,7 @@ deepgram_voice: str = "aura-asteria-en"
 
 twilio = Client(get_secret("TWILIO_ACCOUNT_SID"), get_secret("TWILIO_AUTH_TOKEN"))
 
+
 def start_server():
     while True:
         process = subprocess.Popen(
@@ -62,9 +73,9 @@ def start_server():
 server_process = Process(target=start_server, daemon=True)
 server_process.start()
 
+
 async def main(room_url: str, token: str, callId: str, sipUri: str):
     async with aiohttp.ClientSession() as session:
-
         transport = DailyTransport(
             room_url,
             token,
@@ -96,7 +107,7 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
 
         # tts = ElevenLabsTurbo(
         #     aiohttp_session=session,
-        #     api_key=get_secret("ELEVENLABS_API_KEY"), 
+        #     api_key=get_secret("ELEVENLABS_API_KEY"),
         #     voice_id=get_secret("ELEVENLABS_VOICE_ID"),
         # )
 
@@ -112,7 +123,6 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
             base_url="http://127.0.0.1:5000/v1",
         )
 
-
         messages = [
             {
                 "role": "system",
@@ -123,15 +133,17 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
         tma_in = LLMUserResponseAggregator(messages)
         tma_out = LLMAssistantResponseAggregator(messages)
 
-        pipeline = Pipeline([
-            transport.input(),
-            stt,
-            tma_in,
-            llm,
-            tts,
-            transport.output(),
-            tma_out,
-        ])
+        pipeline = Pipeline(
+            [
+                transport.input(),
+                stt,
+                tma_in,
+                llm,
+                tts,
+                transport.output(),
+                tma_out,
+            ]
+        )
 
         task = PipelineTask(
             pipeline,
@@ -169,7 +181,7 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
             try:
                 # The TwiML is updated using Twilio's client library
                 call = twilio.calls(callId).update(
-                    twiml=f'<Response><Dial><Sip>{sipUri}</Sip></Dial></Response>'
+                    twiml=f"<Response><Dial><Sip>{sipUri}</Sip></Dial></Response>"
                 )
             except Exception as e:
                 raise Exception(f"Failed to forward call: {str(e)}")
@@ -187,7 +199,6 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
 
 
 async def check_vllm_model_status():
-
     url = "http://127.0.0.1:5000/v1/models"
     headers = {"Authorization": f"Bearer {get_secret('HF_TOKEN')}"}
 
@@ -204,11 +215,10 @@ async def check_vllm_model_status():
             await asyncio.sleep(10)
     return False
 
+
 async def check_deepgram_model_status():
     url = "http://127.0.0.1:8082/v1/status/engine"
-    headers = {
-        "Content-Type": "application/json"
-    }
+    headers = {"Content-Type": "application/json"}
     max_retries = 5
     async with aiohttp.ClientSession() as session:
         for _ in range(max_retries):
@@ -218,13 +228,14 @@ async def check_deepgram_model_status():
                     if response.status == 200:
                         json_response = await response.json()
                         print(json_response)
-                        if json_response.get('engine_connection_status') == 'Connected':
+                        if json_response.get("engine_connection_status") == "Connected":
                             print("Connected to deepgram local server")
                             return True
             except aiohttp.ClientConnectionError:
                 print("Deepgram Connection refused, retrying...")
             await asyncio.sleep(10)
     return False
+
 
 async def send_request(url, data, headers):
     try:
@@ -234,10 +245,10 @@ async def send_request(url, data, headers):
     except Exception as e:
         print(f"Error sending request: {str(e)}")
 
-async def start_bot(request_data: dict):
 
+async def start_bot(request_data: dict):
     print(request_data)
-    callId = request_data['CallSid']
+    callId = request_data["CallSid"]
 
     # Create a room and spawn bot
     room = await create_room()
@@ -245,37 +256,38 @@ async def start_bot(request_data: dict):
     endpoint_url = "https://api.cortex.cerebrium.ai/v4/p-c6754f15/twilio-agent/main"  # Replace with your actual endpoint URL
     payload = {
         "room_url": room["room_url"],
-        "token" : room["token"],
+        "token": room["token"],
         "sipUri": room["sip_endpoint"],
-        "callId": callId
+        "callId": callId,
     }
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('CEREBRIUM_BEARER_TOKEN')}"  # Replace 'API_TOKEN' with your actual secret name if needed
+        "Authorization": f"Bearer {get_secret('CEREBRIUM_BEARER_TOKEN')}",  # Replace 'API_TOKEN' with your actual secret name if needed
     }
-    
+
     # Use asyncio.create_task to run the request asynchronously without waiting
     asyncio.create_task(send_request(endpoint_url, payload, headers))
-
 
     # We have the room and the SIP URI,
     # but we do not know if the Daily SIP Worker and the Bot have joined the call
     # put the call on hold until the 'on_dialin_ready' fires.
     # The bot will call forward_twilio_call when it ready.
     resp = VoiceResponse()
-    resp.play(url="http://com.twilio.sounds.music.s3.amazonaws.com/MARKOVICHAMP-Borghestral.mp3", loop=10)
+    resp.play(
+        url="http://com.twilio.sounds.music.s3.amazonaws.com/MARKOVICHAMP-Borghestral.mp3",
+        loop=10,
+    )
     return str(resp)
 
 
 async def create_room():
-        
     params = DailyRoomParams(
         properties=DailyRoomProperties(
             sip=DailyRoomSipParams(
-                display_name = "sip-dialin",
-                video = False,
-                sip_mode = "dial-in",
-                num_endpoints = 1
+                display_name="sip-dialin",
+                video=False,
+                sip_mode="dial-in",
+                num_endpoints=1,
             )
         )
     )
@@ -284,21 +296,22 @@ async def create_room():
     try:
         daily_helper = DailyRESTHelper(
             daily_api_key=get_secret("DAILY_TOKEN"),
-            daily_api_url="https://api.daily.co/v1")
+            daily_api_url="https://api.daily.co/v1",
+        )
         room: DailyRoomObject = daily_helper.create_room(params=params)
 
         token = daily_helper.get_token(room.url, 300)
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unable to provision room {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to provision room {e}")
 
-    
-    print (f"Daily room returned {room.url} {room.config.sip_endpoint}")
+    print(f"Daily room returned {room.url} {room.config.sip_endpoint}")
 
-
-    return {"room_url": room.url, "sip_endpoint": room.config.sip_endpoint, "token": token}
+    return {
+        "room_url": room.url,
+        "sip_endpoint": room.config.sip_endpoint,
+        "token": token,
+    }
 
 
 def create_token(room_name: str):
