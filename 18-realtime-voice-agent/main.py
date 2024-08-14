@@ -158,33 +158,71 @@ async def main(room_url: str, token: str):
         await runner.run(task)
         await session.close()
 
-
-def check_vllm_model_status():
-    url = "http://127.0.0.1:5000/v1/models"
-    headers = {"Authorization": f"Bearer {get_secret('HF_TOKEN')}"}
-    max_retries = 8
-    for _ in range(max_retries):
-        print("Trying vllm server")
-        try:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                return True
-        except requests.ConnectionError:
-            print("Connection refused, retrying...")
-        time.sleep(15)
+async def check_deepgram_model_status():
+    url = "http://127.0.0.1:8082/v1/status/engine"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    max_retries = 5
+    async with aiohttp.ClientSession() as session:
+        for _ in range(max_retries):
+            print("Trying Deepgram local server")
+            try:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        json_response = await response.json()
+                        print(json_response)
+                        if json_response.get('engine_connection_status') == 'Connected':
+                            print("Connected to deepgram local server")
+                            return True
+            except aiohttp.ClientConnectionError:
+                print("Connection refused, retrying...")
+            await asyncio.sleep(10)
     return False
 
+async def check_vllm_model_status():
+    url = "http://127.0.0.1:5000/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {get_secret('HF_TOKEN')}"
+    }
+    data = {
+        "model": "NousResearch/Meta-Llama-3-8B-Instruct",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hello, are you working?"}
+        ]
+    }
+    max_retries = 5
+    async with aiohttp.ClientSession() as session:
+        for _ in range(max_retries):
+            print("Trying vLLM local server")
+            try:
+                async with session.post(url, headers=headers, json=data) as response:
+                    if response.status == 200:
+                        print("vLLM server is ready and responding correctly")
+                        return True
+                    else:
+                        print(f"Unexpected status code: {response.status}")
+                        response_text = await response.text()
+                        print(f"Response: {response_text}")
+            except aiohttp.ClientConnectionError:
+                print("vLLM Connection refused, retrying...")
+            await asyncio.sleep(10)
+    print("Failed to connect to vLLM server after multiple attempts")
+    return False
 
-def start_bot(room_url: str, token: str = None):
-    def target():
-        asyncio.run(main(room_url, token))
+async def start_bot(room_url: str, token: str = None):
+    await check_vllm_model_status()
+    await check_deepgram_model_status()
 
-    check_vllm_model_status()
-    process = Process(target=target, daemon=True)
-    process.start()
-    process.join()  # Wait for the process to complete
+    try:
+        await main(room_url, token)
+    except Exception as e:
+        logger.error(f"Exception in main: {e}")
+        sys.exit(1)  # Exit with a non-zero status code
+    
     return {"message": "session finished"}
-
 
 def create_room():
     url = "https://api.daily.co/v1/rooms/"

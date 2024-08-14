@@ -11,7 +11,7 @@ python_version = "3.10"
 [cerebrium.hardware]
 cpu = 3
 memory = 5.0
-gpu = "AMPERE_A10"
+compute = "AMPERE_A10"
 gpu_count = 1
 provider = "aws"
 region = "us-east-1"

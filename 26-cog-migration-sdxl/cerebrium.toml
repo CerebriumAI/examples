@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "cog-migration-sdxl"
+name = "26-cog-migration-sdxl"
 python_version = "3.11"
 include = "[./*, main.py, cerebrium.toml]"
 exclude = "[./example_exclude]"

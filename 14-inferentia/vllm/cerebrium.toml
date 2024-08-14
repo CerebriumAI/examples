@@ -20,7 +20,7 @@ shell_commands = [
 [cerebrium.hardware]
 region = "us-east-1"
 provider = "aws"
-gpu = "INF2"
+compute = "INF2"
 cpu = 6
 memory = 60.0
 gpu_count = 1

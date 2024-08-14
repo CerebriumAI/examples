@@ -8,7 +8,7 @@ shell_commands = []
 [cerebrium.hardware]
 cpu = 4
 memory = 14.0
-gpu = "AMPERE_A10"
+compute = "AMPERE_A10"
 gpu_count = 1
 provider = "aws"
 region = "us-east-1"
@@ -22,5 +22,7 @@ cooldown = 10
 transformers = "latest"
 accelerate = "latest"
 openai-whisper = "latest"
+pydantic = "latest"
 
 [cerebrium.dependencies.apt]
+ffmpeg = "latest"
