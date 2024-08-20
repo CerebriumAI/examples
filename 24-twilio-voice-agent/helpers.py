@@ -1,13 +1,12 @@
-from loguru import logger
 import asyncio
 import math
 import struct
 import time
 from dataclasses import dataclass, field
 from typing import List
-import aiohttp
 
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+import aiohttp
+from loguru import logger
 from pipecat.frames.frames import (
     Frame,
     AudioRawFrame,
@@ -19,13 +18,11 @@ from pipecat.frames.frames import (
     TTSStoppedFrame,
     MetricsFrame,
 )
-
-from pipecat.vad.vad_analyzer import VADAnalyzer, VADState
-from pipecat.services.elevenlabs import ElevenLabsTTSService
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.deepgram import DeepgramTTSService
-from pipecat.services.openai import OpenAILLMContext, OpenAILLMContextFrame
-
 from pipecat.services.elevenlabs import ElevenLabsTTSService
+from pipecat.services.openai import OpenAILLMContext, OpenAILLMContextFrame
+from pipecat.vad.vad_analyzer import VADAnalyzer, VADState
 
 
 class GreedyLLMAggregator(FrameProcessor):

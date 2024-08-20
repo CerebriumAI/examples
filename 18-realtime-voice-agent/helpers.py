@@ -1,10 +1,10 @@
 import asyncio
+import math
 import struct
 import time
 from dataclasses import dataclass, field
 from typing import List
 
-import math
 from loguru import logger
 from pipecat.frames.frames import (
     Frame,

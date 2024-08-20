@@ -4,12 +4,11 @@ import subprocess
 import sys
 import time
 from multiprocessing import Process
-from fastapi import HTTPException
-
 
 import aiohttp
 import requests
 from cerebrium import get_secret
+from fastapi import HTTPException
 from loguru import logger
 from pipecat.frames.frames import LLMMessagesFrame, EndFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -19,6 +18,12 @@ from pipecat.processors.aggregators.llm_response import (
     LLMAssistantResponseAggregator,
     LLMUserResponseAggregator,
 )
+from pipecat.services.deepgram import DeepgramSTTService
+from pipecat.services.openai import OpenAILLMService
+from pipecat.transports.services.daily import (
+    DailyParams,
+    DailyTransport,
+)
 from pipecat.transports.services.helpers.daily_rest import (
     DailyRESTHelper,
     DailyRoomObject,
@@ -26,24 +31,13 @@ from pipecat.transports.services.helpers.daily_rest import (
     DailyRoomProperties,
     DailyRoomSipParams,
 )
-from twilio.twiml.voice_response import Dial, VoiceResponse, Sip
-from twilio.rest import Client
-from pipecat.services.deepgram import DeepgramSTTService
-from pipecat.services.elevenlabs import ElevenLabsTTSService
-from pipecat.services.openai import OpenAILLMService
-from pipecat.transports.services.daily import (
-    DailyParams,
-    DailyTransport,
-    DailyDialinSettings,
-)
 from pipecat.vad.silero import SileroVADAnalyzer
 from pipecat.vad.vad_analyzer import VADParams
+from twilio.rest import Client
+from twilio.twiml.voice_response import VoiceResponse
 
 from helpers import (
     ClearableDeepgramTTSService,
-    ElevenLabsTurbo,
-    AudioVolumeTimer,
-    TranscriptionTimingLogger,
 )
 
 logger.remove(0)
@@ -262,7 +256,8 @@ async def start_bot(request_data: dict):
     }
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('CEREBRIUM_BEARER_TOKEN')}",  # Replace 'API_TOKEN' with your actual secret name if needed
+        "Authorization": f"Bearer {get_secret('CEREBRIUM_BEARER_TOKEN')}",
+        # Replace 'API_TOKEN' with your actual secret name if needed
     }
 
     # Use asyncio.create_task to run the request asynchronously without waiting

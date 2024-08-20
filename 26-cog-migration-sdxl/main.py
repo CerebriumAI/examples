@@ -1,10 +1,11 @@
+import base64
 import os
-import time
-import torch
 import subprocess
+import time
+from io import BytesIO  # Correct import for BytesIO
+
 import numpy as np
-from typing import List
-from transformers import CLIPImageProcessor
+import torch
 from diffusers import (
     StableDiffusionXLPipeline,
     DDIMScheduler,
@@ -18,8 +19,7 @@ from diffusers import (
 from diffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker,
 )
-from io import BytesIO  # Correct import for BytesIO
-import base64
+from transformers import CLIPImageProcessor
 
 UNET = "sdxl_lightning_4step_unet.pth"
 MODEL_BASE = "stabilityai/stable-diffusion-xl-base-1.0"

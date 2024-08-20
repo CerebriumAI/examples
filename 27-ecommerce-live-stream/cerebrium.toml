@@ -42,5 +42,5 @@ libsql_experimental = "latest"
 
 [cerebrium.dependencies.apt]
 git = "latest"
-"libgl1-mesa-glx" = "latest" 
+"libgl1-mesa-glx" = "latest"
 "ibglib2.0-0" = "latest"

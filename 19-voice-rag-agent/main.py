@@ -2,11 +2,21 @@ import asyncio
 import os
 import sys
 import time
+
 import aiohttp
 import requests
-from multiprocessing import Process
-
-from pipecat.frames.frames import LLMMessagesFrame, EndFrame
+from cerebrium import get_secret
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
+from langchain_pinecone import PineconeVectorStore
+from loguru import logger
+from pipecat.frames.frames import EndFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -14,21 +24,10 @@ from pipecat.processors.aggregators.llm_response import (
     LLMAssistantResponseAggregator,
     LLMUserResponseAggregator,
 )
-from pipecat.services.elevenlabs import ElevenLabsTTSService
 from pipecat.services.deepgram import DeepgramSTTService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat.vad.silero import SileroVADAnalyzer
 from pipecat.vad.vad_analyzer import VADParams
-
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_openai import ChatOpenAI
-from langchain_pinecone import PineconeVectorStore
-from langchain_openai import OpenAIEmbeddings
-from langchain.chains.combine_documents import create_stuff_documents_chain
 
 from helpers import (
     AudioVolumeTimer,
@@ -37,15 +36,10 @@ from helpers import (
     ElevenLabsTurbo,
 )
 
-from loguru import logger
-
-from cerebrium import get_secret
-
 os.environ["SSL_CERT"] = ""
 os.environ["SSL_KEY"] = ""
 os.environ["OPENAI_API_KEY"] = get_secret("OPENAI_API_KEY")
 os.environ["PINECONE_API_KEY"] = get_secret("PINECONE_API_KEY")
-
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")

@@ -1,16 +1,16 @@
 import os
-from pytube import YouTube
+
+import httpx
 from deepgram import (
     DeepgramClient,
     PrerecordedOptions,
     FileSource,
 )
-import httpx
 from dotenv import load_dotenv
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-from langchain_pinecone import PineconeVectorStore
 from langchain_openai import OpenAIEmbeddings
+from langchain_pinecone import PineconeVectorStore
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pytube import YouTube
 
 # Load environment variables from .env file
 load_dotenv()
