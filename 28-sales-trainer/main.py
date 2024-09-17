@@ -6,7 +6,6 @@ from mistralai import Mistral
 import json
 import requests
 
-
 api_key = get_secret("MISTRAL_API_KEY")
 client = Mistral(api_key=api_key)
 
@@ -15,20 +14,26 @@ def acknowledge_problem(issue: str):
     print("Acknowledging problem", flush=True)
     return "Once the user has apologized and acknowledged your problem, ask what they are going to do to solve your problem!"
 
-def propose_solution(issue: str):
+def issues():
+    print("Asking about issues", flush=True)
+    return "Once the user has asked you about what issues you are experiencing, tell them you have had many platform outages over the last week leading to a lost in customers and you want to know what they are going to do to solve your problem!"
+
+
+def propose_solution(performance_solution: str, cost_solution: str = ""):
     print("propose_solution", flush=True)
     return "Once the user has suggested possible solutions or next steps, ask when will these solutions be implemented!"
 
-def provide_timeline(issue: str):
+def provide_timeline(performance_timeline: str):
     print("provide_timeline", flush=True)
     return "Once the user has given a potential timeline of when these solutions will be implemented, ask if you can schedule a follow up to make sure they have met these tasks!"
 
-def schedule_followup(issue: str):
+def schedule_followup(followup_date: str, followup_type:str):
     print("schedule_followup", flush=True)
     return "Once the user has suggested a follow up, tell them that the proposed date and time suits you."
 
 sales_names_to_functions = {
     'acknowledge_problem': functools.partial(acknowledge_problem),
+    'issues': functools.partial(issues),
     'propose_solution': functools.partial(propose_solution),
     'provide_timeline': functools.partial(provide_timeline),
     'schedule_followup': functools.partial(schedule_followup)
@@ -55,6 +60,18 @@ sales_tools = [
     {
       "type": "function",
       "function": {
+        "name": "issues",
+        "description": "Use this function when the user asks what problems you have been experiencing",
+        "parameters": {
+          "type": "object",
+          "properties": {
+          },
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "propose_solution",
         "description": "Use this function when the account executive proposes a solution to address the client's concerns.",
         "parameters": {
@@ -64,12 +81,8 @@ sales_tools = [
               "type": "string",
               "description": "The proposed solution for the performance issues."
             },
-            "cost_solution": {
-              "type": "string",
-              "description": "The proposed solution for the cost issues."
-            }
           },
-          "required": ["performance_solution", "cost_solution"]
+          "required": ["performance_solution"]
         }
       }
     },
@@ -85,33 +98,8 @@ sales_tools = [
               "type": "string",
               "description": "The timeline for addressing performance issues."
             },
-            "cost_timeline": {
-              "type": "string",
-              "description": "The timeline for addressing cost issues."
-            }
           },
-          "required": ["performance_timeline", "cost_timeline"]
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "offer_compensation",
-        "description": "Use this function when the account executive offers some form of compensation or goodwill gesture.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "compensation_type": {
-              "type": "string",
-              "description": "The type of compensation or goodwill gesture offered."
-            },
-            "compensation_value": {
-              "type": "string",
-              "description": "The value or extent of the compensation offered."
-            }
-          },
-          "required": ["compensation_type", "compensation_value"]
+          "required": ["performance_timeline"]
         }
       }
     },
@@ -360,7 +348,7 @@ def create_persona(type: str = "sales"):
             "llm": {
                 "model": "mistral-large-latest",
                 "base_url": "https://api.cortex.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_sales" if type == "sales" else "https://api.cortex.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_interview",
-                "api_key": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9qZWN0SWQiOiJwLWQwOGVlMzVmIiwiaWF0IjoxNzI2MTczNDkwLCJleHAiOjIwNDE3NDk0OTB9.f2Ai74tc3WAFmiiaKrfPTR5UE_BWnbyX6Dl-cyQkhx17j4HjTSNA_GvDi4pP4jvVHUnlPnIT_5O5G4MqPd9hAZIeiYRxeQayD5J73CBoHyClG6re8dAII30IH2LXdeLStAiSpVzQ2a3G8iuEypCjrzmLd9IxK98H9iwe-mCSXxUUfI9VdAO9in6D_rKNIBCwjJuqw32VIutE8e9_nQx5K_KYnNgx9iXYJ7_b98SSkldFb4nT_m7QAbqEf5mwCky6K3VUARHS7vRIrlP4Jd3FCj4mySOLIM4lgPM1Sru_nCet_x26oemHdJi4kSl-abTptig1knGYkC2kcNQfis9WXw",#get_secret("CEREBRIUM_JWT"),
+                "api_key": get_secret("CEREBRIUM_JWT"),
                 "tools": sales_tools if type == "sales" else interview_tools
             },
             "tts": {
