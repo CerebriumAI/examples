@@ -1,10 +1,11 @@
-from cerebrium import get_secret
+import os
+
 from huggingface_hub import login
 from pydantic import BaseModel
 from vllm import LLM, SamplingParams
 
 # Your huggingface token (HF_AUTH_TOKEN) should be stored in your project secrets on your dashboard
-login(token=get_secret("HF_AUTH_TOKEN"))
+login(token=os.environ.get("HF_AUTH_TOKEN"))
 
 # Initialize the model
 llm = LLM(

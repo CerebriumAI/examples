@@ -12,7 +12,6 @@ import torch.nn.functional as F
 import libsql_experimental as libsql
 from supabase import create_client
 from serpapi import GoogleSearch
-from cerebrium import get_secret
 import torch
 
 model = YOLO("./best.pt")  # load a pretrained model (recommended for training)
@@ -23,13 +22,13 @@ model.to(device)
 # processor = AutoImageProcessor.from_pretrained("nomic-ai/nomic-embed-vision-v1.5")
 # vision_model = AutoModel.from_pretrained("nomic-ai/nomic-embed-vision-v1.5", trust_remote_code=True)
 
-# url = get_secret("TURSO_DB_URL")
-# auth_token = get_secret("TURSO_AUTH_TOKEN")
+# url = os.environ.get("TURSO_DB_URL")
+# auth_token = os.environ.get("TURSO_AUTH_TOKEN")
 
 # conn = libsql.connect("products.db", sync_url=url, auth_token=auth_token)
 # conn.sync()
 
-supabase = create_client(get_secret("SUPABASE_URL"), get_secret("SUPABASE_ANON"))
+supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_ANON"))
 
 class ObjectDetection(EventHandler):
   def __init__(self, room_url):
@@ -138,7 +137,7 @@ class ObjectDetection(EventHandler):
     params = {
         "engine": "google_lens",
         "url": url,
-        "api_key": f"{get_secret("SERP_API")}"
+        "api_key": f"{os.environ.get("SERP_API")}"
     }
 
     search = GoogleSearch(params)

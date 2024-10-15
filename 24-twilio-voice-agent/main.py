@@ -7,7 +7,6 @@ from multiprocessing import Process
 
 import aiohttp
 import requests
-from cerebrium import get_secret
 from fastapi import HTTPException
 from loguru import logger
 from pipecat.frames.frames import LLMMessagesFrame, EndFrame
@@ -49,13 +48,15 @@ os.environ["OUTLINES_CACHE_DIR"] = "/tmp/.outlines"
 
 deepgram_voice: str = "aura-asteria-en"
 
-twilio = Client(get_secret("TWILIO_ACCOUNT_SID"), get_secret("TWILIO_AUTH_TOKEN"))
+twilio = Client(
+    os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN")
+)
 
 
 def start_server():
     while True:
         process = subprocess.Popen(
-            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model NousResearch/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {get_secret('HF_TOKEN')}",
+            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model NousResearch/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {os.environ.get('HF_TOKEN')}",
             shell=True,
         )
         process.wait()  # Wait for the process to complete
@@ -75,7 +76,7 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
             token,
             "Respond bot",
             DailyParams(
-                api_key=get_secret("DAILY_TOKEN"),
+                api_key=os.environ.get("DAILY_TOKEN"),
                 dialin_settings=None,
                 audio_in_enabled=True,
                 audio_out_enabled=True,
@@ -101,18 +102,18 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
 
         # tts = ElevenLabsTurbo(
         #     aiohttp_session=session,
-        #     api_key=get_secret("ELEVENLABS_API_KEY"),
-        #     voice_id=get_secret("ELEVENLABS_VOICE_ID"),
+        #     api_key=os.environ.get("ELEVENLABS_API_KEY"),
+        #     voice_id=os.environ.get("ELEVENLABS_VOICE_ID"),
         # )
 
         # llm = OpenAILLMService(
-        #     api_key=get_secret("OPENAI_API_KEY"),
+        #     api_key=os.environ.get("OPENAI_API_KEY"),
         #     model="gpt-4o-mini"
         # )
 
         llm = OpenAILLMService(
             name="LLM",
-            api_key=get_secret("HF_TOKEN"),
+            api_key=os.environ.get("HF_TOKEN"),
             model="NousResearch/Meta-Llama-3-8B-Instruct",
             base_url="http://127.0.0.1:5000/v1",
         )
@@ -194,7 +195,7 @@ async def main(room_url: str, token: str, callId: str, sipUri: str):
 
 async def check_vllm_model_status():
     url = "http://127.0.0.1:5000/v1/models"
-    headers = {"Authorization": f"Bearer {get_secret('HF_TOKEN')}"}
+    headers = {"Authorization": f"Bearer {os.environ.get('HF_TOKEN')}"}
 
     max_retries = 5
     async with aiohttp.ClientSession() as session:
@@ -256,7 +257,7 @@ async def start_bot(request_data: dict):
     }
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('CEREBRIUM_BEARER_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('CEREBRIUM_BEARER_TOKEN')}",
         # Replace 'API_TOKEN' with your actual secret name if needed
     }
 
@@ -290,7 +291,7 @@ async def create_room():
     # Create sip-enabled Daily room via REST
     try:
         daily_helper = DailyRESTHelper(
-            daily_api_key=get_secret("DAILY_TOKEN"),
+            daily_api_key=os.environ.get("DAILY_TOKEN"),
             daily_api_url="https://api.daily.co/v1",
         )
         room: DailyRoomObject = daily_helper.create_room(params=params)
@@ -313,7 +314,7 @@ def create_token(room_name: str):
     url = "https://api.daily.co/v1/meeting-tokens"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {"properties": {"room_name": room_name}}
 

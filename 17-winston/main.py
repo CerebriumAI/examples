@@ -1,12 +1,12 @@
 import json
+import os
 
 import requests
-from cerebrium import get_secret
 from huggingface_hub import login
 from outlines import models, generate
 from pydantic import BaseModel
 
-login(token=get_secret("HF_AUTH_TOKEN"))
+login(token=os.environ.get("HF_AUTH_TOKEN"))
 model = models.transformers("mistralai/Codestral-22B-v0.1")
 boolean_generator = generate.choice(model, ["yes", "no"])
 generator = generate.text(model)
@@ -53,7 +53,7 @@ def predict(item):
 
 def get_changed_files(repo_name, base_sha, head_sha):
     url = f"https://api.github.com/repos/{repo_name}/compare/{base_sha}...{head_sha}"
-    headers = {"Authorization": f'token {get_secret("GITHUB_TOKEN")}'}
+    headers = {"Authorization": f'token {os.environ.get("GITHUB_TOKEN")}'}
     response = requests.get(url, headers=headers)
     comparison = response.json()
 
@@ -76,7 +76,7 @@ def process_files_with_llm(prompt, files_changed):
 
 def approve_pull_request(repo_name, pr_number, message):
     url = f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}/reviews"
-    headers = {"Authorization": f'token {get_secret("GITHUB_TOKEN")}'}
+    headers = {"Authorization": f'token {os.environ.get("GITHUB_TOKEN")}'}
     data = {"body": message, "event": "APPROVE"}
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
@@ -89,7 +89,7 @@ def approve_pull_request(repo_name, pr_number, message):
 
 def leave__comment(repo_name, pr_number, comment):
     url = f"https://api.github.com/repos/{repo_name}/issues/{pr_number}/comments"
-    headers = {"Authorization": f'token {get_secret("GITHUB_TOKEN")}'}
+    headers = {"Authorization": f'token {os.environ.get("GITHUB_TOKEN")}'}
     data = {"body": comment}
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 201:

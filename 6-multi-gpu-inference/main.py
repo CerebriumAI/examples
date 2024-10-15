@@ -16,7 +16,6 @@ from typing import Optional
 import huggingface_hub
 import torch
 from accelerate import Accelerator
-from cerebrium import get_secret
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, LlamaTokenizer, GenerationConfig
 
@@ -30,7 +29,7 @@ accelerator = Accelerator()
 # Loading in base model and tokenizer
 base_model_name = "meta-llama/Llama-2-70b-hf"  # Hugging Face Model Id
 try:
-    hf_auth_token = get_secret("hf_auth_token")
+    hf_auth_token = os.environ.get("hf_auth_token")
     if hf_auth_token == "":
         raise Exception(
             "hf_auth_token is empty. You need a hf_auth_token secret added to your account to access this model."

@@ -4,7 +4,6 @@ import time
 
 import aiohttp
 import requests
-from cerebrium import get_secret
 from loguru import logger
 from pipecat.frames.frames import EndFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -89,7 +88,7 @@ async def combined_main(room_url: str, token: str):
                 """,
         )
         openai_realtime = OpenAILLMServiceRealtimeBeta(
-            api_key=get_secret("OPENAI_API_KEY"),
+            api_key=os.environ.get("OPENAI_API_KEY"),
             session_properties=session_properties,
             start_audio_paused=False,
         )
@@ -129,14 +128,14 @@ async def combined_main(room_url: str, token: str):
         # OpenAI LLM + Rime TTS service
         openai_llm = OpenAILLMService(
             name="LLM",
-            api_key=get_secret("OPENAI_API_KEY"),
+            api_key=os.environ.get("OPENAI_API_KEY"),
             model="gpt-4",
         )
         openai_llm.register_function("switch_service", switch_service)
 
         rime_tts = RimeTTSService(
             name="Voice",
-            api_key=get_secret("RIME_API_KEY"),
+            api_key=os.environ.get("RIME_API_KEY"),
             voice="grove",
             modelId="mist",
             sample_rate=24000,
@@ -252,7 +251,7 @@ def create_room():
     url = "https://api.daily.co/v1/rooms/"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {
         "properties": {
@@ -294,7 +293,7 @@ def create_token(room_name: str):
     url = "https://api.daily.co/v1/meeting-tokens"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {"properties": {"room_name": room_name, "is_owner": True}}
 

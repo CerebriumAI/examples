@@ -1,12 +1,10 @@
-from cerebrium import get_secret
-
 import functools
 from typing import List
 from mistralai import Mistral
 import json
 import requests
 
-api_key = get_secret("MISTRAL_API_KEY")
+api_key = os.environ.get("MISTRAL_API_KEY")
 client = Mistral(api_key=api_key)
 
 
@@ -443,11 +441,11 @@ def create_persona(type: str = "sales"):
                 "base_url": "https://api.cortex.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_sales"
                 if type == "sales"
                 else "https://api.cortex.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_interview",
-                "api_key": get_secret("CEREBRIUM_JWT"),
+                "api_key": os.environ.get("CEREBRIUM_JWT"),
                 "tools": sales_tools if type == "sales" else interview_tools,
             },
             "tts": {
-                "api_key": get_secret("CARTESIA_API_KEY"),
+                "api_key": os.environ.get("CARTESIA_API_KEY"),
                 "tts_engine": "cartesia",
                 "external_voice_id": "820a3788-2b37-4d21-847a-b65d8a68c99a",
                 "voice_settings": {
@@ -461,7 +459,7 @@ def create_persona(type: str = "sales"):
         },
     }
     headers = {
-        "x-api-key": get_secret("TAVUS_API_KEY"),
+        "x-api-key": os.environ.get("TAVUS_API_KEY"),
         "Content-Type": "application/json",
     }
 
@@ -493,7 +491,7 @@ def create_tavus_conversation(type: str):
         },
     }
     headers = {
-        "x-api-key": get_secret("TAVUS_API_KEY"),
+        "x-api-key": os.environ.get("TAVUS_API_KEY"),
         "Content-Type": "application/json",
     }
 
