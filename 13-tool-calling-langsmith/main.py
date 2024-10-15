@@ -1,7 +1,6 @@
 import os
 
 import requests
-from cerebrium import get_secret
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain.memory import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -21,7 +20,7 @@ class Item(BaseModel):
 
 ##LangSmith ENV variables
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_API_KEY"] = get_secret("LANGCHAIN_API_KEY")
+os.environ["LANGCHAIN_API_KEY"] = os.environ.get("LANGCHAIN_API_KEY")
 
 
 @tool
@@ -30,7 +29,7 @@ def get_availability(fromDate: str, toDate: str) -> float:
 
     url = "https://api.cal.com/v1/availability"
     params = {
-        "apiKey": get_secret("CAL_API_KEY"),
+        "apiKey": os.environ.get("CAL_API_KEY"),
         "username": "michael-louis-xxxx",
         "dateFrom": fromDate,
         "dateTo": toDate,
@@ -46,12 +45,12 @@ def get_availability(fromDate: str, toDate: str) -> float:
 
 @tool
 def book_slot(
-    datetime: str, name: str, email: str, title: str, description: str
+        datetime: str, name: str, email: str, title: str, description: str
 ) -> float:
     """Book a meeting on my calendar at the requested date and time using the 'datetime' variable. The 'datetime' variable should be specified in EST. Get a description about what the meeting is about and make a title for it"""
     url = "https://api.cal.com/v1/bookings"
     params = {
-        "apiKey": get_secret("CAL_API_KEY"),
+        "apiKey": os.environ.get("CAL_API_KEY"),
         "username": "michael-louis-xxxx",
         "eventTypeId": "xxxxxx",
         "start": datetime,
@@ -93,7 +92,7 @@ prompt = ChatPromptTemplate.from_messages(
 tools = [get_availability, book_slot]
 
 llm = ChatOpenAI(
-    model="gpt-3.5-turbo-0125", temperature=0, api_key=get_secret("OPENAI_API_KEY")
+    model="gpt-3.5-turbo-0125", temperature=0, api_key=os.environ.get("OPENAI_API_KEY")
 )
 agent = create_tool_calling_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
@@ -119,7 +118,6 @@ def predict(prompt, session_id):
     )
 
     return {"result": output}  # return your results
-
 
 # if __name__ == "__main__":
 #     while True:

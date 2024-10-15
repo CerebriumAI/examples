@@ -1,6 +1,5 @@
 from daily import *
 import time
-from cerebrium import get_secret
 import requests
 from multiprocessing import Process
 
@@ -45,7 +44,7 @@ def create_room():
     url = "https://api.daily.co/v1/rooms/"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {
         "properties": {
@@ -85,7 +84,7 @@ def create_token(room_name: str):
     url = "https://api.daily.co/v1/meeting-tokens"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {
         "properties": {

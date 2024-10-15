@@ -3,7 +3,6 @@ import time
 from typing import Optional
 
 import torch
-from cerebrium import get_secret
 from huggingface_hub import login
 from pydantic import BaseModel
 from transformers import AutoTokenizer, TextStreamer
@@ -16,7 +15,7 @@ class Item(BaseModel):
     top_p: Optional[float] = 0.95
 
 
-login(token=get_secret("HF_AUTH_TOKEN"))
+login(token=os.environ.get("HF_AUTH_TOKEN"))
 os.environ[
     "NEURON_COMPILE_CACHE_URL"
 ] = "/persistent-storage/plain-neuron-compile-cache"

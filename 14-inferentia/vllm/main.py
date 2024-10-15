@@ -2,7 +2,6 @@ import os
 import time
 from typing import Optional
 
-from cerebrium import get_secret
 from huggingface_hub import login
 from pydantic import BaseModel
 from transformers import AutoTokenizer
@@ -17,7 +16,7 @@ class Item(BaseModel):
     top_p: Optional[float] = 0.95
 
 
-login(token=get_secret("HF_AUTH_TOKEN"))
+login(token=os.environ.get("HF_AUTH_TOKEN"))
 
 model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
 llm = LLM(

@@ -1,14 +1,14 @@
 import json
+import os
 import time
 from typing import List, Dict, Any
 
-from cerebrium import get_secret
 from huggingface_hub import login
 from pydantic import BaseModel
 from vllm import SamplingParams, AsyncLLMEngine
 from vllm.engine.arg_utils import AsyncEngineArgs
 
-login(token=get_secret("HF_TOKEN"))
+login(token=os.environ.get("HF_TOKEN"))
 
 engine_args = AsyncEngineArgs(
     model="meta-llama/Meta-Llama-3.1-8B-Instruct",

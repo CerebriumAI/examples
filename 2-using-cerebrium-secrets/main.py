@@ -1,8 +1,8 @@
+import os
 from typing import Optional
 
 import huggingface_hub
 import torch
-from cerebrium import get_secret  # <-- import secrets from cerebrium
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, LlamaTokenizer, GenerationConfig
 
@@ -14,7 +14,7 @@ try:
         for this example, we'll use a secret called `hf_auth_token`
     3. add the code in the line below to access your secret
     """
-    hf_auth_token = get_secret("hf_auth_token")  # load your secret
+    hf_auth_token = os.environ.get("hf_auth_token")  # load your secret
 
     # And that's all! It's that easy.
 

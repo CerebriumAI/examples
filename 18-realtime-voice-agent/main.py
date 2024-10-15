@@ -7,7 +7,6 @@ from multiprocessing import Process
 
 import aiohttp
 import requests
-from cerebrium import get_secret
 from huggingface_hub import login
 from loguru import logger
 from pipecat.frames.frames import LLMMessagesFrame, EndFrame
@@ -39,14 +38,14 @@ os.environ["OUTLINES_CACHE_DIR"] = "/tmp/.outlines"
 
 deepgram_voice: str = "aura-asteria-en"
 
-login(token=get_secret("HF_TOKEN"))
+login(token=os.environ.get("HF_TOKEN"))
 
 
 # Run vllM Server in background process
 def start_server():
     while True:
         process = subprocess.Popen(
-            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model NousResearch/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {get_secret('HF_TOKEN')}",
+            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model NousResearch/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {os.environ.get('HF_TOKEN')}",
             shell=True,
         )
         process.wait()  # Wait for the process to complete
@@ -88,7 +87,7 @@ async def main(room_url: str, token: str):
 
         llm = OpenAILLMService(
             name="LLM",
-            api_key=get_secret("HF_TOKEN"),
+            api_key=os.environ.get("HF_TOKEN"),
             model="NousResearch/Meta-Llama-3-8B-Instruct",
             base_url="http://127.0.0.1:5000/v1",
         )
@@ -184,7 +183,7 @@ async def check_vllm_model_status():
     url = "http://127.0.0.1:5000/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('HF_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('HF_TOKEN')}",
     }
     data = {
         "model": "NousResearch/Meta-Llama-3-8B-Instruct",
@@ -230,7 +229,7 @@ def create_room():
     url = "https://api.daily.co/v1/rooms/"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {
         "properties": {
@@ -255,7 +254,7 @@ def create_room():
     else:
         data = response.json()
         if data.get("error") == "invalid-request-error" and "rooms reached" in data.get(
-            "info", ""
+                "info", ""
         ):
             logger.error(
                 "We are currently at capacity for this demo. Please try again later."
@@ -272,7 +271,7 @@ def create_token(room_name: str):
     url = "https://api.daily.co/v1/meeting-tokens"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {"properties": {"room_name": room_name}}
 

@@ -5,7 +5,6 @@ import time
 
 import aiohttp
 import requests
-from cerebrium import get_secret
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -38,8 +37,8 @@ from helpers import (
 
 os.environ["SSL_CERT"] = ""
 os.environ["SSL_KEY"] = ""
-os.environ["OPENAI_API_KEY"] = get_secret("OPENAI_API_KEY")
-os.environ["PINECONE_API_KEY"] = get_secret("PINECONE_API_KEY")
+os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
+os.environ["PINECONE_API_KEY"] = os.environ.get("PINECONE_API_KEY")
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
@@ -76,7 +75,7 @@ async def main(room_url: str, token: str):
 
         tts = ElevenLabsTurbo(
             aiohttp_session=session,
-            api_key=get_secret("ELEVENLABS_API_KEY"),
+            api_key=os.environ.get("ELEVENLABS_API_KEY"),
             voice_id="uGLvhQYfq0IUmSfqitRE",
         )
 
@@ -184,7 +183,7 @@ def create_room():
     url = "https://api.daily.co/v1/rooms/"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {
         "properties": {
@@ -209,7 +208,7 @@ def create_room():
     else:
         data = response.json()
         if data.get("error") == "invalid-request-error" and "rooms reached" in data.get(
-            "info", ""
+                "info", ""
         ):
             print("We are currently at capacity for this demo. Please try again later.")
             return {
@@ -224,7 +223,7 @@ def create_token(room_name: str):
     url = "https://api.daily.co/v1/meeting-tokens"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {get_secret('DAILY_TOKEN')}",
+        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
     }
     data = {
         "properties": {
