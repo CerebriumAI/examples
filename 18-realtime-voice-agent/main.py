@@ -254,7 +254,7 @@ def create_room():
     else:
         data = response.json()
         if data.get("error") == "invalid-request-error" and "rooms reached" in data.get(
-                "info", ""
+            "info", ""
         ):
             logger.error(
                 "We are currently at capacity for this demo. Please try again later."

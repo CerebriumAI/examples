@@ -45,7 +45,7 @@ def get_availability(fromDate: str, toDate: str) -> float:
 
 @tool
 def book_slot(
-        datetime: str, name: str, email: str, title: str, description: str
+    datetime: str, name: str, email: str, title: str, description: str
 ) -> float:
     """Book a meeting on my calendar at the requested date and time using the 'datetime' variable. The 'datetime' variable should be specified in EST. Get a description about what the meeting is about and make a title for it"""
     url = "https://api.cal.com/v1/bookings"
@@ -118,6 +118,7 @@ def predict(prompt, session_id):
     )
 
     return {"result": output}  # return your results
+
 
 # if __name__ == "__main__":
 #     while True:

@@ -1,4 +1,3 @@
-
 import functools
 from typing import List
 from mistralai import Mistral

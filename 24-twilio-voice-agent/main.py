@@ -48,7 +48,9 @@ os.environ["OUTLINES_CACHE_DIR"] = "/tmp/.outlines"
 
 deepgram_voice: str = "aura-asteria-en"
 
-twilio = Client(os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN"))
+twilio = Client(
+    os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN")
+)
 
 
 def start_server():
