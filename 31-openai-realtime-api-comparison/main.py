@@ -6,7 +6,7 @@ import aiohttp
 import requests
 from cerebrium import get_secret
 from loguru import logger
-from pipecat.frames.frames import  EndFrame
+from pipecat.frames.frames import EndFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -21,7 +21,12 @@ from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat.vad.silero import SileroVADAnalyzer
 from pipecat.vad.vad_analyzer import VADParams
 from rime import RimeTTSService  # Make sure to import the RimeTTSService
-from pipecat.services.openai_realtime_beta import OpenAILLMServiceRealtimeBeta, SessionProperties, InputAudioTranscription, TurnDetection
+from pipecat.services.openai_realtime_beta import (
+    OpenAILLMServiceRealtimeBeta,
+    SessionProperties,
+    InputAudioTranscription,
+    TurnDetection,
+)
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
@@ -32,17 +37,27 @@ os.environ["OUTLINES_CACHE_DIR"] = "/tmp/.outlines"
 
 current_service = "openai_realtime"
 
-async def switch_service(function_name, tool_call_id, args, llm, context, result_callback):
+
+async def switch_service(
+    function_name, tool_call_id, args, llm, context, result_callback
+):
     global current_service
     print("Switching....!!!")
     current_service = args["service"]
-    await result_callback({"voice": f"Switching to {current_service} service. Future voice responses will be using the new service"})
+    await result_callback(
+        {
+            "voice": f"Switching to {current_service} service. Future voice responses will be using the new service"
+        }
+    )
+
 
 async def openai_realtime_filter(frame) -> bool:
     return current_service == "openai_realtime"
 
+
 async def custom_filter(frame) -> bool:
     return current_service == "custom"
+
 
 async def combined_main(room_url: str, token: str):
     async with aiohttp.ClientSession() as session:
@@ -85,7 +100,7 @@ async def combined_main(room_url: str, token: str):
                 "content": "You are a helpful AI assistant that can switch between two services to showcase the difference in performance and cost: 'openai_realtime' and 'custom'. Respond to user queries and switch services when asked.",
             },
         ]
-        openai_realtime.register_function("switch_service", switch_service)       
+        openai_realtime.register_function("switch_service", switch_service)
         tools_realtime = [
             {
                 "type": "function",
@@ -105,10 +120,11 @@ async def combined_main(room_url: str, token: str):
         ]
 
         openai_realtime_context = OpenAILLMContext(
-            messages=messages,
-            tools=tools_realtime
+            messages=messages, tools=tools_realtime
         )
-        context_aggregator = openai_realtime.create_context_aggregator(openai_realtime_context)
+        context_aggregator = openai_realtime.create_context_aggregator(
+            openai_realtime_context
+        )
 
         # OpenAI LLM + Rime TTS service
         openai_llm = OpenAILLMService(
@@ -124,7 +140,7 @@ async def combined_main(room_url: str, token: str):
             voice="grove",
             modelId="mist",
             sample_rate=24000,
-            encoding="linear16"
+            encoding="linear16",
         )
 
         tools_2 = [
@@ -132,52 +148,56 @@ async def combined_main(room_url: str, token: str):
                 name="switch_service",
                 type="function",
                 function={
-                "type": "function",
-                "name": "switch_service",
-                "description": "Switch to the service when the user asks you to",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "service": {
-                            "type": "string",
-                            "description": "The service the user wants you to switch to",
+                    "type": "function",
+                    "name": "switch_service",
+                    "description": "Switch to the service when the user asks you to",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "service": {
+                                "type": "string",
+                                "description": "The service the user wants you to switch to",
+                            },
                         },
+                        "required": ["service"],
                     },
-                    "required": ["service"],
                 },
-            }
             )
         ]
 
-        custom_context = OpenAILLMContext(
-            messages=messages,
-            tools=tools_2
-        )
+        custom_context = OpenAILLMContext(messages=messages, tools=tools_2)
         context_aggregator_custom = openai_llm.create_context_aggregator(custom_context)
 
         pipeline = Pipeline(
             [
                 transport.input(),  # Transport user input
-                ParallelPipeline([
-                    # openai_realtime_beta
-                    FunctionFilter(openai_realtime_filter),
-                    Pipeline([ 
-                        context_aggregator.user(),
-                        openai_realtime,  # LLM
-                        context_aggregator.assistant(),
-                    ])],
+                ParallelPipeline(
+                    [
+                        # openai_realtime_beta
+                        FunctionFilter(openai_realtime_filter),
+                        Pipeline(
+                            [
+                                context_aggregator.user(),
+                                openai_realtime,  # LLM
+                                context_aggregator.assistant(),
+                            ]
+                        ),
+                    ],
                     # local inference
-                    [FunctionFilter(custom_filter),
-                    Pipeline([
-                        # stt,
-                        context_aggregator_custom.user(),
-                        openai_llm,
-                        rime_tts,
-                        context_aggregator_custom.assistant(),
-                    ]),
-                ]),
-                transport.output(),  # Transport bot output 
-                
+                    [
+                        FunctionFilter(custom_filter),
+                        Pipeline(
+                            [
+                                # stt,
+                                context_aggregator_custom.user(),
+                                openai_llm,
+                                rime_tts,
+                                context_aggregator_custom.assistant(),
+                            ]
+                        ),
+                    ],
+                ),
+                transport.output(),  # Transport bot output
             ]
         )
 
@@ -214,10 +234,10 @@ async def combined_main(room_url: str, token: str):
 
         runner = PipelineRunner()
         await runner.run(task)
-        await session.close() 
+        await session.close()
+
 
 async def start_bot(room_url: str, token: str = None):
-
     try:
         await combined_main(room_url, token)
 
@@ -285,4 +305,3 @@ def create_token(room_name: str):
     else:
         logger.error(f"Failed to create token: {response.status_code}")
         return None
-

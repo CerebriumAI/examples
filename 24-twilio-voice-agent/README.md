@@ -10,7 +10,7 @@ You can visit the full documentation [here](https://docs.cerebrium.ai/v4/example
 
 ## Overview
 
-In order to create this application, we use Pipecat, an open source framework for voice and multimodal conversational AI
+To create this application, we use Pipecat, an open source framework for voice and multimodal conversational AI
 that handles some of the functionality we might need such as handling user interruptions, dealing with audio data etc.
 We will speak with our voice AI agent via a WebRTC transport, using Daily (the creators of Pipecat) and will deploy this
 application on Cerebrium to show how it handles deploying and scaling our application seamlessly.

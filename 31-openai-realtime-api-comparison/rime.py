@@ -13,6 +13,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.services.ai_services import TTSService
 
+
 class RimeTTSService(TTSService):
     def __init__(
         self,
@@ -56,14 +57,18 @@ class RimeTTSService(TTSService):
             headers = {
                 "Accept": "audio/pcm",
                 "Authorization": f"Api-Key {self._api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
             try:
                 await self.start_ttfb_metrics()
 
-                async with aiohttp.ClientSession(timeout=ClientTimeout(total=300)) as session:
-                    async with session.post(url, json=payload, headers=headers) as response:
+                async with aiohttp.ClientSession(
+                    timeout=ClientTimeout(total=300)
+                ) as session:
+                    async with session.post(
+                        url, json=payload, headers=headers
+                    ) as response:
                         if response.status != 200:
                             raise ValueError(f"Rime API error: {response.status}")
 
@@ -78,7 +83,7 @@ class RimeTTSService(TTSService):
                                 frame = TTSAudioRawFrame(
                                     audio=chunk,
                                     sample_rate=self._settings["sample_rate"],
-                                    num_channels=1
+                                    num_channels=1,
                                 )
                                 yield frame
 
