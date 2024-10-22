@@ -8,7 +8,7 @@ runtime = "custom"
 
 [cerebrium.runtime.custom]
 port = 5000
-asgi_entrypoint = "uvicorn app.main:app --host 0.0.0.0 --port 5000"
+entrypoint = "uvicorn app.main:app --host 0.0.0.0 --port 5000"
 healthcheck_endpoint = "/health"
 
 [cerebrium.hardware]
