@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, Body
 from loguru import logger
 from pydantic import BaseModel
 
@@ -11,16 +11,13 @@ class Item(BaseModel):
 
 
 @app.post("/predict")
-def predict(prompt):
-    params = Item(prompt=prompt)
-    # This code is run on every inference request.
-
+def predict(item: Item = Body(...)):
     # Access the parameters from your inference request
-    prompt = params.prompt
+    prompt = item.prompt
     logger.info(f"Received a prompt of: `{prompt}`")
 
     return {
-        "your_prompt": params.prompt,
+        "your_prompt": prompt,
         "your_other_return": "success",
     }  # return your results
 
@@ -29,16 +26,6 @@ def predict(prompt):
 @app.get("/health")
 def health():
     return {"status": "healthy"}
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        logger.info(f"Received data: {data}")
-        await websocket.send_text(f"Message text was: {data}")
-    await websocket.close()
 
 
 """
