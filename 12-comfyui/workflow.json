@@ -5,10 +5,7 @@
     {
       "id": 7,
       "type": "CLIPTextEncode",
-      "pos": [
-        -95,
-        -201
-      ],
+      "pos": [-95, -201],
       "size": {
         "0": 425.27801513671875,
         "1": 180.6060791015625
@@ -27,26 +24,19 @@
         {
           "name": "CONDITIONING",
           "type": "CONDITIONING",
-          "links": [
-            16
-          ],
+          "links": [16],
           "slot_index": 0
         }
       ],
       "properties": {
         "Node name for S&R": "CLIPTextEncode"
       },
-      "widgets_values": [
-        "worst quality, low quality, blurry, cropped, lowres,"
-      ]
+      "widgets_values": ["worst quality, low quality, blurry, cropped, lowres,"]
     },
     {
       "id": 16,
       "type": "Canny",
-      "pos": [
-        845,
-        387
-      ],
+      "pos": [845, 387],
       "size": {
         "0": 315,
         "1": 82
@@ -65,10 +55,7 @@
         {
           "name": "IMAGE",
           "type": "IMAGE",
-          "links": [
-            23,
-            25
-          ],
+          "links": [23, 25],
           "shape": 3,
           "slot_index": 0
         }
@@ -76,18 +63,12 @@
       "properties": {
         "Node name for S&R": "Canny"
       },
-      "widgets_values": [
-        0.2,
-        0.6
-      ]
+      "widgets_values": [0.2, 0.6]
     },
     {
       "id": 10,
       "type": "ControlNetApply",
-      "pos": [
-        389,
-        214
-      ],
+      "pos": [389, 214],
       "size": {
         "0": 317.4000244140625,
         "1": 98
@@ -116,26 +97,19 @@
         {
           "name": "CONDITIONING",
           "type": "CONDITIONING",
-          "links": [
-            18
-          ],
+          "links": [18],
           "slot_index": 0
         }
       ],
       "properties": {
         "Node name for S&R": "ControlNetApply"
       },
-      "widgets_values": [
-        0.5
-      ]
+      "widgets_values": [0.5]
     },
     {
       "id": 15,
       "type": "PreviewImage",
-      "pos": [
-        1213,
-        424
-      ],
+      "pos": [1213, 424],
       "size": {
         "0": 210,
         "1": 246
@@ -157,10 +131,7 @@
     {
       "id": 6,
       "type": "CLIPTextEncode",
-      "pos": [
-        -93,
-        -436
-      ],
+      "pos": [-93, -436],
       "size": {
         "0": 422.84503173828125,
         "1": 164.31304931640625
@@ -179,9 +150,7 @@
         {
           "name": "CONDITIONING",
           "type": "CONDITIONING",
-          "links": [
-            10
-          ],
+          "links": [10],
           "slot_index": 0
         }
       ],
@@ -195,10 +164,7 @@
     {
       "id": 14,
       "type": "CheckpointLoaderSimple",
-      "pos": [
-        -469,
-        188
-      ],
+      "pos": [-469, 188],
       "size": {
         "0": 315,
         "1": 98
@@ -210,43 +176,31 @@
         {
           "name": "MODEL",
           "type": "MODEL",
-          "links": [
-            19
-          ],
+          "links": [19],
           "slot_index": 0
         },
         {
           "name": "CLIP",
           "type": "CLIP",
-          "links": [
-            20,
-            21
-          ],
+          "links": [20, 21],
           "slot_index": 1
         },
         {
           "name": "VAE",
           "type": "VAE",
-          "links": [
-            28
-          ],
+          "links": [28],
           "slot_index": 2
         }
       ],
       "properties": {
         "Node name for S&R": "CheckpointLoaderSimple"
       },
-      "widgets_values": [
-        "sd_xl_base_1.0.safetensors"
-      ]
+      "widgets_values": ["sd_xl_base_1.0.safetensors"]
     },
     {
       "id": 12,
       "type": "ControlNetLoader",
-      "pos": [
-        -92,
-        229
-      ],
+      "pos": [-92, 229],
       "size": {
         "0": 422,
         "1": 58
@@ -258,26 +212,19 @@
         {
           "name": "CONTROL_NET",
           "type": "CONTROL_NET",
-          "links": [
-            13
-          ],
+          "links": [13],
           "slot_index": 0
         }
       ],
       "properties": {
         "Node name for S&R": "ControlNetLoader"
       },
-      "widgets_values": [
-        "diffusers_xl_canny_full.safetensors"
-      ]
+      "widgets_values": ["diffusers_xl_canny_full.safetensors"]
     },
     {
       "id": 5,
       "type": "EmptyLatentImage",
-      "pos": [
-        606,
-        -36
-      ],
+      "pos": [606, -36],
       "size": {
         "0": 315,
         "1": 106
@@ -289,28 +236,19 @@
         {
           "name": "LATENT",
           "type": "LATENT",
-          "links": [
-            2
-          ],
+          "links": [2],
           "slot_index": 0
         }
       ],
       "properties": {
         "Node name for S&R": "EmptyLatentImage"
       },
-      "widgets_values": [
-        1024,
-        1024,
-        1
-      ]
+      "widgets_values": [1024, 1024, 1]
     },
     {
       "id": 11,
       "type": "LoadImage",
-      "pos": [
-        410,
-        379
-      ],
+      "pos": [410, 379],
       "size": {
         "0": 387.97003173828125,
         "1": 465.5097961425781
@@ -322,9 +260,7 @@
         {
           "name": "IMAGE",
           "type": "IMAGE",
-          "links": [
-            24
-          ],
+          "links": [24],
           "slot_index": 0
         },
         {
@@ -336,18 +272,12 @@
       "properties": {
         "Node name for S&R": "LoadImage"
       },
-      "widgets_values": [
-        "replicate_logo.png",
-        "image"
-      ]
+      "widgets_values": ["replicate_logo.png", "image"]
     },
     {
       "id": 3,
       "type": "KSampler",
-      "pos": [
-        1017,
-        -208
-      ],
+      "pos": [1017, -208],
       "size": {
         "0": 315,
         "1": 262
@@ -381,9 +311,7 @@
         {
           "name": "LATENT",
           "type": "LATENT",
-          "links": [
-            7
-          ],
+          "links": [7],
           "slot_index": 0
         }
       ],
@@ -403,10 +331,7 @@
     {
       "id": 8,
       "type": "VAEDecode",
-      "pos": [
-        1070,
-        202
-      ],
+      "pos": [1070, 202],
       "size": {
         "0": 210,
         "1": 46
@@ -430,9 +355,7 @@
         {
           "name": "IMAGE",
           "type": "IMAGE",
-          "links": [
-            29
-          ],
+          "links": [29],
           "slot_index": 0
         }
       ],
@@ -443,14 +366,8 @@
     {
       "id": 18,
       "type": "PreviewImage",
-      "pos": [
-        1565,
-        73
-      ],
-      "size": [
-        210,
-        246
-      ],
+      "pos": [1565, 73],
+      "size": [210, 246],
       "flags": {},
       "order": 11,
       "mode": 0,
@@ -467,118 +384,20 @@
     }
   ],
   "links": [
-    [
-      2,
-      5,
-      0,
-      3,
-      3,
-      "LATENT"
-    ],
-    [
-      7,
-      3,
-      0,
-      8,
-      0,
-      "LATENT"
-    ],
-    [
-      10,
-      6,
-      0,
-      10,
-      0,
-      "CONDITIONING"
-    ],
-    [
-      13,
-      12,
-      0,
-      10,
-      1,
-      "CONTROL_NET"
-    ],
-    [
-      16,
-      7,
-      0,
-      3,
-      2,
-      "CONDITIONING"
-    ],
-    [
-      18,
-      10,
-      0,
-      3,
-      1,
-      "CONDITIONING"
-    ],
-    [
-      19,
-      14,
-      0,
-      3,
-      0,
-      "MODEL"
-    ],
-    [
-      20,
-      14,
-      1,
-      7,
-      0,
-      "CLIP"
-    ],
-    [
-      21,
-      14,
-      1,
-      6,
-      0,
-      "CLIP"
-    ],
-    [
-      23,
-      16,
-      0,
-      15,
-      0,
-      "IMAGE"
-    ],
-    [
-      24,
-      11,
-      0,
-      16,
-      0,
-      "IMAGE"
-    ],
-    [
-      25,
-      16,
-      0,
-      10,
-      2,
-      "IMAGE"
-    ],
-    [
-      28,
-      14,
-      2,
-      8,
-      1,
-      "VAE"
-    ],
-    [
-      29,
-      8,
-      0,
-      18,
-      0,
-      "IMAGE"
-    ]
+    [2, 5, 0, 3, 3, "LATENT"],
+    [7, 3, 0, 8, 0, "LATENT"],
+    [10, 6, 0, 10, 0, "CONDITIONING"],
+    [13, 12, 0, 10, 1, "CONTROL_NET"],
+    [16, 7, 0, 3, 2, "CONDITIONING"],
+    [18, 10, 0, 3, 1, "CONDITIONING"],
+    [19, 14, 0, 3, 0, "MODEL"],
+    [20, 14, 1, 7, 0, "CLIP"],
+    [21, 14, 1, 6, 0, "CLIP"],
+    [23, 16, 0, 15, 0, "IMAGE"],
+    [24, 11, 0, 16, 0, "IMAGE"],
+    [25, 16, 0, 10, 2, "IMAGE"],
+    [28, 14, 2, 8, 1, "VAE"],
+    [29, 8, 0, 18, 0, "IMAGE"]
   ],
   "groups": [],
   "config": {},

@@ -3,8 +3,8 @@ name = "educator-agent-1"
 python_version = "3.11"
 docker_base_image_url = "registry.cerebrium.ai/daily:latest"
 
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[videos, rag]"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = ["videos", "rag"]
 shell_commands = []
 
 [cerebrium.hardware]

@@ -5,8 +5,8 @@
 [cerebrium.deployment]
 name = "16-faster-image-generation"
 python_version = "3.11"
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude]"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = ["./example_exclude"]
 shell_commands = [
     "pip install -U --pre oneflow -f https://github.com/siliconflow/oneflow_releases/releases/expanded_assets/community_cu121",
     "pip install --pre onediff",

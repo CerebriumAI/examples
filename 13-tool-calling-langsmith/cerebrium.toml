@@ -5,8 +5,8 @@
 [cerebrium.deployment]
 name = "tool-calling-langsmith"
 python_version = "3.11"
-include = "[./*, main.py, cal.py, cerebrium.toml]"
-exclude = "[./example_exclude, langchain/]"
+include = ["./*", "main.py", "cal.py", "cerebrium.toml"]
+exclude = ["./example_exclude", "langchain/"]
 
 [cerebrium.hardware]
 region = "us-east-1"

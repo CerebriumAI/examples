@@ -1,8 +1,8 @@
 [cerebrium.deployment]
 name = "26-cog-migration-sdxl"
 python_version = "3.11"
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude]"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = ["./example_exclude"]
 docker_base_image_url = "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
 shell_commands = [
     "curl -o /usr/local/bin/pget -L 'https://github.com/replicate/pget/releases/download/v0.6.2/pget_linux_x86_64' && chmod +x /usr/local/bin/pget"
