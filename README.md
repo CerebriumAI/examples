@@ -53,3 +53,11 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 [26-cog-migration-sdxl](26-cog-migration-sdxl)
 
 [27-ecommerce-live-stream](27-ecommerce-live-stream)
+
+[28-sales-trainer](28-sales-trainer)
+
+[29-openai-compatible-endpoint](29-openai-compatible-endpoint)
+
+[30-asgi-server](30-asgi-server)
+
+[31-openai-realtime-api-comparison](31-openai-realtime-api-comparison)
