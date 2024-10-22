@@ -2,8 +2,8 @@
 name = "xtts"
 python_version = "3.11"
 docker_base_image_url = "nvidia/cuda:12.1.1-runtime-ubuntu22.04"
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[.*]"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = [".*"]
 
 [cerebrium.hardware]
 cpu = 2

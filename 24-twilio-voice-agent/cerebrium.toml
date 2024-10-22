@@ -5,8 +5,8 @@
 [cerebrium.deployment]
 name = "twilio-agent"
 python_version = "3.11"
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude]"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = ["./example_exclude"]
 docker_base_image_url = "registry.cerebrium.ai/daily:latest"
 
 [cerebrium.hardware]

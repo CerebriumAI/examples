@@ -2,8 +2,8 @@
 [cerebrium.deployment]
 name = "31-openai-realtime-api"
 python_version = "3.11"
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude]"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = ["./example_exclude"]
 shell_commands = ["pip install git+https://github.com/pipecat-ai/pipecat.git@khk/openai-realtime-beta#egg=pipecat-ai[silero,daily,openai,deepgram]"]
 
 [cerebrium.hardware]

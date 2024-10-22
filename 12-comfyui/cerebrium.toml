@@ -5,8 +5,8 @@
 [cerebrium.deployment]
 name = "comfyui"
 python_version = "3.11"
-include = "[./*, main.py, cerebrium.toml]"
-exclude = "[./example_exclude, ./confyui, ./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors, ./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors]"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = ["./example_exclude", "./confyui", "./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors", "./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors"]
 
 [cerebrium.hardware]
 region = "us-east-1"
