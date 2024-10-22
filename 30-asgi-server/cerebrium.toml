@@ -1,14 +1,13 @@
 [cerebrium.deployment]
 name = "30-asgi-server"
 python_version = "3.12"
-include = []
-exclude = []
+include = ["*"]
+exclude = [".*"]
 shell_commands = []
-runtime = "custom"
 
 [cerebrium.runtime.custom]
 port = 5000
-entrypoint = "uvicorn app.main:app --host 0.0.0.0 --port 5000"
+entrypoint = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
 healthcheck_endpoint = "/health"
 
 [cerebrium.hardware]
