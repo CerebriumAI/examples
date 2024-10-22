@@ -21,7 +21,7 @@ healthcheck_endpoint = "/health"
 ## Things to note
 
 - The `runtime` should be set to `custom`.
-- The `port` should be set to the port on which the ASGI server will run.
+- The `port` should be set to the port on which the ASGI server will run. Note that your requests to cerebrium will still be made to port 443.
 - The `entrypoint` should be set to the command that starts the ASGI server.
 - The code lives in the `/app` directory. So, the `entrypoint` should point to the ASGI server in the `/app/main.py`
   file. For Uvicorn, the entrypoint should be `uvicorn app.main:app ...`
