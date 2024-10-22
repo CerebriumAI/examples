@@ -1,8 +1,8 @@
 [cerebrium.deployment]
 name = "2-using-cerebrium-secrets"
 python_version = "3.12"
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = [".*"]
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[.*]"
 shell_commands = []
 docker_base_image_url = "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
 

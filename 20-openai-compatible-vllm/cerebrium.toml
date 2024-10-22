@@ -2,8 +2,8 @@
 name = "20-openai-compatible-vllm"
 python_version = "3.11"
 
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = [".*"]
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[.*]"
 shell_commands = []
 
 [cerebrium.hardware]

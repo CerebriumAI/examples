@@ -1,7 +1,7 @@
 [cerebrium.deployment]
 name = "4-faster-inference-with-vllm"
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = [".*"]
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[.*]"
 shell_commands = []
 
 # Note: Cuda 12 and Py 3.10 are required for VLLM

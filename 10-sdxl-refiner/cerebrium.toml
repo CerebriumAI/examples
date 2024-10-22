@@ -5,8 +5,8 @@
 [cerebrium.deployment]
 name = "10-sdxl-refiner"
 python_version = "3.11"
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = ["./example_exclude"]
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[./example_exclude]"
 docker_base_image_url = "debian:bookworm-slim"
 
 [cerebrium.hardware]

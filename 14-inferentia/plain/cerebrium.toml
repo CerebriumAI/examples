@@ -5,8 +5,8 @@
 [cerebrium.deployment]
 name = "11-inferentia-plain"
 python_version = "3.10"
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = ["./example_exclude"]
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[./example_exclude]"
 shell_commands = [
     "pip install torch==2.1.* --index-url https://download.pytorch.org/whl/cpu",
     "pip install --upgrade neuronx-cc==2.* --pre torch-neuronx==2.1.* transformers-neuronx --extra-index-url=https://pip.repos.neuron.amazonaws.com",

@@ -2,8 +2,8 @@
 name = "27-ecommerce-live-stream"
 python_version = "3.10"
 docker_base_image_url = "nvidia/cuda:12.1.1-runtime-ubuntu22.04"
-include = ["main.py", "cerebrium.toml", "detection.py", "best.pt"]
-exclude = [".*"]
+include = "[main.py, cerebrium.toml, detection.py, best.pt]"
+exclude = "[.*]"
 
 [cerebrium.hardware]
 cpu = 3

@@ -1,8 +1,8 @@
 [cerebrium.deployment]
 name = "7-streaming-endpoint"
 python_version = "3.12"
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = [".*"]
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[.*]"
 shell_commands = []
 
 [cerebrium.hardware]

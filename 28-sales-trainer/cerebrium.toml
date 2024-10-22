@@ -2,8 +2,8 @@
 name = "coaching-training"
 python_version = "3.11"
 docker_base_image_url="debian:bookworm-slim"
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = ["videos", "rag"]
+include = "[./*, main.py, cerebrium.toml]"
+exclude = "[videos, rag]"
 shell_commands = []
 
 [cerebrium.hardware]
