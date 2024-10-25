@@ -25,6 +25,7 @@ cooldown = 10
 bitsandbytes = "latest"
 sentencepiece = "latest"
 torch = "latest"
+pydantic = "latest"
 
 [cerebrium.dependencies.apt]
 git = "latest"
