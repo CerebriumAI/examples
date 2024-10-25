@@ -7,8 +7,8 @@ shell_commands = []
 
 [cerebrium.hardware]
 cpu = 2
-memory = 8.0
-compute = "AMPERE_A10"
+memory = 2.0
+compute = "CPU"
 gpu_count = 1
 provider = "aws"
 region = "us-east-1"
@@ -20,5 +20,4 @@ cooldown = 10
 
 [cerebrium.dependencies.pip]
 pydantic = "latest"
-numpy = "latest"
 loguru = "latest"
