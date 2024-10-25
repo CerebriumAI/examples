@@ -1,0 +1,24 @@
+[cerebrium.deployment]
+name = "33-simple-streaming"
+python_version = "3.12"
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = [".*"]
+shell_commands = []
+
+[cerebrium.hardware]
+cpu = 2
+memory = 8.0
+compute = "AMPERE_A10"
+gpu_count = 1
+provider = "aws"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+cooldown = 10
+
+[cerebrium.dependencies.pip]
+pydantic = "latest"
+numpy = "latest"
+loguru = "latest"
