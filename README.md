@@ -61,3 +61,5 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 [30-asgi-server](30-asgi-fastapi-server)
 
 [31-openai-realtime-api-comparison](31-openai-realtime-api-comparison)
+
+[32-asgi-gradio-frontend](32-asgi-gradio-frontend)

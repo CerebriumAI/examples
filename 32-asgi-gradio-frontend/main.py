@@ -6,7 +6,7 @@ import os
 import multiprocessing
 import time
 import requests
-from typing import Optional
+from typing import Optional, List
 import sys
 
 # Initialize FastAPI
@@ -20,6 +20,8 @@ GRADIO_HOST = os.getenv("GRADIO_HOST", "127.0.0.1")
 GRADIO_PORT = int(os.getenv("GRADIO_PORT", "7860"))
 GRADIO_URL = os.getenv("GRADIO_SERVER_URL", f"http://{GRADIO_HOST}:{GRADIO_PORT}")
 
+# Configure the Llama endpoint URL
+LLAMA_ENDPOINT = os.getenv("LLAMA_ENDPOINT", " https://api.cortex.cerebrium.ai/v4/p-47d74f53/openai-compatible-endpoint/run") # Update with your endpoint
 
 class GradioServer:
     def __init__(self):
@@ -28,15 +30,50 @@ class GradioServer:
         self.process: Optional[multiprocessing.Process] = None
         self.url = GRADIO_URL
 
-    def run_server(self):
-        def greet(name):
-            return f"Hello, {name}!"
+    async def chat_with_llama(self, message: str, history: List[List[str]]) -> str:
+        """Make a request to the Llama endpoint"""
+        # Convert history and new message into OpenAI chat format
+        messages = []
+        for h in history:
+            messages.extend([
+                {"role": "user", "content": h[0]},
+                {"role": "assistant", "content": h[1]}
+            ])
+        messages.append({"role": "user", "content": message})
 
-        interface = gr.Interface(
-            fn=greet,
-            inputs="text",
-            outputs="text",
-            title="Greeting App"
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{LLAMA_ENDPOINT}/v1/chat/completions",
+                    json={
+                        "messages": messages,
+                        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+                        "stream": False,
+                        "temperature": 0.7,
+                        "top_p": 0.95
+                    },
+                    timeout=30.0
+                )
+
+                if response.status_code == 200:
+                    response_data = response.json()
+                    return response_data['choices'][0]['text']
+                else:
+                    return f"Error: Received status code {response.status_code} from Llama endpoint"
+            except Exception as e:
+                return f"Error communicating with Llama endpoint: {str(e)}"
+
+    def run_server(self):
+        interface = gr.ChatInterface(
+            fn=self.chat_with_llama,
+            type="messages",
+            title="Chat with Llama",
+            description="This is a chat interface powered by Llama 3.1 8B Instruct",
+            examples=[
+                ["What is the capital of France?"],
+                ["Explain quantum computing in simple terms"],
+                ["Write a short poem about technology"]
+            ],
         )
         interface.launch(
             server_name=self.host,
