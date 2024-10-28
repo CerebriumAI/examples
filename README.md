@@ -58,8 +58,10 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 
 [29-openai-compatible-endpoint](29-openai-compatible-endpoint)
 
-[30-asgi-server](30-asgi-server)
+[30-asgi-fastapi-server](30-asgi-fastapi-server)
 
 [31-openai-realtime-api-comparison](31-openai-realtime-api-comparison)
 
 [32-websockets](32-websockets)
+
+[33-asgi-gradio-interface](33-asgi-gradio-interface)

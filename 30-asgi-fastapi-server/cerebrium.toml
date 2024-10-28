@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "30-asgi-server"
+name = "30-asgi-fastapi-server"
 python_version = "3.12"
 include = ["*"]
 exclude = [".*"]
@@ -12,17 +12,14 @@ healthcheck_endpoint = "/health"
 
 [cerebrium.hardware]
 cpu = 2
-memory = 8.0
-compute = "AMPERE_A10"
-gpu_count = 1
-provider = "aws"
-region = "us-east-1"
+memory = 4.0
+compute = "CPU"
 
 [cerebrium.scaling]
 min_replicas = 0
 max_replicas = 2
 cooldown = 10
-replica_concurrency = 1
+replica_concurrency = 1000
 
 [cerebrium.dependencies.pip]
 pydantic = "latest"
