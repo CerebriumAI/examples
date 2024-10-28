@@ -1,4 +1,4 @@
-# Cerebrium ASGI Example (BETA)
+# Cerebrium ASGI Example - Gradio (BETA)
 
 This example demonstrates how to deploy a Cerebrium app using an ASGI server and Gradio.
 
@@ -27,7 +27,7 @@ Warning: This functionality is in beta and may change in the future.
 
 - Make the necessary changes listed in the _Required changes_ section above
 - Deploy your application using `cerebrium deploy -y`
-- In your browser, navigate to `https://dev-api.cortex.cerebrium.ai/v4/<your-project-id>/32-asgi-gradio-frontend/gradio` to interact with your frontend.
+- In your browser, navigate to `https://dev-api.cortex.cerebrium.ai/v4/<your-project-id>/33-asgi-gradio-frontend/gradio` to interact with your frontend.
 
 ## NB: Scaling down (For testing)
 
