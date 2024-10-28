@@ -19,7 +19,7 @@ pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float
 ## Calling the API
 
 ```bash
-curl --location 'https://dev-api.cortex.cerebrium.ai/v4/YOUR-PROJECT_ID/22-fast-stable-diffusion/predict' \
+curl --location 'https://api.cortex.cerebrium.ai/v4/YOUR-PROJECT_ID/22-fast-stable-diffusion/predict' \
 --header 'Content-Type: application/json' \
 --header 'Authorization: Bearer YOUR_TOKEN' \
 --data '{

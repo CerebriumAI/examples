@@ -21,5 +21,5 @@ healthcheck_endpoint = "/health"
 ## Making a request
 
 ```bash
-websocat wss://dev-api.cortex.cerebrium.ai/v4/<your-project-id>/<your-app-name>/<your-websocket-function-name>
+websocat wss://api.cortex.cerebrium.ai/v4/<your-project-id>/<your-app-name>/<your-websocket-function-name>
 ```
