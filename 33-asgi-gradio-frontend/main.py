@@ -1,13 +1,14 @@
+import multiprocessing
+import os
+import sys
+import time
+from typing import Optional, List
+
 import gradio as gr
+import httpx
+import requests
 from fastapi import FastAPI, Request
 from starlette.responses import Response as StarletteResponse
-import httpx
-import os
-import multiprocessing
-import time
-import requests
-from typing import Optional, List
-import sys
 
 # Initialize FastAPI
 app = FastAPI()
@@ -79,10 +80,13 @@ class GradioServer:
         interface.launch(
             server_name=self.host,
             server_port=self.port,
+            root_path=f"https://api.cortex.cerebrium.ai/v4/{os.getenv('PROJECT_ID')}/{os.getenv('APP_NAME')}/",
             quiet=True
         )
 
     def start(self):
+        print(f"Starting Gradio server at {self.url} port {self.port}")
+
         # Start Gradio in a separate process
         self.process = multiprocessing.Process(target=self.run_server)
         self.process.start()
@@ -120,13 +124,17 @@ async def health_check():
 # Catchall proxy endpoint for Gradio
 @app.route("/{path:path}", include_in_schema=False, methods=["GET", "POST"])
 async def gradio(request: Request):
-    print(f"Proxying request to Gradio: {request.url.path}")
+    print(f"Forwarding request path: {request.url.path}")
+
     headers = dict(request.headers)
+
+    # Construct the full URL to Gradio, preserving the original path
+    target_url = f"{GRADIO_URL}{request.url.path}"
 
     async with httpx.AsyncClient() as client:
         response = await client.request(
             request.method,
-            f"{GRADIO_URL}",
+            target_url,
             headers=headers,
             data=await request.body(),
             params=request.query_params,
