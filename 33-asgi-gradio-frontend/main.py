@@ -21,7 +21,8 @@ GRADIO_PORT = int(os.getenv("GRADIO_PORT", "7860"))
 GRADIO_URL = os.getenv("GRADIO_SERVER_URL", f"http://{GRADIO_HOST}:{GRADIO_PORT}")
 
 # Configure the Llama endpoint URL
-LLAMA_ENDPOINT = os.getenv("LLAMA_ENDPOINT", " https://api.cortex.cerebrium.ai/v4/p-47d74f53/openai-compatible-endpoint/run") # Update with your endpoint
+LLAMA_ENDPOINT = os.getenv("LLAMA_ENDPOINT", "<YOUR_MODEL_API_ENDPOINT>")  # Update with your endpoint
+
 
 class GradioServer:
     def __init__(self):
@@ -138,6 +139,7 @@ async def gradio(request: Request):
             status_code=response.status_code,
             headers=response_headers,
         )
+
 
 @app.on_event("startup")
 async def startup_event():
