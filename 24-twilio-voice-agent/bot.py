@@ -1,8 +1,6 @@
 import os
 import sys
 
-import requests
-from fastapi import HTTPException
 from loguru import logger
 from pipecat.frames.frames import LLMMessagesFrame, EndFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -14,13 +12,6 @@ from pipecat.processors.aggregators.openai_llm_context import (
     OpenAILLMContext,
 )
 from pipecat.services.deepgram import DeepgramSTTService
-from pipecat.transports.services.helpers.daily_rest import (
-    DailyRESTHelper,
-    DailyRoomObject,
-    DailyRoomParams,
-    DailyRoomProperties,
-    DailyRoomSipParams,
-)
 from pipecat.vad.silero import SileroVADAnalyzer
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse
@@ -38,7 +29,6 @@ logger.add(sys.stderr, level="DEBUG")
 twilio = Client(
     os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN")
 )
-
 
 async def main(websocket_client, stream_sid):
     transport = FastAPIWebsocketTransport(
@@ -103,53 +93,3 @@ async def main(websocket_client, stream_sid):
     runner = PipelineRunner(handle_sigint=False)
 
     await runner.run(task)
-
-async def create_room():
-    params = DailyRoomParams(
-        properties=DailyRoomProperties(
-            sip=DailyRoomSipParams(
-                display_name="sip-dialin",
-                video=False,
-                sip_mode="dial-in",
-                num_endpoints=1,
-            )
-        )
-    )
-
-    # Create sip-enabled Daily room via REST
-    try:
-        daily_helper = DailyRESTHelper(
-            daily_api_key=os.environ.get("DAILY_TOKEN"),
-            daily_api_url="https://api.daily.co/v1",
-        )
-        room: DailyRoomObject = daily_helper.create_room(params=params)
-
-        token = daily_helper.get_token(room.url, 300)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unable to provision room {e}")
-
-    print(f"Daily room returned {room.url} {room.config.sip_endpoint}")
-
-    return {
-        "room_url": room.url,
-        "sip_endpoint": room.config.sip_endpoint,
-        "token": token,
-    }
-
-
-def create_token(room_name: str):
-    url = "https://api.daily.co/v1/meeting-tokens"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {os.environ.get('DAILY_TOKEN')}",
-    }
-    data = {"properties": {"room_name": room_name}}
-
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        token_info = response.json()
-        return token_info
-    else:
-        logger.error(f"Failed to create token: {response.status_code}")
-        return None
