@@ -26,4 +26,4 @@ Warning: This functionality is in beta and may change in the future.
 ## Running your application
 - Make the necessary changes listed in the _Required changes_ section above
 - Deploy your application using `cerebrium deploy -y`
-- In your browser, navigate to `https://dev-api.cortex.cerebrium.ai/v4/<your-project-id>/33-asgi-gradio-interface/` to interact with your frontend.
+- In your browser, navigate to `https://dev-api.cortex.cerebrium.ai/v4/<your-project-id>/34-asgi-gradio-interface/` to interact with your frontend.

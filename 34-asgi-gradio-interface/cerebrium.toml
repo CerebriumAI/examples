@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "33-gradio-interface"
+name = "34-gradio-interface"
 python_version = "3.12"
 include = ['./*', 'main.py', 'cerebrium.toml']
 exclude = ['.*']
