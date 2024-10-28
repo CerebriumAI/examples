@@ -64,4 +64,4 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 
 [32-websockets](32-websockets)
 
-[33-asgi-gradio-frontend](33-asgi-gradio-frontend)
+[33-asgi-gradio-frontend](33-asgi-gradio-interface)
