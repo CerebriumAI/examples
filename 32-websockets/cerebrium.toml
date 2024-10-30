@@ -13,7 +13,7 @@ healthcheck_endpoint = "/health"
 [cerebrium.hardware]
 cpu = 2
 memory = 8.0
-compute = "AMPERE_A10"
+compute = "CPU"
 gpu_count = 1
 provider = "aws"
 region = "us-east-1"
