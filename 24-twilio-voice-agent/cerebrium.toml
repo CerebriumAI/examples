@@ -21,6 +21,7 @@ entrypoint = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8765"]
 min_replicas = 1
 max_replicas = 2
 cooldown = 30
+replica_concurrency = 100
 
 [cerebrium.dependencies.pip]
 torch = ">=2.0.0"
