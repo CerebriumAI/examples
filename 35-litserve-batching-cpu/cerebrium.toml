@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "35-litserve-batching"
+name = "35-litserve-batching-cpu"
 python_version = "3.12"
 include = ["*"]
 exclude = [".*"]

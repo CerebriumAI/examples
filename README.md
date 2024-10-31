@@ -65,3 +65,7 @@ Please see the [Cerebrium documentation](https://docs.cerebrium.ai) for more inf
 [32-websockets](32-websockets)
 
 [34-asgi-gradio-interface](34-asgi-gradio-interface)
+
+[35-litserve-batching-cpu](35-litserve-batching-cpu)
+
+[36-litserve-batching-gpu](36-litserve-batching-gpu)
