@@ -21,7 +21,7 @@ class Item(BaseModel):
     prompt: str
     temperature: float
     top_p: float
-    top_k: float
+    top_k: int
     max_tokens: int
     frequency_penalty: float
 
