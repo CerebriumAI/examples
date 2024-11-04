@@ -19,7 +19,7 @@ compute = "AMPERE_A10"
 min_replicas = 0
 max_replicas = 2
 cooldown = 10
-replica_concurrency = 4
+replica_concurrency = 4 # This should match the batch size
 
 [cerebrium.dependencies.pip]
 pydantic = "latest"
