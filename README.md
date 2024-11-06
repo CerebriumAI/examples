@@ -20,56 +20,64 @@ We've split each of the examples by category to make them easier to find.
 
 1. [Deploy your first model](1-getting-started/1-first-cortex-deployment) 
 2. [Managing secrets and configurations](1-getting-started/2-using-cerebrium-secrets)
-3. [Deploying inferentia](1-getting-started/3-inferentia)
-4. [CPU-only workloads](1-getting-started/4-cpu-only)
+3. [CPU-only workloads](1-getting-started/3-cpu-only)
 
-### 2. Advanced Concepts 🧠
+### 2. Endpoints 🛤
 
-1. [Deploy ComfyUI on Cerebrium](2-advanced-concepts/1-comfyui)
-2. [Improve inference speed with VLLM](2-advanced-concepts/2-faster-inference-with-vllm)
-3. [Loading model weights faster](2-advanced-concepts/3-loading-model-weights-faster)
-4. [Multi-GPU inference](2-advanced-concepts/4-multi-gpu-inference)
-5. [Stream results from Falcon 7B to a client](2-advanced-concepts/5-streaming-endpoint)
-6. [How to generate images faster with SDXL](2-advanced-concepts/6-faster-image-generation)
-7. [WebSockets](2-advanced-concepts/7-websockets)
-8. [Implement simple output streaming](2-advanced-concepts/8-simple-streaming)
-9. [Batching requests with vLLM](2-advanced-concepts/9-vllm-batching-gpu)
-10. [Batching requests with transformers](2-advanced-concepts/10-transformers-batching-gpu)
+1. [Create an OpenAI compatible endpoint with vLLM](2-endpoints/1-openai-compatible-endpoint)
+2. [Stream results from Falcon 7B to a client](2-endpoints/2-streaming-endpoint)
+3. [WebSockets](2-endpoints/3-websockets)
+4. [Implement simple output streaming](2-endpoints/4-simple-streaming)
 
+### 3. Advanced Concepts 🧠
 
-### 3. Voice 🎤
+1. [Improve inference speed with VLLM](3-advanced-concepts/1-faster-inference-with-vllm)
+2. [Deploying Inferentia](3-advanced-concepts/2-inferentia)
+3. [Loading model weights faster](3-advanced-concepts/3-loading-model-weights-faster)
+4. [Multi-GPU inference](3-advanced-concepts/4-multi-gpu-inference)
 
-1. [Transcription service using Whisper](3-voice/1-whisper-transcription)
-2. [Create a realtime voice agent](3-voice/2-realtime-voice-agent)
-3. [Create a voice agent that leverages current context with RAG](3-voice/3-voice-rag-agent)
-4. [Create a WebSockets-based voice agent using Twilio](3-voice/4-twilio-voice-agent)
-5. [Clone voices with XTTS](3-voice/5-xtts)
+### 4. Integrations 🤝
 
-### 4. Large Language Models 🤖
+1. [Create a Langchain QA system](4-integrations/1-langchain-QA)
+2. [Create a virtual calendar assistant with Langsmith](4-integrations/2-tool-calling-langsmith)
+3. [Build a code review tool with Winston](4-integrations/3-winston)
 
-1. [Create a Langchain QA system](4-large-language-models/1-langchain-QA)
-2. [Create a virtual calendar assistant with Langsmith](4-large-language-models/2-tool-calling-langsmith)
-3. [Build a code review tool with Winston](4-large-language-models/3-winston)
-4. [Create a sales training tool with Mistral](4-large-language-models/4-sales-trainer)
-5. [Create an OpenAI compatible endpoint with vLLM](4-large-language-models/5-openai-compatible-endpoint)
-6. [Build your own OpenAI realtime API replacement](4-large-language-models/6-openai-realtime-api-comparison)
+### 5. Voice 🎤
 
-### 5. Image & Video 📸
+1. [Transcription service using Whisper](5-voice/1-whisper-transcription)
+2. [Create a realtime voice agent](5-voice/2-realtime-voice-agent)
+3. [Create a voice agent that leverages current context with RAG](5-voice/3-voice-rag-agent)
+4. [Create a WebSockets-based voice agent using Twilio](5-voice/4-twilio-voice-agent)
+5. [Clone voices with XTTS](5-voice/5-xtts)
+6. [Build your own OpenAI realtime API replacement](5-voice/6-openai-realtime-api-comparison)
 
-1. [Build a ControlNet logo detection system](5-image-and-video/1-logo-controlnet)
-2. [Refined image generation with SDXL](5-image-and-video/2-sdxl-refiner)
-3. [Using SDXL Lightning for image processing](5-image-and-video/3-sdxl-lightning)
-4. [Fast stable diffusion for image generation](5-image-and-video/4-fast-stable-diffusion)
-5. [Regular stable diffusion for image generation](5-image-and-video/5-regular-stable-diffusion)
-6. [Migrate your COG model to SDXL](5-image-and-video/6-cog-migration-sdxl)
-7. [Find products for sale using a live video stream](5-image-and-video/7-ecommerce-live-stream)
+### 6. Image & Video 📸
 
-### 6. Python apps 🌐
+1. [Deploy ComfyUI on Cerebrium](6-image-and-video/1-comfyui)
+2. [Build a ControlNet logo detection system](6-image-and-video/2-logo-controlnet)
+3. [Refined image generation with SDXL](6-image-and-video/3-sdxl-refiner)
+4. [Using SDXL Lightning for image processing](6-image-and-video/4-sdxl-lightning)
+5. [Fast stable diffusion for image generation](6-image-and-video/5-fast-stable-diffusion)
+6. [Regular stable diffusion for image generation](6-image-and-video/6-regular-stable-diffusion)
+7. [How to generate images faster with SDXL](6-image-and-video/7-faster-image-generation)
 
-1. [Deploy FastAPI applications](6-python-apps/1-asgi-fastapi-server)
-2. [Create ML web interfaces with Gradio](6-python-apps/2-asgi-gradio-interface)
-3. [Implement batching with LitServe - CPU version](6-python-apps/3-litserve-batching-cpu)
-4. [Implement batching with LitServe - GPU version](6-python-apps/4-litserve-batching-gpu)
+### 7. Migrations 🚚
+1. [Migrate your COG model to SDXL](7-migrations/1-cog-migration-sdxl)
+
+### 8. Application demos 🎬
+1. [Create a sales training tool with Mistral](8-application-demos/1-sales-trainer)
+2. [Find products for sale using a live video stream](8-application-demos/2-ecommerce-live-stream)
+
+### 9. Batching 📦
+1. [Implement batching with LitServe - CPU version](9-batching/1-litserve-batching-cpu)
+2. [Implement batching with LitServe - GPU version](9-batching/2-litserve-batching-gpu)
+3. [Batching requests with vLLM](9-batching/3-vllm-batching-gpu)
+4. [Batching requests with transformers](9-batching/4-transformers-batching-gpu)
+
+### 10. Python apps 🌐
+
+1. [Deploy FastAPI applications](10-python-apps/1-asgi-fastapi-server)
+2. [Create ML web interfaces with Gradio](10-python-apps/2-asgi-gradio-interface)
 
 ## How to Contribute 🤝
 We love contributions! Here's how you can contribute to our examples repository:
