@@ -1,0 +1,35 @@
+[cerebrium.deployment]
+name = "3-voice-rag-agent"
+python_version = "3.11"
+docker_base_image_url = "registry.cerebrium.ai/daily:latest"
+
+include = ["./*", "main.py", "cerebrium.toml"]
+exclude = ["videos", "rag"]
+shell_commands = []
+
+[cerebrium.hardware]
+cpu = 3
+memory = 14.0
+compute = "AMPERE_A10"
+gpu_count = 1
+provider = "aws"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 5
+cooldown = 120
+
+[cerebrium.dependencies.pip]
+deepgram-sdk = "latest"
+"pipecat-ai[silero, daily, openai, deepgram, elevenlabs]" = "latest"
+aiohttp = ">=3.9.4"
+torchaudio = ">=2.3.0"
+channels = ">=4.0.0"
+requests = "==2.32.2"
+openai = "latest"
+langchain = "latest"
+langchain_community = "latest"
+langchain_openai = "latest"
+langchain_pinecone = "latest"
+pinecone = "latest"
