@@ -1,0 +1,38 @@
+[cerebrium.deployment]
+name = "5-tensorrt"
+python_version = "3.10"
+docker_base_image_url = "nvidia/cuda:12.1.1-runtime-ubuntu22.04"
+disable_auth = false
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+shell_commands = [
+    "pip install tensorrt_llm==0.10.0.dev2024042300 -U --pre --extra-index-url https://pypi.nvidia.com",
+    "wget https://raw.githubusercontent.com/NVIDIA/TensorRT-LLM/71d8d4d3dc655671f32535d6d2b60cab87f36e87/examples/llama/convert_checkpoint.py -O ./convert_checkpoint.py"
+]
+
+[cerebrium.hardware]
+cpu = 3
+memory = 64.0
+compute = "AMPERE_A10"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+
+[cerebrium.dependencies.pip]
+transformers = "latest"
+torch = "latest"
+pydantic = "latest"
+huggingface-hub = "latest"
+hf-transfer = "latest"
+requests = "latest"
+
+[cerebrium.dependencies.apt]
+openmpi-bin = "latest"
+libopenmpi-dev = "latest"
+git = "latest"
+git-lfs = "latest"
+wget = "latest"
+
