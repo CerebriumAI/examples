@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "4-simple-streaming"
+name = "2-simple-streaming"
 python_version = "3.12"
 include = ["./*", "main.py", "cerebrium.toml"]
 exclude = [".*"]

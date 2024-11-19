@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "5-langchain-QA"
+name = "1-langchain-QA"
 python_version = "3.12"
 include = ["./*", "main.py", "cerebrium.toml"]
 exclude = [".*"]
