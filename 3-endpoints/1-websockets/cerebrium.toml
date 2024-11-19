@@ -1,5 +1,5 @@
 [cerebrium.deployment]
-name = "3-websockets"
+name = "1-websockets"
 python_version = "3.12"
 include = ["*"]
 exclude = [".*"]
