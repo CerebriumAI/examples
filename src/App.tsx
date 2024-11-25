@@ -43,7 +43,7 @@ function App() {
         body: JSON.stringify({request: {
           url: repoUrl,
           provider,
-          githubToken,
+          token,
           type: repoUrl.includes('github.com') ? 'github' : ''
         }}),
       });
@@ -135,7 +135,7 @@ function App() {
                   id="token"
                   type="password"
                   value={token}
-                  onChange={(e) => setGithubToken(e.target.value)}
+                  onChange={(e) => setToken(e.target.value)}
                   placeholder="github_pat_xxxxxxxxxxxxxxxxxxxx"
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-cerebrium-pink focus:border-transparent"
                 />
