@@ -44,6 +44,7 @@ function App() {
           url: repoUrl,
           provider,
           token,
+          type: repoUrl.includes('github.com') ? 'github' : ''
         }}),
       });
 
