@@ -43,7 +43,7 @@ function App() {
         body: JSON.stringify({request: {
           url: repoUrl,
           provider,
-          token,
+          githubToken,
           type: repoUrl.includes('github.com') ? 'github' : ''
         }}),
       });
