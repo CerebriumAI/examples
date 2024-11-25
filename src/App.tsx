@@ -135,7 +135,7 @@ function App() {
                   id="token"
                   type="password"
                   value={token}
-                  onChange={(e) => setToken(e.target.value)}
+                  onChange={(e) => setGithubToken(e.target.value)}
                   placeholder="github_pat_xxxxxxxxxxxxxxxxxxxx"
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-cerebrium-pink focus:border-transparent"
                 />
