@@ -40,12 +40,12 @@ function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9qZWN0SWQiOiJwLTJlNDE1ZDA1IiwiaWF0IjoxNzMyNTM4MjEzLCJleHAiOjIwNDgxMTQyMTN9.4yVrto4fuLtMeoNOTZGOH8d1crY-Qx2sD-pX29Jgh42j_z6ZIV5Qwr1YcFN5_ExU8hcTs6tRQ0kB6yXRsDisgAmHBGBJG0SnnmAanO_eVnt2fw5R93JhWMeDjLpCjsSIWKaiqKwA28Gos_0aMboK9-jRsV9aurhHaIX7l0BnW7kYU_YgOSWPeH92tFgoaCj1pvH6f00uorx429-dY5ynFFBfY3V23kRRMQgrz7rZ2agvq5FRCLzbTgOBJmDJGKNPzzFhtVhORpMrJM1xa5ING_1A2doTFN1vQNoHKZ6AnN_THQrXxVe7f4FeJNLFYXoRsixYRrrIFfR-cf8u8VymJQ`
         },
-        body: JSON.stringify({request: {
+        body: JSON.stringify({
           url: repoUrl,
           provider,
           token,
           type: repoUrl.includes('github.com') ? 'github' : ''
-        }}),
+        }),
       });
 
       const reader = res.body?.getReader();
