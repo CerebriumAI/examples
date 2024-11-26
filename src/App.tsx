@@ -3,6 +3,9 @@ import { ArrowRight, ExternalLink } from 'lucide-react';
 import { Skeleton } from './components/Skeleton';
 import { RadioGroup } from './components/RadioGroup';
 import { ResponseSection } from './components/ResponseSection';
+import { StatsSection } from './components/StatsSection';
+import { LoadingIndicator } from './components/LoadingIndicator';
+import posthog from 'posthog-js'
 
 type Provider = 'replicate' | 'huggingface' | 'runpod' | 'baseten';
 
@@ -17,28 +20,46 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [repoUrl, setRepoUrl] = useState('');
   const [token, setToken] = useState('');
-  const [githubUrl, setGithubUrl] = useState('');
-  const [githubToken, setGithubToken] = useState('');
   const [provider, setProvider] = useState<Provider>('replicate');
   const [response, setResponse] = useState<MigrationResponse | null>(null);
-  const [includeGithub, setIncludeGithub] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
 
   const isHuggingFace = provider === 'huggingface';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isHuggingFace && repoUrl.startsWith('https://github.com') && !token) {
-      alert('Please provide a GitHub token for GitHub URLs.');
+
+    posthog.capture('Clicked Migrate', {
+      provider,
+      token,
+      url: repoUrl,
+      type: repoUrl.includes('github.com') ? 'github' : ''
+    });
+    if (isHuggingFace) {
+      if (repoUrl.startsWith('https://github.com') && !token) {
+        alert('Please provide a GitHub token for GitHub URLs.');
+        return;
+      }
+      if (!repoUrl.includes('/') && !repoUrl.startsWith('https://github.com')) {
+        alert('Please enter a valid GitHub URL or Hugging Face Model ID.');
+        return;
+      }
+    } else if (!repoUrl.startsWith('https://github.com')) {
+      alert('Please enter a valid GitHub URL.');
       return;
     }
     setIsLoading(true);
     setResponse('');
+    setError(null); 
     try {
-      const res = await fetch('https://api.cortex.cerebrium.ai/v4/p-2e415d05/migration-tool/migrate', {
+      const res = await fetch("http://localhost:8000/migrate", {//'https://api.cortex.cerebrium.ai/v4/p-2e415d05/migration-tool/migrate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9qZWN0SWQiOiJwLTJlNDE1ZDA1IiwiaWF0IjoxNzMyNTM4MjEzLCJleHAiOjIwNDgxMTQyMTN9.4yVrto4fuLtMeoNOTZGOH8d1crY-Qx2sD-pX29Jgh42j_z6ZIV5Qwr1YcFN5_ExU8hcTs6tRQ0kB6yXRsDisgAmHBGBJG0SnnmAanO_eVnt2fw5R93JhWMeDjLpCjsSIWKaiqKwA28Gos_0aMboK9-jRsV9aurhHaIX7l0BnW7kYU_YgOSWPeH92tFgoaCj1pvH6f00uorx429-dY5ynFFBfY3V23kRRMQgrz7rZ2agvq5FRCLzbTgOBJmDJGKNPzzFhtVhORpMrJM1xa5ING_1A2doTFN1vQNoHKZ6AnN_THQrXxVe7f4FeJNLFYXoRsixYRrrIFfR-cf8u8VymJQ`
+          'Authorization': `Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9qZWN0SWQiOiJwLTJlNDE1ZDA1IiwiaWF0IjoxNzMyNTM4MjEzLCJleHAiOjIwNDgxMTQyMTN9.4yVrto4fuLtMeoNOTZGOH8d1crY-Qx2sD-pX29Jgh42j_z6ZIV5Qwr1YcFN5_ExU8hcTs6tRQ0kB6yXRsDisgAmHBGBJG0SnnmAanO_eVnt2fw5R93JhWMeDjLpCjsSIWKaiqKwA28Gos_0aMboK9-jRsV9aurhHaIX7l0BnW7kYU_YgOSWPeH92tFgoaCj1pvH6f00uorx429-dY5ynFFBfY3V23kRRMQgrz7rZ2agvq5FRCLzbTgOBJmDJGKNPzzFhtVhORpMrJM1xa5ING_1A2doTFN1vQNoHKZ6AnN_THQrXxVe7f4FeJNLFYXoRsixYRrrIFfR-cf8u8VymJQ`,
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
         },
         body: JSON.stringify({
           url: repoUrl,
@@ -47,6 +68,10 @@ function App() {
           type: repoUrl.includes('github.com') ? 'github' : ''
         }),
       });
+
+      if (!res.ok) {
+        throw new Error('An error occurred on the API');
+      }
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -60,6 +85,15 @@ function App() {
       }
     } catch (error) {
       console.error('Migration failed:', error);
+      setError('Migration failed. Please try again later.');
+
+      posthog.capture('migration failed', {
+        provider,
+        token,
+        url: repoUrl,
+        type: repoUrl.includes('github.com') ? 'github' : '',
+        error: error.message || 'Unknown error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -75,9 +109,10 @@ function App() {
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Cerebrium Migration Tool
           </h1>
-          <p className="text-lg text-gray-600">
-            Seamlessly migrate your workloads from your current infrastructure to Cerebrium
+          <p className="text-lg text-gray-600 mb-12">
+            Seamlessly migrate your AI workloads from your current infrastructure to Cerebrium
           </p>
+          <StatsSection />
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
@@ -101,7 +136,7 @@ function App() {
             </label>
             <input
               id="repo-url"
-              type="url"
+              type="text"
               required
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
@@ -166,17 +201,47 @@ function App() {
             </div>
           ) : response && (
             <div className="mt-8 space-y-8">
+              {provider === 'replicate' && (
+                <p className="text-sm text-gray-600">
+                  Learn more about migrating Replicate workloads in our{' '}
+                  <a 
+                    href="https://docs.cerebrium.ai/migrations/replicate" 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cerebrium-pink hover:text-cerebrium-pink/80 inline-flex items-center gap-1"
+                  >
+                    migration guide <ExternalLink className="w-4 h-4" />
+                  </a>
+                </p>
+              )}
+              {provider === 'huggingface' && (
+                <p className="text-sm text-gray-600">
+                  Learn more about migrating Hugging Face workloads in our{' '}
+                  <a
+                    href="https://docs.cerebrium.ai/migration/huggingface"
+                    target="_blank"
+                    rel="noopener noreferrer" 
+                    className="text-cerebrium-pink hover:text-cerebrium-pink/80 inline-flex items-center gap-1"
+                  >
+                    migration guide <ExternalLink className="w-4 h-4" />
+                  </a>
+                </p>
+              )}
               <ResponseSection title="Response" content={response} />
             </div>
           )}
-          
+          {isLoading && !error && (
+            <div className="mt-8">
+              <LoadingIndicator />
+            </div>
+          )}
+          {error && (
+            <div className="mt-4 text-red-600 text-center text-lg font-bold">
+              {error}
+            </div>
+          )}
         </div>
       </div>
-      {isLoading && (
-        <div className="fixed bottom-0 left-0 right-0 bg-gray-100 text-center py-2">
-          Loading...
-        </div>
-      )}
     </div>
   );
 }
