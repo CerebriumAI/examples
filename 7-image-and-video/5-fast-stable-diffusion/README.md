@@ -5,7 +5,7 @@ This example includes the model weights in the base image, which loads faster. T
 The key part is the shell_commands in the cerebrium.toml file
 
 ```toml
-shell_commands = ["export HF_HOME=/cortex/app/.cache/huggingface","python3 -c \"import torch; from diffusers import StableDiffusionPipeline; StableDiffusionPipeline.from_pretrained('stabilityai/stable-diffusion-2-1', torch_dtype=torch.float16)\""]
+shell_commands = ["export HF_HOME=/cortex/.cache/huggingface","python3 -c \"import torch; from diffusers import StableDiffusionPipeline; StableDiffusionPipeline.from_pretrained('stabilityai/stable-diffusion-2-1', torch_dtype=torch.float16)\""]
 ```
 
 This will download the model at build time.

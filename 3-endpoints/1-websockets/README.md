@@ -9,7 +9,7 @@ Warning: This functionality is in beta and may change in the future.
 ```toml
 [cerebrium.runtime.custom]
 port = 5000
-entrypoint = "uvicorn app.main:app --host 0.0.0.0 --port 5000"
+entrypoint = "uvicorn main:app --host 0.0.0.0 --port 5000"
 healthcheck_endpoint = "/health"
 ```
 
