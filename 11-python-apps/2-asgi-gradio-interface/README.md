@@ -14,12 +14,14 @@ Warning: This functionality is in beta and may change in the future.
 ### cerebrium.toml
 - The `port` should be set to the port on which the ASGI server will run. Note that your requests to cerebrium will still be made to port 443.
 - The `entrypoint` should be set to the command that starts the ASGI server.
-- The code lives in the `/app` directory. So, the `entrypoint` should point to the ASGI server in the `/app/main.py`
-  file. For Uvicorn, the entrypoint should be `uvicorn app.main:app ...`
+- The code lives in the `/cortex` directory and this is also the entrypoint workdir.
+- The `entrypoint` should point to the ASGI server in the `main.py` file. For Uvicorn, the entrypoint should be
+  `uvicorn main:app ...`
+
   ```toml
   [cerebrium.runtime.custom]
   port = 5000
-  entrypoint = "uvicorn app.main:app --host 0.0.0.0 --port 5000"
+  entrypoint = "uvicorn main:app --host 0.0.0.0 --port 5000"
   healthcheck_endpoint = "/health"
   ```
   
