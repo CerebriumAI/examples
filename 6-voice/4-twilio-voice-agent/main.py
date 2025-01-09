@@ -4,7 +4,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 
-from .bot import main
+from bot import main
 
 app = FastAPI()
 
@@ -22,6 +22,10 @@ async def start_call():
     print("POST TwiML")
     return HTMLResponse(content=open("app/templates/streams.xml").read(), media_type="application/xml")
 
+#  health check endpoint
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
