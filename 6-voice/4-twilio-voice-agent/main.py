@@ -20,7 +20,7 @@ app.add_middleware(
 @app.post("/")
 async def start_call():
     print("POST TwiML")
-    return HTMLResponse(content=open("app/templates/streams.xml").read(), media_type="application/xml")
+    return HTMLResponse(content=open("templates/streams.xml").read(), media_type="application/xml")
 
 #  health check endpoint
 @app.get("/health")
