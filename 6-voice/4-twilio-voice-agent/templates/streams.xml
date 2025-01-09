@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <!--Update with your project ID-->
+    <!--Update with your project ID below-->
     <Stream url="wss://api.cortex.cerebrium.ai/v4/p-xxxxxx/4-twilio-agent/ws"></Stream>
   </Connect>
   <Pause length="40"/>
