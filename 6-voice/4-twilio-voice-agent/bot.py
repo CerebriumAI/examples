@@ -46,7 +46,7 @@ async def main(websocket_client, stream_sid):
     llm = OpenAILLMService(
         name="LLM",
         api_key=os.environ.get("OPENAI_API_KEY"),
-        model="gpt-4o-mini",
+        model="gpt-4",
     )
     
 
