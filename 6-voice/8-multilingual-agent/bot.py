@@ -14,7 +14,6 @@ from pipecat.processors.aggregators.openai_llm_context import (
 from pipecat.services.whisper import WhisperSTTService
 from pipecat.vad.silero import SileroVADAnalyzer
 from twilio.rest import Client
-from twilio.twiml.voice_response import VoiceResponse
 from pipecat.transports.network.fastapi_websocket import (
     FastAPIWebsocketTransport,
     FastAPIWebsocketParams,
