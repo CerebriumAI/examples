@@ -16,6 +16,7 @@ gpu_count = 1
 [cerebrium.runtime.custom]
 port = 8765
 entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765"]
+healthcheck_endpoint = "/health"
 
 [cerebrium.scaling]
 min_replicas = 1

@@ -113,12 +113,6 @@ class BufferedSentence:
     text_frame: TextFrame = None
 
 
-@dataclass
-class BufferedSentence:
-    audio_frames: List[AudioRawFrame] = field(default_factory=list)
-    text_frame: TextFrame = None
-
-
 class VADGate(FrameProcessor):
     def __init__(
         self,
