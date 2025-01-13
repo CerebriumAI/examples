@@ -1,0 +1,22 @@
+[cerebrium.deployment]
+name = "ctranslate-whisper"
+python_version = "3.11"
+docker_base_image_url = "nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04"
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+shell_commands = []
+
+[cerebrium.hardware]
+cpu = 4
+memory = 8.0
+compute = "AMPERE_A10"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+
+[cerebrium.dependencies.pip]
+faster_whisper = "latest"
+ctranslate2 = "latest"
