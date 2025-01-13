@@ -1,0 +1,25 @@
+[cerebrium.deployment]
+name = "outbound-livekit-agent"
+python_version = "3.11"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = false
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.hardware]
+cpu = 2
+memory = 10.0
+compute = "CPU"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+
+[cerebrium.dependencies.paths]
+pip = "requirements.txt"
+
+[cerebrium.runtime.custom]
+port = 8600
+entrypoint = ["python", "main.py", "start"]
