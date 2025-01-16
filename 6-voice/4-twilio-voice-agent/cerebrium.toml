@@ -9,9 +9,9 @@ disable_auth = true
 region = "us-east-1"
 provider = "aws"
 compute = "CPU"
-cpu = 2
+cpu = 10
 memory = 8.0
-gpu_count = 1
+gpu_count = 0
 
 [cerebrium.runtime.custom]
 port = 8765
@@ -22,7 +22,9 @@ healthcheck_endpoint = "/health"
 min_replicas = 1
 max_replicas = 2
 cooldown = 30
-replica_concurrency = 100
+replica_concurrency = 4
+scaling_metric = "concurrency_utilization"
+scaling_target = 80
 
 [cerebrium.dependencies.pip]
 torch = ">=2.0.0"
