@@ -1,10 +1,11 @@
 # Real-time Voice AI Agent
 
-This repository contains the code to build the demo application [here](https://fastvoiceagent.cerebrium.ai/). We create
-a real-time voice AI agent that can respond to any query via speech, in speech, in ~500ms. This is an extremely flexible
-implementation where you have the ability to swap in any Large Language model, Text-to-speech (TTS) model and
-Speech-to-text (STT) model of your liking. This is extremely useful for use cases involving voice such as customer
-service bots, receptionists and many more.
+This repository demonstrates how to build a specialized French-speaking voice AI agent. While many voice AI solutions exist, handling multilingual applications effectively remains a challenge. This implementation focuses on achieving high accuracy in French language processing while maintaining low latency (~500ms) and reasonable costs.
+
+Our solution addresses several key challenges in multilingual voice AI:
+- Utilizing Cartesia's enhanced TTS capabilities with support for French accents and gendered voices
+- Implementing optimized STT (Speech-to-text) processing to minimize Word Error Rate (WER) while maintaining low latency
+- Leveraging modern LLM capabilities for French language understanding and response generation
 
 You can visit the full documentation [here](https://docs.cerebrium.ai/v4/examples/realtime-voice-agents)
 

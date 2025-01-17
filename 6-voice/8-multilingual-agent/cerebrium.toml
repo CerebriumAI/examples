@@ -8,9 +8,9 @@ disable_auth = true
 [cerebrium.hardware]
 region = "us-east-1"
 provider = "aws"
-compute = "CPU"
+compute = "AMPERE_A10"
 cpu = 2
-memory = 8.0
+memory = 10.0
 gpu_count = 1
 
 [cerebrium.runtime.custom]
