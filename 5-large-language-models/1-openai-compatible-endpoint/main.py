@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import List, Dict, Any
+from typing import Any
 
 from huggingface_hub import login
 from pydantic import BaseModel
@@ -28,18 +28,18 @@ class ChatCompletionResponse(BaseModel):
     object: str
     created: int
     model: str
-    choices: List[Dict[str, Any]]
+    choices: list[Any]
 
 
 async def run(
-    messages: List[Message],
+    messages: list,
     model: str,
     run_id: str,
     stream: bool = True,
     temperature: float = 0.8,
     top_p: float = 0.95,
 ):
-    prompt = " ".join([f"{msg['role']}: {msg['content']}" for msg in messages])
+    prompt = " ".join([f"{Message(**msg).role}: {Message(**msg).content}" for msg in messages])
     sampling_params = SamplingParams(temperature=temperature, top_p=top_p)
     results_generator = engine.generate(prompt, sampling_params, run_id)
     previous_text = ""
@@ -65,4 +65,8 @@ async def run(
                 }
             ],
         )
-        yield json.dumps(response.model_dump())
+        print(response.model_dump())
+        yield f"data: {json.dumps(response.model_dump())}\n\n"
+    
+    # Send the final [DONE] message
+    yield "data: [DONE]\n\n"
