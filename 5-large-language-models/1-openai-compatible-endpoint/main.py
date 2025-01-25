@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import Any
+
 
 from huggingface_hub import login
 from pydantic import BaseModel
@@ -12,24 +12,14 @@ login(token=os.environ.get("HF_TOKEN"))
 
 engine_args = AsyncEngineArgs(
     model="meta-llama/Meta-Llama-3.1-8B-Instruct",
-    gpu_memory_utilization=0.9,  # Increase GPU memory utilization
-    max_model_len=8192,  # Decrease max model length
+    gpu_memory_utilization=0.9,
+    max_model_len=8192,
 )
 engine = AsyncLLMEngine.from_engine_args(engine_args)
-
 
 class Message(BaseModel):
     role: str
     content: str
-
-
-class ChatCompletionResponse(BaseModel):
-    id: str
-    object: str
-    created: int
-    model: str
-    choices: list[Any]
-
 
 async def run(
     messages: list,
@@ -38,35 +28,49 @@ async def run(
     stream: bool = True,
     temperature: float = 0.8,
     top_p: float = 0.95,
+    max_tokens: int = 4096,
 ):
     prompt = " ".join([f"{Message(**msg).role}: {Message(**msg).content}" for msg in messages])
     sampling_params = SamplingParams(temperature=temperature, top_p=top_p)
     results_generator = engine.generate(prompt, sampling_params, run_id)
+
     previous_text = ""
-    full_text = ""  # Collect all generated text here
+    first_chunk = True
 
     async for output in results_generator:
-        prompt = output.outputs
-        new_text = prompt[0].text[len(previous_text) :]
-        previous_text = prompt[0].text
-        full_text += new_text  # Append new text to full_text
+        prompt_output = output.outputs
+        new_text = prompt_output[0].text[len(previous_text):]
+        previous_text = prompt_output[0].text
 
-        response = ChatCompletionResponse(
-            id=run_id,
-            object="chat.completion",
-            created=int(time.time()),
-            model=model,
-            choices=[
+        chunk = {
+            "id": run_id,
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [
                 {
-                    "text": new_text,
                     "index": 0,
-                    "logprobs": None,
-                    "finish_reason": prompt[0].finish_reason or "stop",
+                    "delta": {},
+                    "finish_reason": None
                 }
-            ],
-        )
-        print(response.model_dump())
-        yield f"data: {json.dumps(response.model_dump())}\n\n"
-    
-    # Send the final [DONE] message
+            ]
+        }
+
+        # Include role in the first chunk
+        if first_chunk:
+            chunk["choices"][0]["delta"]["role"] = "assistant"
+            first_chunk = False
+
+        # Add new text to delta if there is any
+        if new_text:
+            chunk["choices"][0]["delta"]["content"] = new_text
+
+        # Check for a finish_reason
+        finish_reason = prompt_output[0].finish_reason
+        if finish_reason and finish_reason != "none":
+            chunk["choices"][0]["finish_reason"] = finish_reason
+
+        yield f"data: {json.dumps(chunk)}\n\n"
+
+    # After all chunks, send [DONE]
     yield "data: [DONE]\n\n"
