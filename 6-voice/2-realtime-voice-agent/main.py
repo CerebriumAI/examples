@@ -45,7 +45,7 @@ login(token=os.environ.get("HF_TOKEN"))
 def start_server():
     while True:
         process = subprocess.Popen(
-            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model NousResearch/Meta-Llama-3-8B-Instruct --dtype bfloat16 --api-key {os.environ.get('HF_TOKEN')}",
+            f"python -m vllm.entrypoints.openai.api_server --port 5000 --model meta-llama/Llama-3.2-3B-Instruct --dtype auto --max_model_len 60000 --gpu-memory-utilization 0.9 --api-key {os.environ.get('HF_TOKEN')}",
             shell=True,
         )
         process.wait()  # Wait for the process to complete
@@ -88,7 +88,7 @@ async def main(room_url: str, token: str):
         llm = OpenAILLMService(
             name="LLM",
             api_key=os.environ.get("HF_TOKEN"),
-            model="NousResearch/Meta-Llama-3-8B-Instruct",
+            model="meta-llama/Llama-3.2-3B-Instruct",
             base_url="http://127.0.0.1:5000/v1",
         )
 
@@ -186,7 +186,7 @@ async def check_vllm_model_status():
         "Authorization": f"Bearer {os.environ.get('HF_TOKEN')}",
     }
     data = {
-        "model": "NousResearch/Meta-Llama-3-8B-Instruct",
+        "model": "meta-llama/Llama-3.2-3B-Instruct",
         "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Hello, are you working?"},
