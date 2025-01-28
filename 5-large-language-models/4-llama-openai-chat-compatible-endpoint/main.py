@@ -1,7 +1,6 @@
-import json
 import os
 import time
-
+import json
 
 from huggingface_hub import login
 from pydantic import BaseModel
@@ -17,9 +16,21 @@ engine_args = AsyncEngineArgs(
 )
 engine = AsyncLLMEngine.from_engine_args(engine_args)
 
+
 class Message(BaseModel):
     role: str
     content: str
+
+
+def format_chat_prompt(messages: list) -> str:
+    formatted_messages = []
+    for msg in messages:
+        msg_obj = Message(**msg)
+        formatted_messages.append(
+            f"<|start_header_id|>{msg_obj.role}<|end_header_id|>\n{msg_obj.content}<|eot_id|>"
+        )
+    return "<|begin_of_text|>" + "".join(formatted_messages) + "<|start_header_id|>assistant<|end_header_id|>"
+
 
 async def run(
     messages: list,
@@ -30,8 +41,10 @@ async def run(
     top_p: float = 0.95,
     max_tokens: int = 4096,
 ):
-    prompt = " ".join([f"{Message(**msg).role}: {Message(**msg).content}" for msg in messages])
-    sampling_params = SamplingParams(temperature=temperature, top_p=top_p)
+    # Format your prompt for llama-friendly usage:
+    prompt = format_chat_prompt(messages)
+
+    sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
     results_generator = engine.generate(prompt, sampling_params, run_id)
 
     previous_text = ""
@@ -39,9 +52,10 @@ async def run(
 
     async for output in results_generator:
         prompt_output = output.outputs
-        new_text = prompt_output[0].text[len(previous_text):]
+        new_text = prompt_output[0].text[len(previous_text) :]
         previous_text = prompt_output[0].text
 
+        # Construct OpenAI-compatible chunk
         chunk = {
             "id": run_id,
             "object": "chat.completion.chunk",
@@ -51,26 +65,26 @@ async def run(
                 {
                     "index": 0,
                     "delta": {},
-                    "finish_reason": None
+                    "finish_reason": None,
                 }
-            ]
+            ],
         }
 
-        # Include role in the first chunk
+        # Include the role in the first chunk
         if first_chunk:
             chunk["choices"][0]["delta"]["role"] = "assistant"
             first_chunk = False
 
-        # Add new text to delta if there is any
+        # Add new text to the delta if any
         if new_text:
             chunk["choices"][0]["delta"]["content"] = new_text
 
-        # Check for a finish_reason
-        finish_reason = prompt_output[0].finish_reason
+        # Capture a finish reason if it's provided
+        finish_reason = prompt_output[0].finish_reason or None
         if finish_reason and finish_reason != "none":
             chunk["choices"][0]["finish_reason"] = finish_reason
 
         yield f"data: {json.dumps(chunk)}\n\n"
 
-    # After all chunks, send [DONE]
+    # Send the final [DONE] message
     yield "data: [DONE]\n\n"
