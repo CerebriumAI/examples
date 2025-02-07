@@ -16,7 +16,7 @@ login(token=os.environ.get("HF_TOKEN"))
 
 # model_id = "deepseek-ai/DeepSeek-R1" ##uncomment for R1
 model_id = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
-runtime = Runtime(model_path=model_id, tp_size=1) #change tp_size=7 if serving R1
+runtime = Runtime(model_path=model_id, tp_size=1) #change tp_size=8 if serving R1 on H200
 
 async def run(
     messages: list,
