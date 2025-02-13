@@ -7,13 +7,13 @@ exclude = [".*"]
 shell_commands = []
 
 [cerebrium.runtime.custom]
-port = 5000
-entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+port = 5555
+entrypoint = ["fastapi", "run", "main.py", "--port", "5555"]
 healthcheck_endpoint = "/health"
 
 [cerebrium.hardware]
-cpu = 0.5
-memory = 0.5
+cpu = 0.25
+memory = 0.1
 compute = "CPU"
 gpu_count = 1
 provider = "aws"
@@ -28,5 +28,4 @@ cooldown = 1800
 
 [cerebrium.dependencies.pip]
 loguru = "latest"
-fastapi = "latest"
-"uvicorn[standard]" = "latest"
+"fastapi[standard]" = "latest"
