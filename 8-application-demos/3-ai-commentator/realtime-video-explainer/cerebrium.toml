@@ -1,0 +1,41 @@
+[cerebrium.deployment]
+name = "realtime-video-explainer"
+python_version = "3.11"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = false
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.hardware]
+cpu = 4
+memory = 16.0
+compute = "ADA_L40"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+response_grace_period = 1800
+scaling_metric = "concurrency_utilization"
+scaling_target = 100
+scaling_buffer = 2
+
+[cerebrium.dependencies.pip]
+numpy = "<2"
+torch = "==2.2.0"
+Pillow = "==10.1.0"
+torchaudio = "==2.2.0"
+torchvision = "==0.17.0"
+transformers = "latest"
+librosa = "==0.9.0"
+soundfile = "==0.12.1"
+vector-quantize-pytorch = "==1.18.5"
+vocos = "==0.1.0"
+decord = "latest"
+moviepy = "latest"
+"huggingface-hub[hf_transfer]" = "latest"
+livekit-api = "latest"
+vllm = "latest"
+
+

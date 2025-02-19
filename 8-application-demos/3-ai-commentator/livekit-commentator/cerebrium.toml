@@ -1,0 +1,41 @@
+[cerebrium.deployment]
+name = "livekit-commentator"
+python_version = "3.11"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = false
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*',]
+
+[cerebrium.hardware]
+cpu = 2
+memory = 12.0
+compute = "CPU"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+response_grace_period = 900
+scaling_metric = "cpu_utilization"
+scaling_target = 80
+
+[cerebrium.dependencies.pip]
+"livekit-agents" = ">=0.11.1"
+"livekit-plugins-silero" = ">=0.7.3"
+"python-dotenv" = "latest"
+"aiofile" = "latest"
+"fastapi" = "latest"
+"uvicorn" = "latest"
+"httpx" = "latest"
+"pyaudio" = "latest"
+cartesia = "latest"
+"opencv-python" = "latest"
+
+[cerebrium.dependencies.apt]
+portaudio19-dev = "latest"
+ffmpeg = "latest"
+
+[cerebrium.runtime.custom]
+port = 8600
+entrypoint = ["python", "main.py", "start"]
