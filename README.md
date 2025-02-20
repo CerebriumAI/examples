@@ -68,6 +68,8 @@ We've split each of the examples by category to make them easier to find.
 ### 9. Application demos 🎬
 1. [Create a sales training tool with Mistral](8-application-demos/1-sales-trainer)
 2. [Find products for sale using a live video stream](8-application-demos/2-ecommerce-live-stream)
+3. [AI commentator](8-application-demos/3-ai-commentator)
+3. [AI coding agent](8-application-demos/4-ai-coding-agent)
 
 ### 10. Batching 📦
 1. [Implement batching with LitServe - CPU version](10-batching/1-litserve-batching-cpu)

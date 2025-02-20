@@ -1,0 +1,43 @@
+[cerebrium.deployment]
+name = "4-ai-coding-agent"
+python_version = "3.12"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.runtime.custom]
+port = 8765
+entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765"]
+healthcheck_endpoint = "/health"
+
+[cerebrium.hardware]
+cpu = 4
+memory = 16.0
+compute = "AMPERE_A10"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+response_grace_period = 900
+scaling_metric = "concurrency_utilization"
+scaling_target = 100
+scaling_buffer = 0
+
+[cerebrium.dependencies.pip]
+uvicorn = "latest"
+fastapi = "latest"
+requests = "latest"
+channels = "latest"
+websockets = "latest"
+sentencepiece = "latest"
+torch = ">=2.0.0"
+transformers = ">=4.35.0"
+accelerate = "latest"
+xformers = "latest"
+hf_transfer = "latest"
+e2b-code-interpreter = "latest"
+cuid2 = "latest"
+huggingface_hub = "latest"
