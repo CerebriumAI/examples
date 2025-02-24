@@ -14,7 +14,7 @@ healthcheck_endpoint = "/health"
 [cerebrium.hardware]
 cpu = 4
 memory = 16.0
-compute = "AMPERE_A10"
+compute = "ADA_L40"
 
 [cerebrium.scaling]
 min_replicas = 1
