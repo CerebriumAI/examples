@@ -1,14 +1,15 @@
 import os
+import re
+import json
+import logging
+import asyncio
+import torch
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional
-import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
-import json
-import logging
 from threading import Thread
-import asyncio
 from e2b import Sandbox
 from typing import Callable
 from cuid2 import cuid_wrapper
@@ -56,7 +57,7 @@ class Fragment(FragmentBase):
         return v
 
 
-model_path = "Qwen/Qwen2.5-7B-Instruct-1M"
+model_path = "Qwen/Qwen2.5-Coder-14B-Instruct"
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
     torch_dtype=torch.float16,
@@ -72,28 +73,29 @@ async def get_fragments_structure(prompt: str, websocket: WebSocket) -> List[Fra
     Each fragment should contain only the structural information (no code, descriptions or implementation details).
     
     RULES FOR FRAGMENT STRUCTURE:
-    1. Format must be an array of objects:
+    Format must be an array of objects:
        [{
-         "id": "",  // Leave empty, will be generated
          "title": "ComponentName",
          "description": "Brief description",
          "file_path": "components/component-name.tsx",
-         "dependencies": []  // Only NPM packages, NOT component names
+         "dependencies": []
        }]
     
-    2. File Paths:
+    File Paths:
        - Fragment paths should be in: components/[name].tsx
        - Main page goes in: app/page.tsx
     
-    3. Dependencies:
+    Dependencies:
        - Include ONLY npm package names
        - DO NOT include other component names as dependencies
        - DO NOT include react, next.js, or shadcn UI (they're pre-installed)
     
-    4. Component Structure:
-       - Create modular, reusable components
+    Component Structure:
+       - NEVER import components that are not necessary for the functionality of this component
        - ALWAYS include an app/page.tsx file in the list of fragments that import the other generated fragments
+       - The page component should always consolidate all the other components, so add it last.
        - Keep components in components directory
+       - Generate as few components as possible
     
     Remember:
     - Dependencies are ONLY for npm packages
@@ -105,11 +107,14 @@ async def get_fragments_structure(prompt: str, websocket: WebSocket) -> List[Fra
     <|im_start|>user\n{prompt}<|im_end|>
     <|im_start|>assistant\n"""
 
+    logger.info(f"chat: {chat}")
+
     try:
         json_str = await stream_tokens(chat, websocket, "structure")
         json_str = json_str[json_str.find('['):json_str.rfind(']') + 1]
 
         raw_fragments = json.loads(json_str)
+        logger.info(f"Raw fragments: {raw_fragments}")
 
         for i, fragment in enumerate(raw_fragments):
             fragment["id"] = cuid_generator()
@@ -143,33 +148,31 @@ async def generate_commentary(fragment: FragmentBase, fragments: List[FragmentBa
     - Title: {fragment.title}
     - Description: {fragment.description}
     - Path: {fragment.file_path}
-
     Other components in the project:
     {other_fragments}
-
+    
     Project technical stack:
     - Next.js 14.2.24 with app router
     - TypeScript
     - Tailwind CSS for styling
     - shadcn UI components (in /components/ui/)
     - React Server Components by default
-
-    Your task:
-    Write a BRIEF technical explanation of how we'll implement this component. Focus on:
-    1. Component's role in the larger application
-    2. Key UI elements and their arrangement
-    3. Any state management needs
-    4. Integration with other components
-    5. Notable technical considerations
-
+    
+    Your task is to write a BRIEF technical explanation of how we'll implement this component. Focus on:
+    - Component's role in the larger application
+    - Key UI elements and their arrangement
+    - Any state management needs
+    - Integration with other components
+    - Notable technical considerations
+    
     Rules for your response:
-    1. Be concise (3-4 sentences maximum)
-    2. Focus on implementation approach, not generic descriptions
-    3. Mention specific shadcn UI components or Tailwind classes when relevant
-    4. Reference other components from the project where appropriate
-    5. No code snippets or markdown
-    6. No generic platitudes or obvious statements
-    7. Get straight to the technical details"""
+    - Be concise (2-3 sentences maximum)
+    - Focus on implementation approach, not generic descriptions
+    - Mention specific shadcn UI components or Tailwind classes when relevant
+    - Reference other components from the project where appropriate
+    - No code snippets
+    - No generic platitudes or obvious statements
+    - Get straight to the technical details"""
 
     context_chat = f"""<|im_start|>system
     You are a senior frontend developer known for clear, concise technical explanations.
@@ -211,22 +214,17 @@ async def generate_code(fragment: FragmentBase, fragments: List[FragmentBase], p
     Path: {fragment.file_path}
     
     STRICT IMPORT RULES:
-    1. ONLY import shadcn UI components from '@/components/ui/[component]'
     2. ONLY import shadcn UI components from list of available components: {', '.join(valid_shadcn_components)}
-    3. Other components that exist in the project that you can import from:{other_components}
+    1. ONLY import shadcn UI components from '@/components/ui/[component].tsx'
+    3. Other components that exist in the project that you can import from: {other_components}
     4. DO NOT import any other components unless they are in our list of available components or other components in the project
+    5. Do NOT import components that are not necessary for the component you are working on
     
-    Response Rules:
+    RESPONSE RULES:
     1. Output ONLY the TypeScript/JavaScript code
     2. NO descriptions, comments, or explanations
-    3. NO markdown code blocks or backticks
-    4. NO "Here's the code" or similar phrases
-    5. Start directly with the import statements
-    6. End with the last line of component code
     8. Follow Next.js 14 app router patterns
-    9. Use Tailwind for styling
-    
-    Begin with the first import statement."""
+    9. Use Tailwind for styling"""
 
     code_chat = f"""<|im_start|>system
     You are an expert Next.js developer who writes clean, self-contained components.
@@ -245,33 +243,73 @@ async def generate_code(fragment: FragmentBase, fragments: List[FragmentBase], p
 
 
 async def stream_tokens(prompt: str, websocket: WebSocket, msg_type: str = "token") -> str:
-    """Generate and stream tokens"""
+    """Generate and stream tokens with preprocessing to remove markdown artifacts"""
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
     Thread(target=model.generate, kwargs={
-        "inputs": inputs["input_ids"],
-        "attention_mask": inputs["attention_mask"],
-        "max_new_tokens": 2048,
-        "temperature": 0.7,
-        "do_sample": True,
+        **inputs,
+        "max_new_tokens": 512,
         "streamer": streamer,
-        "pad_token_id": tokenizer.eos_token_id
     }).start()
 
     text = ""
+    buffer = ""
+    in_code_block = False
+    language_detected = False
+
+    # Common language identifiers (typescript, javascript, tsx, etc.)
+    lang_pattern = re.compile(r"^(typescript|javascript|tsx|jsx|ts|js)\s*$", re.IGNORECASE)
+
     try:
         for token in streamer:
-            if token.strip():
-                text += token
+            buffer += token
+
+            # Handle code block start
+            if "```" in buffer and not in_code_block:
+                parts = buffer.split("```", 1)
+                if parts[0].strip():
+                    text += parts[0]
+                buffer = parts[1] if len(parts) > 1 else ""
+                in_code_block = True
+                language_detected = False
+                continue
+
+            # Handle language identifier line
+            if in_code_block and not language_detected and "\n" in buffer:
+                line, rest = buffer.split("\n", 1)
+                if lang_pattern.match(line.strip()):
+                    buffer = rest
+                    language_detected = True
+                    continue
+                else:
+                    language_detected = True
+
+            # Handle code block end
+            if "```" in buffer:
+                buffer = buffer.replace("```", "")
+                in_code_block = False
+
+            # Process complete token chunks
+            if " " in buffer or "\n" in buffer or len(buffer) > 10:
+                text += buffer
+                buffer = ""
                 if msg_type != "structure":
                     await websocket.send_json({"type": msg_type, "content": text})
+
             await asyncio.sleep(0)
+
+        # Handle any remaining buffer
+        if buffer:
+            text += buffer
+            if msg_type != "structure":
+                await websocket.send_json({"type": msg_type, "content": text})
+
     except Exception as e:
         logger.error(f"Streaming error: {e}")
         await websocket.send_json({"type": "error", "content": str(e)})
 
-    return text.strip()
+    return text.replace("```", "").strip()
 
 
 def deploy_to_e2b(fragments: List[Fragment]):
