@@ -8,18 +8,19 @@ import os
 from dotenv import load_dotenv
 import asyncio
 import wave
+from model import UltravoxModel
 
 load_dotenv()
 
 
-# pipe = transformers.pipeline(model='fixie-ai/ultravox-v0_5-llama-3_1-8b', trust_remote_code=True)
+# model = UltravoxModel()
 
 async def run(room_url):  # run_id is optional, injected by Cerebrium at runtime
     from translator import Translator
 
     Daily.init()
 
-    translation_client = Translator(room_url)
+    translation_client = Translator(room_url, '')#model)
     client = translation_client.client
 
     client.set_user_name("translator")
