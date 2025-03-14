@@ -1,7 +1,7 @@
 [cerebrium.deployment]
 name = "5-live-translation-room"
 python_version = "3.11"
-docker_base_image_url = "debian:bookworm-slim"
+docker_base_image_url = "nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04"
 disable_auth = false
 include = ['./*', 'main.py', 'cerebrium.toml']
 exclude = ['.*']
@@ -14,21 +14,23 @@ compute = "ADA_L40"
 [cerebrium.scaling]
 min_replicas = 0
 max_replicas = 5
-cooldown = 90
+cooldown = 30
 replica_concurrency = 1
-response_grace_period = 900
+response_grace_period = 500
 scaling_metric = "concurrency_utilization"
 scaling_target = 100
+scaling_buffer = 2
+
 
 [cerebrium.dependencies.pip]
 transformers = "latest"
+torch = "latest"
 peft = "latest"
 librosa = "latest"
 "huggingface-hub[hf-transfer]" = "latest"
+faster_whisper = "latest"
 vllm = "latest"
-cartesia = "latest"
-"daily-python" = "latest"
-"silero_vad" = "latest"
+"pipecat-ai[silero, daily, cartesia, whisper]" = "0.0.47"
 
 [cerebrium.dependencies.apt]
 ffmpeg = "latest"
