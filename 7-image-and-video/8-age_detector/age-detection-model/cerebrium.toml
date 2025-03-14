@@ -1,0 +1,34 @@
+[cerebrium.deployment]
+name = "facial-recognition"
+python_version = "3.11"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*', 'facial-recognition/']
+
+[cerebrium.hardware]
+cpu = 3
+memory = 12.0
+compute = "AMPERE_A10"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+response_grace_period = 900
+scaling_metric = "concurrency_utilization"
+scaling_target = 100
+
+[cerebrium.dependencies.pip]
+pillow = "latest"
+accelerate = "latest"
+safetensors = "latest"
+transformers = "latest"
+xformers = "latest"
+fastapi = "latest"
+"uvicorn[standard]" = "latest"
+
+[cerebrium.runtime.custom]
+port = 5000
+entrypoint = "uvicorn main:app --host 0.0.0.0 --port 5000"
