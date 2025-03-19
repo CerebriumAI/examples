@@ -30,21 +30,14 @@ git clone https://github.com/comfyanonymous/ComfyUI
 pip install -r ComfyUI/requirements.txt
 ```
 
-## Usage
+4. Update your workflow template in `workflow_api.json` and models in `model.json` if needed.
 
-### Starting the Server
-
-Run the FastAPI server:
-
+5. Deploy to Cerebrium:
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8765
+cerebrium deploy
 ```
 
-The server will:
-1. Load the workflow template
-2. Launch ComfyUI in the background
-3. Download required models (if not already present)
-4. Begin accepting API requests
+## Usage
 
 ### API Endpoints
 
