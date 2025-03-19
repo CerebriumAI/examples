@@ -5,23 +5,36 @@
 [cerebrium.deployment]
 name = "1-comfyui"
 python_version = "3.11"
-include = ["./*", "main.py", "cerebrium.toml"]
-exclude = ["./example_exclude", "./confyui", "./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors", "./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors"]
+include = ["./*", "main.py", "cerebrium.toml", "workflow.json", "workflow_api.json", "helpers.py", "model.json"]
+exclude = ["./example_exclude", "./ComfyUI", "./ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors", "./ComfyUI/models/controlnet/diffusion_pytorch_model.fp16.safetensors"]
+shell_commands = ["git clone https://github.com/comfyanonymous/ComfyUI", "pip install -r ComfyUI/requirements.txt"]
+
+[cerebrium.runtime.custom]
+port = 8765
+entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765"]
+healthcheck_endpoint = "/health"
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "AMPERE_A10"
-cpu = 3
-memory = 12.0
-gpu_count = 1
+cpu = 4
+memory = 16.0
 
 [cerebrium.scaling]
-min_replicas = 0
+min_replicas = 1
 max_replicas = 2
-cooldown = 20
+cooldown = 30
+replica_concurrency = 1
+response_grace_period = 900
+scaling_metric = "concurrency_utilization"
+scaling_target = 100
+scaling_buffer = 0
 
 [cerebrium.dependencies.pip]
+uvicorn = "latest"
+fastapi = "latest"
+requests = "latest"
+channels = "latest"
+websockets = "latest"
 websocket-client = "==1.6.4"
 accelerate = "==0.23.0"
 opencv-python = "latest"
@@ -41,7 +54,5 @@ tqdm = "latest"
 psutil = "latest"
 kornia = ">=0.7.1"
 
-
-[cerebrium.dependencies.conda]
-
 [cerebrium.dependencies.apt]
+git = "latest"
