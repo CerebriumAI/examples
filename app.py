@@ -1,3 +1,7 @@
+# Orpheus-FASTAPI by Lex-au
+# https://github.com/Lex-au/Orpheus-FastAPI
+# Description: Main FastAPI server for Orpheus Text-to-Speech
+
 import os
 import time
 from datetime import datetime

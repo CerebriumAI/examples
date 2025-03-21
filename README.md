@@ -1,3 +1,5 @@
+![Orpheus-FASTAPI Banner](https://lex-au.github.io/Orpheus-FastAPI/Banner.png)
+
 # Orpheus-FASTAPI
 
 [![GitHub](https://img.shields.io/github/license/Lex-au/Orpheus-FastAPI)](https://github.com/Lex-au/Orpheus-FastAPI/blob/main/LICENSE.txt)
@@ -5,6 +7,18 @@
 High-performance Text-to-Speech server with OpenAI-compatible API, 8 voices, emotion tags, and modern web UI. Optimized for RTX GPUs.
 
 [GitHub Repository](https://github.com/Lex-au/Orpheus-FastAPI)
+
+## Voice Demos
+
+Listen to sample outputs with different voices and emotions:
+- [Default Test Sample](https://lex-au.github.io/Orpheus-FastAPI/DefaultTest.mp3) - Standard neutral tone
+- [Leah Happy Sample](https://lex-au.github.io/Orpheus-FastAPI/LeahHappy.mp3) - Cheerful, upbeat demo
+- [Tara Sad Sample](https://lex-au.github.io/Orpheus-FastAPI/TaraSad.mp3) - Emotional, melancholic demo
+- [Zac Contemplative Sample](https://lex-au.github.io/Orpheus-FastAPI/ZacContemplative.mp3) - Thoughtful, measured tone
+
+## User Interface
+
+![Web User Interface](https://lex-au.github.io/Orpheus-FastAPI/WebUI.png)
 
 ## Features
 
@@ -86,9 +100,13 @@ Or with specific host/port:
 uvicorn app:app --host 0.0.0.0 --port 5005 --reload
 ```
 
+![Terminal Output](https://lex-au.github.io/Orpheus-FastAPI/terminal.png)
+
 Access:
 - Web interface: http://localhost:5005/ (or http://127.0.0.1:5005/)
 - API documentation: http://localhost:5005/docs (or http://127.0.0.1:5005/docs)
+
+![API Documentation](https://lex-au.github.io/Orpheus-FastAPI/docs.png)
 
 ## API Usage
 
