@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#0f1729]">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orpheus FASTAPI | Advanced Text-to-Speech</title>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50:  '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            },
+            purple: {
+              50: '#faf5ff',
+              100: '#f3e8ff',
+              200: '#e9d5ff',
+              300: '#d8b4fe',
+              400: '#c084fc',
+              500: '#a855f7',
+              600: '#9333ea',
+              700: '#7e22ce',
+              800: '#6b21a8',
+              900: '#581c87',
+            },
+            dark: {
+              50: '#f9fafb',
+              100: '#f3f4f6',
+              200: '#e5e7eb',
+              300: '#d1d5db',
+              400: '#9ca3af',
+              500: '#6b7280',
+              600: '#4b5563',
+              700: '#374151',
+              800: '#1f2937',
+              900: '#111827',
+              950: '#030712',
+              1000: '#0f1729'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer components {
+      .btn-primary {
+        @apply bg-primary-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-dark-800 focus:ring-offset-2 transition-colors;
+      }
+      .voice-card {
+        @apply border border-dark-700 rounded-lg p-4 cursor-pointer transition-all hover:border-primary-400 hover:shadow-md bg-dark-800 text-dark-200;
+      }
+      .voice-card.active {
+        @apply border-primary-500 ring-2 ring-primary-500 bg-dark-700;
+      }
+      .audio-progress {
+        @apply h-2 w-full bg-dark-700 rounded-full overflow-hidden;
+      }
+      .audio-progress-bar {
+        @apply h-full bg-primary-500 transition-all duration-300;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
+</head>
+<body class="h-full">
+  <div class="min-h-full">
+    <!-- Navigation -->
+    <nav class="bg-gradient-to-r from-dark-900 to-purple-900 border-b border-purple-800 shadow-lg">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+          <div class="flex items-center">
+            <div class="flex-shrink-0">
+              <span class="text-white text-xl font-bold">Orpheus FASTAPI</span>
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <a href="/docs" class="text-primary-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">API Docs</a>
+            <a href="https://github.com/lex-au" target="_blank" class="text-primary-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">GitHub</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main>
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        
+        <!-- Notification area -->
+        {% if error %}
+        <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-md shadow-sm">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-red-700">{{ error }}</p>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if success %}
+        <div class="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-md shadow-sm">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-green-700">Audio generated successfully in {{ generation_time }}s!</p>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        
+        <!-- TTS form -->
+        <div class="bg-dark-800 shadow-lg rounded-lg overflow-hidden border border-dark-700">
+          <form id="tts-form" class="flex flex-col">
+            <div class="p-6">
+              <h2 class="text-lg font-medium text-white mb-4">Generate Speech</h2>
+              
+              <!-- Text input -->
+              <div class="mb-6">
+                <label for="text" class="block text-sm font-medium text-white mb-1">Text to speak</label>
+                <div class="relative">
+                  <textarea 
+                    name="text" 
+                    id="text" 
+                    rows="4" 
+                    class="block w-full rounded-md border-dark-600 bg-dark-700 text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 focus:ring-offset-dark-800 sm:text-sm px-3 py-2"
+                    placeholder="Enter text to convert to speech..."
+                    required
+                  >{{ text if text else "" }}</textarea>
+                  <div class="absolute bottom-2 right-2 text-xs text-purple-300">
+                    <span id="char-count">0</span> / 8192 characters
+                  </div>
+                </div>
+              </div>
+
+              <!-- Voice selection -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-white mb-2">Voice</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {% for voice_option in voices %}
+                  <div class="voice-card {% if voice_option == DEFAULT_VOICE %}active{% endif %}" data-voice="{{ voice_option }}">
+                    <input type="radio" name="voice" value="{{ voice_option }}" class="hidden" {% if voice_option == DEFAULT_VOICE %}checked{% endif %}>
+                    <div class="flex items-center mb-2">
+                      <span class="font-medium text-white">{{ voice_option|capitalize }}</span>
+                    </div>
+    <div class="text-xs text-dark-300">
+                      {% if voice_option == "tara" %}Female, conversational, clear
+                      {% elif voice_option == "leah" %}Female, warm, gentle
+                      {% elif voice_option == "jess" %}Female, energetic, youthful
+                      {% elif voice_option == "leo" %}Male, authoritative, deep
+                      {% elif voice_option == "dan" %}Male, friendly, casual
+                      {% elif voice_option == "mia" %}Female, professional, articulate
+                      {% elif voice_option == "zac" %}Male, enthusiastic, dynamic
+                      {% elif voice_option == "zoe" %}Female, calm, soothing
+                      {% endif %}
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <!-- Advanced options (can be expanded) -->
+              <div class="mb-6">
+                <details class="group">
+                  <summary class="list-none flex cursor-pointer">
+                    <span class="text-sm font-medium text-white">Advanced options</span>
+                    <span class="ml-2 text-purple-300">
+                      <svg class="group-open:rotate-180 h-5 w-5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                    </span>
+                  </summary>
+                  <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label for="model" class="block text-sm font-medium text-white mb-1">Model</label>
+                      <div class="relative">
+                        <select id="model" name="model" class="block w-full rounded-md bg-dark-700 border-dark-600 text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 focus:ring-offset-dark-800 focus:outline-none outline-none sm:text-sm pl-3 pr-10 py-2 appearance-none">
+                          <option value="orpheus" selected>Orpheus 3B (0.1)</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-purple-300">
+                          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label for="speed" class="block text-sm font-medium text-white mb-1">Speed</label>
+                      <input type="range" id="speed" name="speed" min="0.5" max="1.5" step="0.1" value="1.0" 
+                        class="mt-1 w-full h-2 bg-dark-600 rounded-lg appearance-none cursor-pointer">
+                      <div class="flex justify-between text-xs text-purple-300 mt-1">
+                        <span>Slower</span>
+                        <span id="speed-value">1.0</span>
+                        <span>Faster</span>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <div class="bg-dark-900 px-6 py-4 flex items-center justify-between">
+              <div class="text-sm text-purple-300">
+                <p>Supports emotion tags: <span class="font-mono text-xs">&lt;laugh&gt;</span>, <span class="font-mono text-xs">&lt;sigh&gt;</span>, etc.</p>
+              </div>
+              <button type="submit" id="generate-btn" class="btn-primary hover:bg-primary-600 active:bg-primary-800">
+                Generate Speech
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Audio player container - will be populated by JavaScript -->
+        <div id="audio-player-container"></div>
+
+        <!-- Recent generations (could be expanded) -->
+        <div class="mt-8">
+          <h2 class="text-lg font-medium text-white mb-4">Tips & Tricks</h2>
+          <div class="bg-dark-800 shadow-lg rounded-lg overflow-hidden border border-dark-700">
+            <div class="p-6">
+              <ul class="list-disc pl-5 text-sm text-purple-300 space-y-2">
+                <li>Use <span class="font-mono text-xs">&lt;laugh&gt;</span> to add laughter to the speech</li>
+                <li>Use <span class="font-mono text-xs">&lt;sigh&gt;</span> for a sighing sound</li>
+                <li>Other supported tags: <span class="font-mono text-xs">&lt;chuckle&gt;</span>, <span class="font-mono text-xs">&lt;cough&gt;</span>, <span class="font-mono text-xs">&lt;sniffle&gt;</span>, <span class="font-mono text-xs">&lt;groan&gt;</span>, <span class="font-mono text-xs">&lt;yawn&gt;</span>, <span class="font-mono text-xs">&lt;gasp&gt;</span></li>
+                <li>For longer audio, the system can generate up to 2 minutes of speech in a single request</li>
+                <li>For API access, use the <code class="font-mono text-xs bg-dark-600 text-primary-300 p-1 rounded">/v1/audio/speech</code> endpoint (OpenAI compatible)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark-900 border-t border-dark-700 py-6">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-center">
+          <span class="text-purple-300 text-sm">Powered by <a href="https://fastapi.tiangolo.com/" target="_blank" class="text-primary-400 hover:text-primary-300">FASTAPI</a></span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Loading spinner template (hidden by default) -->
+  <div id="loading-overlay" class="hidden fixed inset-0 bg-dark-900 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-dark-800 p-6 rounded-lg shadow-lg flex flex-col items-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mb-4"></div>
+      <p class="text-white text-lg">Generating audio...</p>
+    </div>
+  </div>
+
+  <!-- Audio player template (used for dynamic insertion) -->
+  <template id="audio-player-template">
+    <div class="mt-8 bg-dark-800 shadow-lg rounded-lg overflow-hidden border border-dark-700">
+      <div class="p-6">
+        <h2 class="text-lg font-medium text-white mb-4">Generated Audio</h2>
+        
+        <div class="mb-6">
+          <div id="waveform" class="w-full h-24"></div>
+        </div>
+        
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center space-x-4">
+            <button id="play-btn" class="inline-flex items-center px-4 py-2 border border-primary-700 rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-dark-800 focus:ring-offset-2">
+              <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+              </svg>
+              Play
+            </button>
+            <a id="download-link" href="#" download class="inline-flex items-center px-4 py-2 border border-dark-600 rounded-md shadow-sm text-sm font-medium text-white bg-dark-700 hover:bg-dark-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-dark-800 focus:ring-offset-2">
+              <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+              Download
+            </a>
+          </div>
+          <div class="text-sm text-purple-300">
+            Voice: <span id="voice-name" class="font-medium"></span> • 
+            Duration: <span id="audio-duration" class="font-medium">--:--</span> • 
+            Generated in: <span id="generation-time" class="font-medium"></span>s
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- JavaScript for interactivity -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Global variables
+      let wavesurfer;
+      // Character counter
+      const textArea = document.getElementById('text');
+      const charCount = document.getElementById('char-count');
+      
+      textArea.addEventListener('input', function() {
+        charCount.textContent = textArea.value.length;
+      });
+      
+      // Initialize char count
+      charCount.textContent = textArea.value.length;
+      
+      // Voice selection
+      const voiceCards = document.querySelectorAll('.voice-card');
+      
+      voiceCards.forEach(card => {
+        card.addEventListener('click', function() {
+          // Unselect all cards
+          voiceCards.forEach(c => c.classList.remove('active'));
+          
+          // Select this card
+          this.classList.add('active');
+          
+          // Check the radio button
+          const radio = this.querySelector('input[type="radio"]');
+          radio.checked = true;
+        });
+      });
+      
+      // Speed slider
+      const speedSlider = document.getElementById('speed');
+      const speedValue = document.getElementById('speed-value');
+      
+      speedSlider.addEventListener('input', function() {
+        speedValue.textContent = speedSlider.value;
+      });
+      
+      // No preview buttons in this version
+      
+      // Function to initialize WaveSurfer
+      function initWaveSurfer(audioPath) {
+        // If wavesurfer already exists, destroy it to prevent memory leaks
+        if (wavesurfer) {
+          wavesurfer.destroy();
+        }
+        
+        // Create new wavesurfer instance
+        wavesurfer = WaveSurfer.create({
+          container: '#waveform',
+          waveColor: '#38bdf8',
+          progressColor: '#0284c7',
+          cursorColor: '#0ea5e9',
+          barWidth: 3,
+          barRadius: 3,
+          cursorWidth: 1,
+          height: 80,
+          barGap: 2,
+          responsive: true
+        });
+        
+        wavesurfer.load('/' + audioPath);
+        
+        wavesurfer.on('ready', function() {
+          const duration = wavesurfer.getDuration();
+          const minutes = Math.floor(duration / 60);
+          const seconds = Math.floor(duration % 60);
+          document.getElementById('audio-duration').textContent = 
+            `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+        });
+        
+        // Play button
+        const playBtn = document.getElementById('play-btn');
+        playBtn.addEventListener('click', function() {
+          wavesurfer.playPause();
+          
+          if (wavesurfer.isPlaying()) {
+            playBtn.innerHTML = `
+              <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 00-1 1v2a1 1 0 001 1h6a1 1 0 001-1V9a1 1 0 00-1-1H7z" clip-rule="evenodd" />
+              </svg>
+              Pause
+            `;
+          } else {
+            playBtn.innerHTML = `
+              <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+              </svg>
+              Play
+            `;
+          }
+        });
+      }
+      
+      // Function to create and add the audio player to the DOM
+      function createAudioPlayer(response) {
+        const container = document.getElementById('audio-player-container');
+        const template = document.getElementById('audio-player-template');
+        
+        // Clone the template
+        const audioPlayer = template.content.cloneNode(true);
+        
+        // Clear previous player if exists
+        container.innerHTML = '';
+        
+        // Add the new player
+        container.appendChild(audioPlayer);
+        
+        // Set values
+        document.getElementById('voice-name').textContent = response.voice.charAt(0).toUpperCase() + response.voice.slice(1);
+        document.getElementById('generation-time').textContent = response.generation_time;
+        document.getElementById('download-link').href = '/' + response.output_file;
+        
+        // Initialize waveform
+        initWaveSurfer(response.output_file);
+      }
+      
+      // Form submission handler
+      const form = document.getElementById('tts-form');
+      form.addEventListener('submit', async function(event) {
+        // Prevent default form submission
+        event.preventDefault();
+        
+        // Get form data
+        const text = document.getElementById('text').value;
+        const voice = document.querySelector('input[name="voice"]:checked').value;
+        
+        if (!text.trim()) {
+          alert('Please enter some text to generate speech');
+          return;
+        }
+        
+        // Show loading overlay
+        document.getElementById('loading-overlay').classList.remove('hidden');
+        
+        try {
+          // Make API request to /speak endpoint
+          const response = await fetch('/speak', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              text: text,
+              voice: voice
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to generate speech');
+          }
+          
+          const data = await response.json();
+          
+          // Create audio player with response
+          createAudioPlayer(data);
+          
+        } catch (error) {
+          console.error('Error generating speech:', error);
+          alert('An error occurred while generating speech. Please try again.');
+        } finally {
+          // Hide loading overlay
+          document.getElementById('loading-overlay').classList.add('hidden');
+        }
+      });
+      
+      // Initialize audio player if output file exists from server-side rendering
+      {% if output_file %}
+      createAudioPlayer({
+        voice: "{{ voice if voice else DEFAULT_VOICE }}",
+        output_file: "{{ output_file }}",
+        generation_time: "{{ generation_time }}"
+      });
+      {% endif %}
+    });
+  </script>
+</body>
+</html>
