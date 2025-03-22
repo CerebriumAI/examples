@@ -12,32 +12,126 @@ import queue
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional, Generator, Union, Tuple
+from dotenv import load_dotenv
 
-# Detect if we're on a high-end system like RTX 4090
+# Helper to detect if running in Uvicorn's reloader
+def is_reloader_process():
+    """Check if the current process is a uvicorn reloader"""
+    return (sys.argv[0].endswith('_continuation.py') or 
+            os.environ.get('UVICORN_STARTED') == 'true')
+
+# Set a flag to avoid repeat messages
+IS_RELOADER = is_reloader_process()
+if not IS_RELOADER:
+    os.environ['UVICORN_STARTED'] = 'true'
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Detect hardware capabilities and display information
 import torch
+import psutil
+
+# Detect if we're on a high-end system based on hardware capabilities
 HIGH_END_GPU = False
 if torch.cuda.is_available():
-    gpu_name = torch.cuda.get_device_name(0).lower()
-    if any(x in gpu_name for x in ['4090', '3090', 'a100', 'h100']):
-        HIGH_END_GPU = True
-        print(f"High-end GPU detected: {torch.cuda.get_device_name(0)}")
-        print("Enabling high-performance optimizations")
+    # Get GPU properties
+    props = torch.cuda.get_device_properties(0)
+    gpu_name = props.name
+    gpu_mem_gb = props.total_memory / (1024**3)
+    compute_capability = f"{props.major}.{props.minor}"
+    
+    # Consider high-end if: large VRAM (≥16GB) OR high compute capability (≥8.0) OR large VRAM (≥12GB) with good CC (≥7.0)
+    HIGH_END_GPU = (gpu_mem_gb >= 16.0 or 
+                    props.major >= 8 or 
+                    (gpu_mem_gb >= 12.0 and props.major >= 7))
+        
+    if HIGH_END_GPU:
+        if not IS_RELOADER:
+            print(f"🖥️ Hardware: High-end CUDA GPU detected")
+            print(f"📊 Device: {gpu_name}")
+            print(f"📊 VRAM: {gpu_mem_gb:.2f} GB")
+            print(f"📊 Compute Capability: {compute_capability}")
+            print("🚀 Using high-performance optimizations")
+    else:
+        if not IS_RELOADER:
+            print(f"🖥️ Hardware: CUDA GPU detected")
+            print(f"📊 Device: {gpu_name}")
+            print(f"📊 VRAM: {gpu_mem_gb:.2f} GB")
+            print(f"📊 Compute Capability: {compute_capability}")
+            print("🚀 Using GPU-optimized settings")
+else:
+    # Get CPU info
+    cpu_cores = psutil.cpu_count(logical=False)
+    cpu_threads = psutil.cpu_count(logical=True)
+    ram_gb = psutil.virtual_memory().total / (1024**3)
+    
+    if not IS_RELOADER:
+        print(f"🖥️ Hardware: CPU only (No CUDA GPU detected)")
+        print(f"📊 CPU: {cpu_cores} cores, {cpu_threads} threads")
+        print(f"📊 RAM: {ram_gb:.2f} GB")
+        print("⚙️ Using CPU-optimized settings")
 
-# Orpheus-FASTAPI settings - make configurable for different endpoints
-API_URL = os.environ.get("ORPHEUS_API_URL", "http://your-server-ip:port/v1/completions or v1/chat/completions")
+# Load configuration from environment variables without hardcoded defaults
+# Critical settings - will log errors if missing
+required_settings = ["ORPHEUS_API_URL"]
+missing_settings = [s for s in required_settings if s not in os.environ]
+if missing_settings:
+    print(f"ERROR: Missing required environment variable(s): {', '.join(missing_settings)}")
+    print("Please set them in .env file or environment. See .env.example for defaults.")
+
+# API connection settings
+API_URL = os.environ.get("ORPHEUS_API_URL")
+if not API_URL:
+    print("WARNING: ORPHEUS_API_URL not set. API calls will fail until configured.")
+
 HEADERS = {
     "Content-Type": "application/json"
 }
 
-# Better timeout handling for API requests
-REQUEST_TIMEOUT = int(os.environ.get("ORPHEUS_API_TIMEOUT", "120"))  # 120 seconds default for long generations
+# Request timeout settings
+try:
+    REQUEST_TIMEOUT = int(os.environ.get("ORPHEUS_API_TIMEOUT", "120"))
+except (ValueError, TypeError):
+    print("WARNING: Invalid ORPHEUS_API_TIMEOUT value, using 120 seconds as fallback")
+    REQUEST_TIMEOUT = 120
 
-# Model parameters - optimized defaults for high-end GPUs
-MAX_TOKENS = 8192 if HIGH_END_GPU else 1200  # Significantly increased for RTX 4090 to allow ~1.5-2 minutes of audio
-TEMPERATURE = 0.6 
-TOP_P = 0.9
+# Model generation parameters from environment variables
+try:
+    MAX_TOKENS = int(os.environ.get("ORPHEUS_MAX_TOKENS", "8192"))
+except (ValueError, TypeError):
+    print("WARNING: Invalid ORPHEUS_MAX_TOKENS value, using 8192 as fallback")
+    MAX_TOKENS = 8192
+
+try:
+    TEMPERATURE = float(os.environ.get("ORPHEUS_TEMPERATURE", "0.6"))
+except (ValueError, TypeError):
+    print("WARNING: Invalid ORPHEUS_TEMPERATURE value, using 0.6 as fallback")
+    TEMPERATURE = 0.6
+
+try:
+    TOP_P = float(os.environ.get("ORPHEUS_TOP_P", "0.9"))
+except (ValueError, TypeError):
+    print("WARNING: Invalid ORPHEUS_TOP_P value, using 0.9 as fallback")
+    TOP_P = 0.9
+
+# Repetition penalty is hardcoded to 1.1 which is the only stable value for quality output
 REPETITION_PENALTY = 1.1
-SAMPLE_RATE = 24000  # SNAC model uses 24kHz
+
+try:
+    SAMPLE_RATE = int(os.environ.get("ORPHEUS_SAMPLE_RATE", "24000"))
+except (ValueError, TypeError):
+    print("WARNING: Invalid ORPHEUS_SAMPLE_RATE value, using 24000 as fallback")
+    SAMPLE_RATE = 24000
+
+# Print loaded configuration only in the main process, not in the reloader
+if not IS_RELOADER:
+    print(f"Configuration loaded:")
+    print(f"  API_URL: {API_URL}")
+    print(f"  MAX_TOKENS: {MAX_TOKENS}")
+    print(f"  TEMPERATURE: {TEMPERATURE}")
+    print(f"  TOP_P: {TOP_P}")
+    print(f"  REPETITION_PENALTY: {REPETITION_PENALTY}")
 
 # Parallel processing settings
 NUM_WORKERS = 4 if HIGH_END_GPU else 2
@@ -115,10 +209,12 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     formatted_prompt = format_prompt(prompt, voice)
     print(f"Generating speech for: {formatted_prompt}")
     
-    # Optimize the token generation for high-end GPUs
+    # Optimize the token generation for GPUs
     if HIGH_END_GPU:
         # Use more aggressive parameters for faster generation on high-end GPUs
         print("Using optimized parameters for high-end GPU")
+    elif torch.cuda.is_available():
+        print("Using optimized parameters for GPU acceleration")
     
     # Create the request payload
     payload = {
@@ -329,6 +425,10 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     # Batch processing of tokens for improved throughput
     batch_size = 32 if HIGH_END_GPU else 16
     
+    # Thread synchronization for proper completion detection
+    producer_done_event = threading.Event()
+    producer_started_event = threading.Event()
+    
     # Convert the synchronous token generator into an async generator with batching
     async def async_token_gen():
         batch = []
@@ -338,7 +438,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                 for t in batch:
                     yield t
                 batch = []
-        # Process any remaining tokens
+        # Process any remaining tokens in the final batch
         for t in batch:
             yield t
 
@@ -348,82 +448,120 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         chunk_count = 0
         last_log_time = start_time
         
-        async for audio_chunk in tokens_decoder(async_token_gen()):
-            audio_queue.put(audio_chunk)
-            chunk_count += 1
+        try:
+            # Signal that producer has started processing
+            producer_started_event.set()
             
-            # Log performance periodically
-            current_time = time.time()
-            if current_time - last_log_time >= 3.0:  # Every 3 seconds
-                elapsed = current_time - start_time
-                if elapsed > 0:
-                    chunks_per_sec = chunk_count / elapsed
-                    print(f"Audio generation rate: {chunks_per_sec:.2f} chunks/second")
-                last_log_time = current_time
-                
-        # Signal completion
-        audio_queue.put(None)
+            async for audio_chunk in tokens_decoder(async_token_gen()):
+                # Process each audio chunk from the decoder
+                if audio_chunk:
+                    audio_queue.put(audio_chunk)
+                    chunk_count += 1
+                    
+                    # Log performance periodically
+                    current_time = time.time()
+                    if current_time - last_log_time >= 3.0:  # Every 3 seconds
+                        elapsed = current_time - last_log_time
+                        if elapsed > 0:
+                            recent_chunks = chunk_count
+                            chunks_per_sec = recent_chunks / elapsed
+                            print(f"Audio generation rate: {chunks_per_sec:.2f} chunks/second")
+                        last_log_time = current_time
+                        # Reset chunk counter for next interval
+                        chunk_count = 0
+        except Exception as e:
+            print(f"Error in token processing: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Always signal completion, even if there was an error
+            print("Producer completed - setting done event")
+            producer_done_event.set()
+            # Add sentinel to queue to signal end of stream
+            audio_queue.put(None)
 
     def run_async():
+        """Run the async producer in its own thread"""
         asyncio.run(async_producer())
 
     # Use a separate thread with higher priority for producer
-    thread = threading.Thread(target=run_async)
+    thread = threading.Thread(target=run_async, name="TokenProcessor")
     thread.daemon = True  # Allow thread to be terminated when main thread exits
     thread.start()
     
-    # For high-end GPUs, use a ThreadPoolExecutor for parallel file I/O
-    if HIGH_END_GPU and wav_file:
-        # Buffer for collecting chunks before writing
-        write_buffer = []
-        buffer_size = 10  # Write every 10 chunks
-        
-        def write_chunks_to_file(chunks, file):
-            for chunk in chunks:
-                file.writeframes(chunk)
-        
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future = None
+    # Wait for producer to actually start before proceeding
+    # This avoids race conditions where we might try to read from an empty queue
+    # before the producer has had a chance to add anything
+    producer_started_event.wait(timeout=5.0)
+    
+    # Optimized I/O approach for all systems
+    # This approach is simpler and more reliable than separate code paths
+    write_buffer = bytearray()
+    buffer_max_size = 1024 * 1024  # 1MB max buffer size (adjustable)
+    
+    # Keep track of the last time we checked for completion
+    last_check_time = time.time()
+    check_interval = 1.0  # Check producer status every second
+    
+    # Process audio chunks until we're done
+    while True:
+        try:
+            # Get the next audio chunk with a short timeout
+            # This allows us to periodically check status and handle other events
+            audio = audio_queue.get(timeout=0.1)
             
-            while True:
-                audio = audio_queue.get()
-                if audio is None:
-                    # Write any remaining buffered chunks
-                    if write_buffer and wav_file:
-                        if future:
-                            future.result()  # Wait for previous write to complete
-                        write_chunks_to_file(write_buffer, wav_file)
-                    break
-                
-                audio_segments.append(audio)
-                
-                if wav_file:
-                    write_buffer.append(audio)
-                    if len(write_buffer) >= buffer_size:
-                        if future:
-                            future.result()  # Wait for previous write to complete
-                        # Write in a separate thread to avoid blocking
-                        chunks_to_write = write_buffer
-                        write_buffer = []
-                        future = executor.submit(write_chunks_to_file, chunks_to_write, wav_file)
-    else:
-        # Simpler direct approach for lower-end systems
-        while True:
-            audio = audio_queue.get()
+            # None marker indicates end of stream
             if audio is None:
+                print("Received end-of-stream marker")
                 break
             
+            # Store the audio segment for return value
             audio_segments.append(audio)
             
-            # Write to WAV file if provided
+            # Write to file if needed
             if wav_file:
-                wav_file.writeframes(audio)
+                write_buffer.extend(audio)
+                
+                # Flush buffer if it's large enough
+                if len(write_buffer) >= buffer_max_size:
+                    wav_file.writeframes(write_buffer)
+                    write_buffer = bytearray()  # Reset buffer
+        
+        except queue.Empty:
+            # No data available right now
+            current_time = time.time()
+            
+            # Periodically check if producer is done
+            if current_time - last_check_time > check_interval:
+                last_check_time = current_time
+                
+                # If producer is done and queue is empty, we're finished
+                if producer_done_event.is_set() and audio_queue.empty():
+                    print("Producer done and queue empty - finishing consumer")
+                    break
+                
+                # Flush buffer periodically even if not full
+                if wav_file and len(write_buffer) > 0:
+                    wav_file.writeframes(write_buffer)
+                    write_buffer = bytearray()  # Reset buffer
+    
+    # Extra safety check - ensure thread is done
+    if thread.is_alive():
+        print("Waiting for token processor thread to complete...")
+        thread.join(timeout=10.0)
+        if thread.is_alive():
+            print("WARNING: Token processor thread did not complete within timeout")
+    
+    # Final flush of any remaining data
+    if wav_file and len(write_buffer) > 0:
+        print(f"Final buffer flush: {len(write_buffer)} bytes")
+        wav_file.writeframes(write_buffer)
     
     # Close WAV file if opened
     if wav_file:
         wav_file.close()
-    
-    thread.join()
+        if output_file:
+            print(f"Audio saved to {output_file}")
     
     # Calculate and print detailed performance metrics
     if audio_segments:
@@ -461,8 +599,59 @@ def stream_audio(audio_buffer):
     except Exception as e:
         print(f"Audio playback error: {e}")
 
+import re
+import numpy as np
+from io import BytesIO
+import wave
+
+def split_text_into_sentences(text):
+    """Split text into sentences with a more reliable approach."""
+    # We'll use a simple approach that doesn't rely on variable-width lookbehinds
+    # which aren't supported in Python's regex engine
+    
+    # First, split on common sentence ending punctuation
+    # This isn't perfect but works for most cases and avoids the regex error
+    parts = []
+    current_sentence = ""
+    
+    for char in text:
+        current_sentence += char
+        
+        # If we hit a sentence ending followed by a space, consider this a potential sentence end
+        if char in (' ', '\n', '\t') and len(current_sentence) > 1:
+            prev_char = current_sentence[-2]
+            if prev_char in ('.', '!', '?'):
+                # Check if this is likely a real sentence end and not an abbreviation
+                # (Simple heuristic: if there's a space before the period, it's likely a real sentence end)
+                if len(current_sentence) > 3 and current_sentence[-3] not in ('.', ' '):
+                    parts.append(current_sentence.strip())
+                    current_sentence = ""
+    
+    # Add any remaining text
+    if current_sentence.strip():
+        parts.append(current_sentence.strip())
+    
+    # Combine very short segments to avoid tiny audio files
+    min_chars = 20  # Minimum reasonable sentence length
+    combined_sentences = []
+    i = 0
+    
+    while i < len(parts):
+        current = parts[i]
+        
+        # If this is a short sentence and not the last one, combine with next
+        while i < len(parts) - 1 and len(current) < min_chars:
+            i += 1
+            current += " " + parts[i]
+            
+        combined_sentences.append(current)
+        i += 1
+    
+    return combined_sentences
+
 def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE, 
-                     top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=REPETITION_PENALTY):
+                     top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=None, 
+                     use_batching=True, max_batch_chars=1000):
     """Generate speech from text using Orpheus model with performance optimizations."""
     print(f"Starting speech generation for '{prompt[:50]}{'...' if len(prompt) > 50 else ''}'")
     print(f"Using voice: {voice}, GPU acceleration: {'Yes (High-end)' if HIGH_END_GPU else 'Yes' if torch.cuda.is_available() else 'No'}")
@@ -473,25 +662,186 @@ def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temp
     
     start_time = time.time()
     
-    # Generate speech with optimized settings
-    result = tokens_decoder_sync(
-        generate_tokens_from_api(
-            prompt=prompt, 
-            voice=voice,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            repetition_penalty=repetition_penalty
-        ),
-        output_file=output_file
-    )
+    # For shorter text, use the standard non-batched approach
+    if not use_batching or len(prompt) < max_batch_chars:
+        # Note: we ignore any provided repetition_penalty and always use the hardcoded value
+        # This ensures consistent quality regardless of what might be passed in
+        result = tokens_decoder_sync(
+            generate_tokens_from_api(
+                prompt=prompt, 
+                voice=voice,
+                temperature=temperature,
+                top_p=top_p,
+                max_tokens=max_tokens,
+                repetition_penalty=REPETITION_PENALTY  # Always use hardcoded value
+            ),
+            output_file=output_file
+        )
+        
+        # Report final performance metrics
+        end_time = time.time()
+        total_time = end_time - start_time
+        print(f"Total speech generation completed in {total_time:.2f} seconds")
+        
+        return result
+    
+    # For longer text, use sentence-based batching
+    print(f"Using sentence-based batching for text with {len(prompt)} characters")
+    
+    # Split the text into sentences
+    sentences = split_text_into_sentences(prompt)
+    print(f"Split text into {len(sentences)} segments")
+    
+    # Create batches by combining sentences up to max_batch_chars
+    batches = []
+    current_batch = ""
+    
+    for sentence in sentences:
+        # If adding this sentence would exceed the batch size, start a new batch
+        if len(current_batch) + len(sentence) > max_batch_chars and current_batch:
+            batches.append(current_batch)
+            current_batch = sentence
+        else:
+            # Add separator space if needed
+            if current_batch:
+                current_batch += " "
+            current_batch += sentence
+    
+    # Add the last batch if it's not empty
+    if current_batch:
+        batches.append(current_batch)
+    
+    print(f"Created {len(batches)} batches for processing")
+    
+    # Process each batch and collect audio segments
+    all_audio_segments = []
+    batch_temp_files = []
+    
+    for i, batch in enumerate(batches):
+        print(f"Processing batch {i+1}/{len(batches)} ({len(batch)} characters)")
+        
+        # Create a temporary file for this batch if an output file is requested
+        temp_output_file = None
+        if output_file:
+            temp_output_file = f"outputs/temp_batch_{i}_{int(time.time())}.wav"
+            batch_temp_files.append(temp_output_file)
+        
+        # Generate speech for this batch
+        batch_segments = tokens_decoder_sync(
+            generate_tokens_from_api(
+                prompt=batch,
+                voice=voice,
+                temperature=temperature,
+                top_p=top_p,
+                max_tokens=max_tokens,
+                repetition_penalty=REPETITION_PENALTY
+            ),
+            output_file=temp_output_file
+        )
+        
+        # Add to our collection
+        all_audio_segments.extend(batch_segments)
+    
+    # If an output file was requested, stitch together the temporary files
+    if output_file and batch_temp_files:
+        # Stitch together WAV files
+        stitch_wav_files(batch_temp_files, output_file)
+        
+        # Clean up temporary files
+        for temp_file in batch_temp_files:
+            try:
+                os.remove(temp_file)
+            except Exception as e:
+                print(f"Warning: Could not remove temporary file {temp_file}: {e}")
     
     # Report final performance metrics
     end_time = time.time()
     total_time = end_time - start_time
+    
+    # Calculate combined duration
+    if all_audio_segments:
+        total_bytes = sum(len(segment) for segment in all_audio_segments)
+        duration = total_bytes / (2 * SAMPLE_RATE)  # 2 bytes per sample at 24kHz
+        print(f"Generated {len(all_audio_segments)} audio segments")
+        print(f"Generated {duration:.2f} seconds of audio in {total_time:.2f} seconds")
+        print(f"Realtime factor: {duration/total_time:.2f}x")
+        
     print(f"Total speech generation completed in {total_time:.2f} seconds")
     
-    return result
+    return all_audio_segments
+
+def stitch_wav_files(input_files, output_file, crossfade_ms=50):
+    """Stitch multiple WAV files together with crossfading for smooth transitions."""
+    if not input_files:
+        return
+        
+    print(f"Stitching {len(input_files)} WAV files together with {crossfade_ms}ms crossfade")
+    
+    # If only one file, just copy it
+    if len(input_files) == 1:
+        import shutil
+        shutil.copy(input_files[0], output_file)
+        return
+    
+    # Convert crossfade_ms to samples
+    crossfade_samples = int(SAMPLE_RATE * crossfade_ms / 1000)
+    print(f"Using {crossfade_samples} samples for crossfade at {SAMPLE_RATE}Hz")
+    
+    # Build the final audio in memory with crossfades
+    final_audio = np.array([], dtype=np.int16)
+    first_params = None
+    
+    for i, input_file in enumerate(input_files):
+        try:
+            with wave.open(input_file, 'rb') as wav:
+                if first_params is None:
+                    first_params = wav.getparams()
+                elif wav.getparams() != first_params:
+                    print(f"Warning: WAV file {input_file} has different parameters")
+                    
+                frames = wav.readframes(wav.getnframes())
+                audio = np.frombuffer(frames, dtype=np.int16)
+                
+                if i == 0:
+                    # First segment - use as is
+                    final_audio = audio
+                else:
+                    # Apply crossfade with previous segment
+                    if len(final_audio) >= crossfade_samples and len(audio) >= crossfade_samples:
+                        # Create crossfade weights
+                        fade_out = np.linspace(1.0, 0.0, crossfade_samples)
+                        fade_in = np.linspace(0.0, 1.0, crossfade_samples)
+                        
+                        # Apply crossfade
+                        crossfade_region = (final_audio[-crossfade_samples:] * fade_out + 
+                                           audio[:crossfade_samples] * fade_in).astype(np.int16)
+                        
+                        # Combine: original without last crossfade_samples + crossfade + new without first crossfade_samples
+                        final_audio = np.concatenate([final_audio[:-crossfade_samples], 
+                                                    crossfade_region, 
+                                                    audio[crossfade_samples:]])
+                    else:
+                        # One segment too short for crossfade, just append
+                        print(f"Segment {i} too short for crossfade, concatenating directly")
+                        final_audio = np.concatenate([final_audio, audio])
+        except Exception as e:
+            print(f"Error processing file {input_file}: {e}")
+            if i == 0:
+                raise  # Critical failure if first file fails
+    
+    # Write the final audio data to the output file
+    try:
+        with wave.open(output_file, 'wb') as output_wav:
+            if first_params is None:
+                raise ValueError("No valid WAV files were processed")
+                
+            output_wav.setparams(first_params)
+            output_wav.writeframes(final_audio.tobytes())
+        
+        print(f"Successfully stitched audio to {output_file} with crossfading")
+    except Exception as e:
+        print(f"Error writing output file {output_file}: {e}")
+        raise
 
 def list_available_voices():
     """List all available voices with the recommended one marked."""
@@ -514,7 +864,7 @@ def main():
     parser.add_argument("--temperature", type=float, default=TEMPERATURE, help="Temperature for generation")
     parser.add_argument("--top_p", type=float, default=TOP_P, help="Top-p sampling parameter")
     parser.add_argument("--repetition_penalty", type=float, default=REPETITION_PENALTY, 
-                       help="Repetition penalty (>=1.1 required for stable generation)")
+                       help="Repetition penalty (fixed at 1.1 for stable generation - parameter kept for compatibility)")
     
     args = parser.parse_args()
     

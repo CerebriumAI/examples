@@ -145,15 +145,17 @@ token_cache = {}
 MAX_CACHE_SIZE = 1000  # Limit cache size to prevent memory bloat
 
 async def tokens_decoder(token_gen):
-    """Optimized token decoder with caching and conservative batch processing to ensure correct output"""
+    """Optimized token decoder with reliable end-of-buffer handling for complete audio generation"""
     buffer = []
     count = 0
-    # Start with conservative parameters to ensure we get audio output
-    min_frames_required = 28  # Default minimum frames (4 chunks of 7)
-    process_every_n = 7  # Process every 7 tokens
+    # Use a smaller minimum frame requirement to allow more flexible processing
+    min_frames_required = 28  # Lower requirement (4 chunks of 7 tokens)
+    ideal_frames = 49  # Ideal standard frame size (7×7 window)
+    process_every_n = 7  # Process every 7 tokens (standard for Orpheus model)
     
     start_time = time.time()
     token_count = 0
+    last_log_time = start_time
     
     async for token_sim in token_gen:
         token_count += 1
@@ -172,18 +174,70 @@ async def tokens_decoder(token_gen):
             buffer.append(token)
             count += 1
 
-            # Process in larger batches for better GPU utilization
-            if count % process_every_n == 0 and count >= min_frames_required:
-                buffer_to_proc = buffer[-min_frames_required:]
+            # Log throughput periodically
+            current_time = time.time()
+            if current_time - last_log_time > 5.0:  # Every 5 seconds
+                elapsed = current_time - last_log_time
+                if elapsed > 0:
+                    recent_tokens = token_count
+                    tokens_per_sec = recent_tokens / elapsed
+                    print(f"Token processing rate: {tokens_per_sec:.1f} tokens/second")
+                last_log_time = current_time
+                token_count = 0
+            
+            # Process standard batches when we have enough tokens
+            if count % process_every_n == 0:
+                # Best case: we have enough for the ideal frame size
+                if len(buffer) >= ideal_frames:
+                    buffer_to_proc = buffer[-ideal_frames:]
+                # Fallback: we have enough for the minimum requirement
+                elif len(buffer) >= min_frames_required:
+                    buffer_to_proc = buffer[-min_frames_required:]
+                # For the first few frames, we may not have enough yet
+                else:
+                    continue
+                
+                # Debug output to help diagnose issues
+                if count % 28 == 0:
+                    print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
+                
+                # Process the tokens
                 audio_samples = convert_to_audio(buffer_to_proc, count)
                 if audio_samples is not None:
-                    # Log processing rate occasionally
-                    if count % 140 == 0:  # Log every 20 chunks (assuming process_every_n=7)
-                        elapsed = time.time() - start_time
-                        tokens_per_sec = token_count / elapsed if elapsed > 0 else 0
-                        print(f"Processing speed: {tokens_per_sec:.1f} tokens/sec, buffer size: {len(buffer)}")
-                    
                     yield audio_samples
+    
+    # CRITICAL: End-of-generation handling - process all remaining frames
+    # Process remaining complete frames (ideal size)
+    if len(buffer) >= ideal_frames:
+        buffer_to_proc = buffer[-ideal_frames:]
+        audio_samples = convert_to_audio(buffer_to_proc, count)
+        if audio_samples is not None:
+            yield audio_samples
+            
+    # Process any additional complete frames (minimum size)
+    elif len(buffer) >= min_frames_required:
+        buffer_to_proc = buffer[-min_frames_required:]
+        audio_samples = convert_to_audio(buffer_to_proc, count)
+        if audio_samples is not None:
+            yield audio_samples
+            
+    # Final special case: even if we don't have minimum frames, try to process
+    # what we have by padding with silence tokens that won't affect the audio
+    elif len(buffer) >= process_every_n:
+        # Pad to minimum frame requirement with copies of the final token
+        # This is more continuous than using unrelated tokens from the beginning
+        last_token = buffer[-1]
+        padding_needed = min_frames_required - len(buffer)
+        
+        # Create a padding array of copies of the last token
+        # This maintains continuity much better than circular buffering
+        padding = [last_token] * padding_needed
+        padded_buffer = buffer + padding
+        
+        print(f"Processing final partial frame: {len(buffer)} tokens + {padding_needed} repeated-token padding")
+        audio_samples = convert_to_audio(padded_buffer, count)
+        if audio_samples is not None:
+            yield audio_samples
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
@@ -213,18 +267,25 @@ def tokens_decoder_sync(syn_token_gen):
         start_time = time.time()
         chunk_count = 0
         
-        # Process audio chunks from the token decoder
-        async for audio_chunk in tokens_decoder(async_token_gen()):
-            audio_queue.put(audio_chunk)
-            chunk_count += 1
-            
-            # Log performance stats periodically
-            if chunk_count % 10 == 0:
-                elapsed = time.time() - start_time
-                print(f"Generated {chunk_count} chunks in {elapsed:.2f}s ({chunk_count/elapsed:.2f} chunks/sec)")
-                
-        # Signal completion
-        audio_queue.put(None)  # Sentinel
+        try:
+            # Process audio chunks from the token decoder
+            async for audio_chunk in tokens_decoder(async_token_gen()):
+                if audio_chunk:  # Validate audio chunk before adding to queue
+                    audio_queue.put(audio_chunk)
+                    chunk_count += 1
+                    
+                    # Log performance stats periodically
+                    if chunk_count % 10 == 0:
+                        elapsed = time.time() - start_time
+                        print(f"Generated {chunk_count} chunks in {elapsed:.2f}s ({chunk_count/elapsed:.2f} chunks/sec)")
+        except Exception as e:
+            print(f"Error in audio producer: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:    
+            # Signal completion
+            print("Audio producer completed - finalizing all chunks")
+            audio_queue.put(None)  # Sentinel
 
     def run_async():
         asyncio.run(async_producer())
