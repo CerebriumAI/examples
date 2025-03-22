@@ -8,6 +8,7 @@ python-multipart==0.0.6
 # API and Communication
 requests==2.31.0
 python-dotenv==1.0.0
+watchfiles=1.0.4
 
 # Audio Processing
 numpy==1.24.0
