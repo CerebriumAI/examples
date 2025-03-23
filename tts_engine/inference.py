@@ -273,12 +273,14 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                         try:
                             data = json.loads(data_str)
                             if 'choices' in data and len(data['choices']) > 0:
-                                token_text = data['choices'][0].get('text', '')
-                                token_counter += 1
-                                perf_monitor.add_tokens()
-                                
-                                if token_text:
-                                    yield token_text
+                                token_chunk = data['choices'][0].get('text', '')
+                                for token_text in token_chunk.split('>'):
+                                    token_text = f'{token_text}>'
+                                    token_counter += 1
+                                    perf_monitor.add_tokens()
+                                    
+                                    if token_text:
+                                        yield token_text
                         except json.JSONDecodeError as e:
                             print(f"Error decoding JSON: {e}")
                             continue
