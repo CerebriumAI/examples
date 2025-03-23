@@ -14,6 +14,7 @@ High-performance Text-to-Speech server with OpenAI-compatible API, 8 voices, emo
 - 🔄 Enhanced environment variable support with .env file loading (configurable via UI)
 - 🖥️ Added automatic hardware detection and optimization for different GPUs
 - 📊 Implemented detailed performance reporting for audio generation
+- ⚠️ Note: Python 3.12 is not supported due to removal of pkgutil.ImpImporter
 
 [GitHub Repository](https://github.com/Lex-au/Orpheus-FastAPI)
 
@@ -62,7 +63,7 @@ Orpheus-FastAPI/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.8-3.11 (Python 3.12 is not supported due to removal of pkgutil.ImpImporter)
 - CUDA-compatible GPU (recommended: RTX series for best performance)
 - Separate LLM inference server running the Orpheus model (e.g., LM Studio or llama.cpp server)
 
