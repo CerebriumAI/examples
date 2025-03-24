@@ -140,10 +140,12 @@ NUM_WORKERS = 4 if HIGH_END_GPU else 2
 AVAILABLE_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
 DEFAULT_VOICE = "tara"  # Best voice according to documentation
 
+# Import the unified token handling from speechpipe
+from .speechpipe import turn_token_into_id, CUSTOM_TOKEN_PREFIX
+
 # Special token IDs for Orpheus model
 START_TOKEN_ID = 128259
 END_TOKEN_IDS = [128009, 128260, 128261, 128257]
-CUSTOM_TOKEN_PREFIX = "<custom_token_"
 
 # Performance monitoring
 class PerformanceMonitor:
@@ -218,7 +220,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     
     # Create the request payload
     payload = {
-        "model": "orpheus-3b-0.1-ft-q4_k_m",  # Model name can be anything, endpoint will use loaded model
+        "model": "Orpheus-3b-FT-Q8_0.gguf",  # Model name can be anything, endpoint will use loaded model
         "prompt": formatted_prompt,
         "max_tokens": max_tokens,
         "temperature": temperature,
@@ -278,7 +280,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                                     token_text = f'{token_text}>'
                                     token_counter += 1
                                     perf_monitor.add_tokens()
-                                    
+
                                     if token_text:
                                         yield token_text
                         except json.JSONDecodeError as e:
@@ -313,44 +315,8 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                 print("Max retries reached. Token generation failed.")
                 return
 
-# Token ID cache to avoid repeated processing
-token_id_cache = {}
-MAX_CACHE_SIZE = 10000
-
-def turn_token_into_id(token_string: str, index: int) -> Optional[int]:
-    """Optimized token-to-ID conversion with caching."""
-    # Check cache first (significant speedup for repeated tokens)
-    cache_key = (token_string, index % 7)
-    if cache_key in token_id_cache:
-        return token_id_cache[cache_key]
-        
-    # Early rejection for obvious non-matches
-    if CUSTOM_TOKEN_PREFIX not in token_string:
-        return None
-        
-    # Process token
-    token_string = token_string.strip()
-    last_token_start = token_string.rfind(CUSTOM_TOKEN_PREFIX)
-    
-    if last_token_start == -1:
-        return None
-    
-    last_token = token_string[last_token_start:]
-    
-    if not (last_token.startswith(CUSTOM_TOKEN_PREFIX) and last_token.endswith(">")):
-        return None
-        
-    try:
-        number_str = last_token[14:-1]
-        token_id = int(number_str) - 10 - ((index % 7) * 4096)
-        
-        # Cache the result if it's valid
-        if len(token_id_cache) < MAX_CACHE_SIZE:
-            token_id_cache[cache_key] = token_id
-            
-        return token_id
-    except (ValueError, IndexError):
-        return None
+# The turn_token_into_id function is now imported from speechpipe.py
+# This eliminates duplicate code and ensures consistent behavior
 
 def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
     """Convert token frames to audio with performance monitoring."""
@@ -365,13 +331,15 @@ def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
     return result
 
 async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
-    """Simplified token decoder without complex ring buffer to ensure reliable output."""
+    """Simplified token decoder with early first-chunk processing for lower latency."""
     buffer = []
     count = 0
     
-    # Use conservative batch parameters to ensure output quality
-    min_frames = 28  # Default for reliability (4 chunks of 7)
-    process_every = 7  # Process every 7 tokens (standard for Orpheus)
+    # Use different thresholds for first chunk vs. subsequent chunks
+    first_chunk_processed = False
+    min_frames_first = 7  # Process after just 7 tokens for first chunk (ultra-low latency)
+    min_frames_subsequent = 28  # Default for reliability after first chunk (4 chunks of 7)
+    process_every = 7  # Process every 7 tokens (standard for Orpheus model)
     
     start_time = time.time()
     last_log_time = start_time
@@ -393,19 +361,32 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
                     print(f"Token processing rate: {token_count/elapsed:.1f} tokens/second")
                 last_log_time = current_time
             
-            # Process in standard batches for Orpheus model
-            if count % process_every == 0 and count >= min_frames:
-                # Use simple slice operation - reliable and correct
-                buffer_to_proc = buffer[-min_frames:]
-                
-                # Debug output to help diagnose issues
-                if count % 28 == 0:
-                    print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
-                
-                # Process the tokens
-                audio_samples = convert_to_audio(buffer_to_proc, count)
-                if audio_samples is not None:
-                    yield audio_samples
+            # Different processing paths based on whether first chunk has been processed
+            if not first_chunk_processed:
+                # For first audio output, process as soon as we have enough tokens for one chunk
+                if count >= min_frames_first:
+                    buffer_to_proc = buffer[-min_frames_first:]
+                    
+                    # Process the first chunk for immediate audio feedback
+                    print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
+                    if audio_samples is not None:
+                        first_chunk_processed = True  # Mark first chunk as processed
+                        yield audio_samples
+            else:
+                # For subsequent chunks, use standard processing with larger batch
+                if count % process_every == 0 and count >= min_frames_subsequent:
+                    # Use simple slice operation - reliable and correct
+                    buffer_to_proc = buffer[-min_frames_subsequent:]
+                    
+                    # Debug output to help diagnose issues
+                    if count % 28 == 0:
+                        print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
+                    
+                    # Process the tokens
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
+                    if audio_samples is not None:
+                        yield audio_samples
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
