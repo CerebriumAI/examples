@@ -18,6 +18,15 @@ High-performance Text-to-Speech server with OpenAI-compatible API, 8 voices, emo
 
 [GitHub Repository](https://github.com/Lex-au/Orpheus-FastAPI)
 
+## Model Collection
+
+🚀 **NEW:** Try the quantized models for improved performance!
+- **Q2_K**: Ultra-fast inference with 2-bit quantization
+- **Q4_K_M**: Balanced quality/speed with 4-bit quantization (mixed)
+- **Q8_0**: Original high-quality 8-bit model
+
+[Browse the Orpheus-FASTAPI Model Collection on HuggingFace](https://huggingface.co/collections/lex-au/orpheus-fastapi-67e125ae03fc96dae0517707)
+
 ## Voice Demos
 
 Listen to sample outputs with different voices and emotions:
@@ -271,7 +280,14 @@ This application requires a separate LLM inference server running the Orpheus mo
 - [llama.cpp server](https://github.com/ggerganov/llama.cpp) - Run with the appropriate model parameters
 - Any compatible OpenAI API-compatible server
 
-Download the quantised model from [lex-au/Orpheus-3b-FT-Q8_0.gguf](https://huggingface.co/lex-au/Orpheus-3b-FT-Q8_0.gguf) and load it in your inference server.
+**Quantized Model Options:**
+- **lex-au/Orpheus-3b-FT-Q2_K.gguf**: Fastest inference (~50% faster tokens/sec than Q8_0)
+- **lex-au/Orpheus-3b-FT-Q4_K_M.gguf**: Balanced quality/speed 
+- **lex-au/Orpheus-3b-FT-Q8_0.gguf**: Original high-quality model
+
+Choose based on your hardware and needs. Lower bit models (Q2_K, Q4_K_M) provide ~2x realtime performance on high-end GPUs.
+
+[Browse all models in the collection](https://huggingface.co/collections/lex-au/orpheus-fastapi-67e125ae03fc96dae0517707)
 
 The inference server should be configured to expose an API endpoint that this FastAPI application will connect to.
 
@@ -313,7 +329,7 @@ To add new voices, update the `AVAILABLE_VOICES` list in `tts_engine/inference.p
 When running the Orpheus model with llama.cpp, use these parameters to ensure optimal performance:
 
 ```bash
-./llama-server -m models/Orpheus-3b-FT-Q8_0.gguf \
+./llama-server -m models/Modelname.gguf \
   --ctx-size={{your ORPHEUS_MAX_TOKENS from .env}} \
   --n-predict={{your ORPHEUS_MAX_TOKENS from .env}} \
   --rope-scaling=linear
