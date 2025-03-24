@@ -1,0 +1,30 @@
+[cerebrium.deployment]
+name = "10-sesame-voice-api"
+python_version = "3.12"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = false
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*', 'test.py', 'output.wav']
+
+[cerebrium.hardware]
+cpu = 3.0
+memory = 12.0
+compute = "AMPERE_A10"
+
+[cerebrium.scaling]
+min_replicas = 1 #Don't forget to set this back to 0 when you're done
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 1
+response_grace_period = 900
+scaling_metric = "concurrency_utilization"
+scaling_target = 100
+scaling_buffer = 0
+roll_out_duration_seconds = 0
+
+[cerebrium.dependencies.paths]
+pip = "requirements.txt"
+
+[cerebrium.dependencies.apt]
+git = "latest"
+ffmpeg = "latest"
