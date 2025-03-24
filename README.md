@@ -51,6 +51,11 @@ We've split each of the examples by category to make them easier to find.
 4. [Create a WebSockets-based voice agent using Twilio](6-voice/4-twilio-voice-agent)
 5. [Clone voices with XTTS](6-voice/5-xtts)
 6. [Build your own OpenAI realtime API replacement](6-voice/6-openai-realtime-api-comparison)
+7. [Outbound LiveKit agent](6-voice/7-outbound-livekit-agent)
+8. [Real-time Voice AI Agent](6-voice/8-multilingual-agent)
+9. [Transcribing with FasterWhisper](6-voice/9-faster-whisper)
+10. [Sesame Conversational Speech Model (CSM) API](6-voice/10-sesame-voice-api)
+
 
 ### 7. Image & Video 📸
 
