@@ -208,8 +208,6 @@ This server works as a frontend that connects to an external LLM inference serve
 - Token and audio caching
 - Optimised batch sizes
 
-For best performance, adjust the API_URL in `tts_engine/inference.py` to point to your LLM inference server endpoint.
-
 ### Hardware Detection and Optimization
 
 The system features intelligent hardware detection that automatically optimizes performance based on your hardware capabilities:
