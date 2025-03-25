@@ -196,7 +196,7 @@ You can insert emotion tags into your text to add expressiveness:
 - `<yawn>`: Add a yawning sound
 - `<gasp>`: Add a gasping sound
 
-Example: "Well, that's interesting <laugh> I hadn't thought of that before."
+Example: `"Well, that's interesting <laugh> I hadn't thought of that before."`
 
 ## Technical Details
 
