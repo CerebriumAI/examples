@@ -1,0 +1,41 @@
+.video-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 20px;
+}
+
+.video-player {
+    position: relative;
+    width: 480px;
+    height: 360px;
+    background: #333;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.video-frame {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.video-player p {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    color: white;
+    margin: 0;
+    padding: 5px 10px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+} 
