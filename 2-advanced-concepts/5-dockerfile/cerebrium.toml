@@ -1,0 +1,25 @@
+[cerebrium.deployment]
+name = "5-dockerfile"
+python_version = "3.12"
+include = ["./*"]
+exclude = [".*"]
+shell_commands = [""]
+
+[cerebrium.hardware]
+cpu = 1
+memory = 1.0
+compute = "CPU"
+gpu_count = 0
+provider = "aws"
+region = "us-east-1"
+
+[cerebrium.runtime.custom]
+port = 8192
+healthcheck_endpoint = "/health"
+dockerfile_path = "./Dockerfile"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+cooldown = 1
+replica_concurrency = 100
