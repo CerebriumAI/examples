@@ -8,6 +8,11 @@ High-performance Text-to-Speech server with OpenAI-compatible API, 8 voices, emo
 
 ## Changelog
 
+**v1.2.0** (2025-04-12)
+- ❤️ Added optional Docker Compose support with GPU-enabled `llama.cpp` server and Orpheus-FastAPI integration  
+- 🐳 Docker implementation contributed by [@richardr1126](https://github.com/richardr1126) – huge thanks for the clean setup and orchestration work!  
+- 🧱 Native install path remains unchanged for non-Docker users
+
 **v1.1.0** (2025-03-23)
 - ✨ Added long-form audio support with sentence-based batching and crossfade stitching
 - 🔊 Improved short audio quality with optimized token buffer handling
@@ -84,6 +89,7 @@ The docker compose file orchestrates the Orpheus-FastAPI for audio and a llama.c
 
 ```bash
 cp .env.example .env # Nothing needs to be changed, but the file is required
+copy .env.example .env # For Windows CMD
 ```
 
 ```bash
