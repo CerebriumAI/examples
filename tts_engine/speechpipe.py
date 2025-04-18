@@ -115,7 +115,9 @@ except Exception as e:
         print(f"TorchScript optimization skipped: {e}")
 
 # Setup CUDA graphs for the model's decode operation if available
-decode_graphed = None
+decode_graphed = None  # Disabled due to tensor size mismatch issues with dynamic inputs
+# Keeping the code commented below for future reference
+"""
 if CUDA_GRAPHS_AVAILABLE and snac_device == "cuda":
     try:
         # We'll create a graphed version of the decode method
@@ -138,6 +140,7 @@ if CUDA_GRAPHS_AVAILABLE and snac_device == "cuda":
         if not IS_RELOADER:
             print(f"CUDA graphs setup failed: {e}")
         decode_graphed = None
+"""
 
 def convert_to_audio(multiframe, count):
     """
