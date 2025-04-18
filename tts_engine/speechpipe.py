@@ -12,13 +12,23 @@ import gc
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128,garbage_collection_threshold:0.6"
 
+# Check for CUDA availability *before* trying to use it
 if torch.cuda.is_available():
-    # Reserve ~1 GB at startup (adjust as needed)
+    # Define snac_device early if CUDA is available
+    snac_device = "cuda"
+    # Reserve ~1 GB at startup (adjust as needed)
     reserve_mb = 2048
-    dummy = torch.empty((reserve_mb * 1024 * 1024 // 4,), dtype=torch.float32, device=snac_device)
-    del dummy
-    torch.cuda.empty_cache()
-    print(f"Reservoir of {reserve_mb} MiB reserved and released")
+    try:
+        # Use the now-defined snac_device
+        dummy = torch.empty((reserve_mb * 1024 * 1024 // 4,), dtype=torch.float32, device=snac_device)
+        del dummy
+        torch.cuda.empty_cache()
+        print(f"Reservoir of {reserve_mb} MiB reserved and released")
+    except Exception as e:
+        print(f"Warning: Failed to reserve GPU memory: {e}")
+else:
+    # Define snac_device if CUDA is not available
+    snac_device = "mps" if torch.backends.mps.is_available() else "cpu"
 
 # Helper to detect if running in Uvicorn's reloader (same as in inference.py)
 def is_reloader_process():
@@ -52,6 +62,8 @@ except:
 model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").eval()
 
 # Check if CUDA is available and set device accordingly
+# This definition is now redundant if CUDA is available, but harmless
+# It ensures snac_device is defined if CUDA check somehow failed earlier
 snac_device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 if not IS_RELOADER:
     print(f"Using device: {snac_device}")
