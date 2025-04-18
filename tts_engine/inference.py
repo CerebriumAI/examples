@@ -404,14 +404,15 @@ async def tokens_decoder(
     end_flag = object()
     is_done = False
     
-    # Preallocate buffers for better performance
-    token_batch = []
+    # Preallocate buffers for better performance but moved inside producer function
     batch_size = 32  # Initial small batch for quick first chunk
     max_batch_size = 128  # Will grow to this for subsequent chunks
     
     # Producer task to fill the queue with batched tokens
     async def producer():
         nonlocal is_done
+        # Initialize token_batch inside the producer function
+        token_batch = []
         try:
             count = 0
             async for token in tokens_generator:
@@ -443,6 +444,11 @@ async def tokens_decoder(
                 await audio_queue.put(token_batch.copy())
                 token_batch.clear()
                 
+        except GeneratorExit:
+            # Properly handle GeneratorExit
+            is_done = True
+            await audio_queue.put(end_flag)
+            return
         except Exception as e:
             print(f"Error in tokens producer: {e}")
             import traceback
@@ -526,6 +532,9 @@ async def tokens_decoder(
                 # Mark batch as processed
                 current_batch = None
                 
+        except GeneratorExit:
+            # Properly handle GeneratorExit by doing necessary cleanup
+            return
         except Exception as e:
             print(f"Error in tokens consumer: {e}")
             import traceback
@@ -534,17 +543,18 @@ async def tokens_decoder(
     # Run producer and consumer tasks concurrently
     producer_task = asyncio.create_task(producer())
     
-    # Process tokens in the consumer
-    async for chunk in consumer():
-        yield chunk
-    
-    # Clean up producer task
-    if not producer_task.done():
-        producer_task.cancel()
-        try:
-            await producer_task
-        except asyncio.CancelledError:
-            pass
+    try:
+        # Process tokens in the consumer
+        async for chunk in consumer():
+            yield chunk
+    finally:
+        # Clean up producer task
+        if not producer_task.done():
+            producer_task.cancel()
+            try:
+                await producer_task
+            except asyncio.CancelledError:
+                pass
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """High-throughput synchronous processor with optimized memory and I/O handling."""
