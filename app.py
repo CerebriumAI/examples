@@ -45,13 +45,23 @@ ensure_env_file_exists()
 load_dotenv(override=True)
 
 from fastapi import FastAPI, Request, Form, HTTPException, Depends
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import json
+from io import BytesIO
+import wave
 
-from tts_engine import generate_speech_from_api, AVAILABLE_VOICES, DEFAULT_VOICE, VOICE_TO_LANGUAGE, AVAILABLE_LANGUAGES
+from tts_engine import (
+    generate_speech_from_api,
+    stream_speech_from_api,
+    AVAILABLE_VOICES,
+    DEFAULT_VOICE,
+    VOICE_TO_LANGUAGE,
+    AVAILABLE_LANGUAGES,
+    SAMPLE_RATE
+)
 
 # Create FastAPI app
 app = FastAPI(
@@ -89,11 +99,11 @@ class APIResponse(BaseModel):
     output_file: str
     generation_time: float
 
-# OpenAI-compatible API endpoint
+# Original OpenAI-compatible API endpoint (returns file)
 @app.post("/v1/audio/speech")
-async def create_speech_api(request: SpeechRequest):
+async def create_speech_api_file(request: SpeechRequest):
     """
-    Generate speech from text using the Orpheus TTS model.
+    Generate speech from text using the Orpheus TTS model and return an audio file.
     Compatible with OpenAI's /v1/audio/speech endpoint.
     
     For longer texts (>1000 characters), batched generation is used
@@ -101,33 +111,116 @@ async def create_speech_api(request: SpeechRequest):
     """
     if not request.input:
         raise HTTPException(status_code=400, detail="Missing input text")
-    
+
+    # Currently only WAV format is supported
+    if request.response_format.lower() != "wav":
+        raise HTTPException(status_code=400, detail="Unsupported response format. Only 'wav' is supported.")
+
     # Generate unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Ensure outputs directory exists
+    os.makedirs("outputs", exist_ok=True)
     output_path = f"outputs/{request.voice}_{timestamp}.wav"
-    
+
     # Check if we should use batched generation
     use_batching = len(request.input) > 1000
     if use_batching:
         print(f"Using batched generation for long text ({len(request.input)} characters)")
-    
+
     # Generate speech with automatic batching for long texts
     start = time.time()
-    generate_speech_from_api(
-        prompt=request.input,
-        voice=request.voice,
-        output_file=output_path,
-        use_batching=use_batching,
-        max_batch_chars=1000  # Process in ~1000 character chunks (roughly 1 paragraph)
-    )
+    try:
+        generate_speech_from_api(
+            prompt=request.input,
+            voice=request.voice,
+            output_file=output_path,
+            use_batching=use_batching,
+            max_batch_chars=1000  # Process in ~1000 character chunks (roughly 1 paragraph)
+        )
+    except Exception as e:
+        print(f"Error during speech generation: {e}")
+        raise HTTPException(status_code=500, detail=f"Speech generation failed: {e}")
+        
     end = time.time()
     generation_time = round(end - start, 2)
-    
+    print(f"File generation took {generation_time}s")
+
     # Return audio file
+    if not os.path.exists(output_path):
+         raise HTTPException(status_code=500, detail="Generated audio file not found.")
+         
     return FileResponse(
         path=output_path,
         media_type="audio/wav",
         filename=f"{request.voice}_{timestamp}.wav"
+    )
+
+# New streaming endpoint
+@app.post("/v1/audio/speech/stream")
+async def create_speech_api_streaming(request: SpeechRequest):
+    """
+    Generate speech from text using the Orpheus TTS model and stream the result.
+    Returns a streaming response with audio/wav content.
+    """
+    if not request.input:
+        raise HTTPException(status_code=400, detail="Missing input text")
+
+    # Currently only WAV format is supported for streaming
+    if request.response_format.lower() != "wav":
+        raise HTTPException(status_code=400, detail="Unsupported response format for streaming. Only 'wav' is supported.")
+
+    # Create the async generator for audio chunks
+    try:
+        audio_stream_generator = stream_speech_from_api(
+            prompt=request.input,
+            voice=request.voice
+            # Add temperature, top_p etc. if needed from request
+            # temperature=request.temperature, # Example if added to SpeechRequest model
+            # top_p=request.top_p,
+        )
+    except Exception as e:
+        print(f"Error initiating speech stream generation: {e}")
+        raise HTTPException(status_code=500, detail=f"Speech stream initiation failed: {e}")
+
+    async def wav_streaming_generator():
+        # Create a BytesIO buffer to construct the WAV header
+        wav_buffer = BytesIO()
+        try:
+            with wave.open(wav_buffer, 'wb') as wf:
+                wf.setnchannels(1)  # Mono
+                wf.setsampwidth(2)  # 16-bit PCM
+                wf.setframerate(SAMPLE_RATE)
+                # Write a dummy frame count for now, will be updated later if possible
+                # but for streaming, the header size is fixed, and data follows
+                wf.writeframes(b'') 
+        except Exception as e:
+            print(f"Error creating WAV header: {e}")
+            # If header fails, we can't stream WAV
+            raise HTTPException(status_code=500, detail=f"Failed to create WAV header: {e}")
+        
+        # Yield the header first
+        header = wav_buffer.getvalue()
+        yield header
+        print("Sent WAV header") # Debug log
+        
+        # Yield audio data chunks as they come from the generator
+        try:
+            chunk_count = 0
+            async for chunk in audio_stream_generator:
+                if chunk:
+                    yield chunk
+                    chunk_count += 1
+                await asyncio.sleep(0.001) # Allow context switching
+            print(f"Sent {chunk_count} audio chunks") # Debug log
+        except Exception as e:
+            print(f"Error during audio stream generation: {e}")
+            # Don't raise HTTPException here as the response has already started
+            # Client will likely detect a broken stream
+
+    # Return the streaming response
+    return StreamingResponse(
+        wav_streaming_generator(),
+        media_type="audio/wav"
     )
 
 @app.get("/v1/audio/voices")

@@ -12,6 +12,14 @@ import gc
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128,garbage_collection_threshold:0.6"
 
+if torch.cuda.is_available():
+    # Reserve ~1 GB at startup (adjust as needed)
+    reserve_mb = 2048
+    dummy = torch.empty((reserve_mb * 1024 * 1024 // 4,), dtype=torch.float32, device=snac_device)
+    del dummy
+    torch.cuda.empty_cache()
+    print(f"Reservoir of {reserve_mb} MiB reserved and released")
+
 # Helper to detect if running in Uvicorn's reloader (same as in inference.py)
 def is_reloader_process():
     """Check if the current process is a uvicorn reloader"""
