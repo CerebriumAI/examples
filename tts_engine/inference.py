@@ -367,7 +367,27 @@ def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
         
     return result
 
-async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
+async def stream_speech_from_api(
+    prompt: str,
+    voice: str = DEFAULT_VOICE,
+    temperature: float = TEMPERATURE,
+    top_p: float = TOP_P,
+    max_tokens: int = MAX_TOKENS,
+    repetition_penalty: float = REPETITION_PENALTY
+):
+    """Async generator to stream speech audio chunks from Orpheus TTS model."""
+    token_gen = generate_tokens_from_api(
+        prompt=prompt,
+        voice=voice,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        repetition_penalty=repetition_penalty
+    )
+    for chunk in tokens_decoder(token_gen):
+        yield chunk
+
+def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     """Simplified token decoder with early first-chunk processing for lower latency."""
     buffer = []
     count = 0
@@ -382,7 +402,7 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     last_log_time = start_time
     token_count = 0
     
-    async for token_text in token_gen:
+    for token_text in token_gen:
         token = turn_token_into_id(token_text, count)
         if token is not None and token > 0:
             # Add to buffer using simple append (reliable method)
@@ -618,7 +638,7 @@ async def stream_speech_from_api(
         max_tokens=max_tokens,
         repetition_penalty=repetition_penalty
     )
-    async for chunk in tokens_decoder(token_gen):
+    for chunk in tokens_decoder(token_gen):
         yield chunk
 
 def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE, 
