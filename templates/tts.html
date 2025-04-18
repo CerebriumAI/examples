@@ -155,25 +155,72 @@
                 </div>
               </div>
 
+              <!-- Language selection -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-white mb-2">Language</label>
+                <div class="flex flex-wrap gap-3">
+                  {% for language in AVAILABLE_LANGUAGES %}
+                  <div class="language-option {% if language == 'english' %}active{% endif %}" data-language="{{ language }}">
+                    <input type="radio" name="language" value="{{ language }}" class="hidden" {% if language == 'english' %}checked{% endif %}>
+                    <span class="px-3 py-1 rounded-full bg-dark-700 hover:bg-dark-600 text-white text-sm cursor-pointer">{{ language|capitalize }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+
               <!-- Voice selection -->
               <div class="mb-6">
                 <label class="block text-sm font-medium text-white mb-2">Voice</label>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {% for voice_option in voices %}
-                  <div class="voice-card {% if voice_option == DEFAULT_VOICE %}active{% endif %}" data-voice="{{ voice_option }}">
+                  <div class="voice-card {% if voice_option == DEFAULT_VOICE %}active{% endif %}" 
+                       data-voice="{{ voice_option }}" 
+                       data-language="{{ VOICE_TO_LANGUAGE[voice_option] }}"
+                       style="display: {% if VOICE_TO_LANGUAGE[voice_option] != 'english' %}none{% endif %}">
                     <input type="radio" name="voice" value="{{ voice_option }}" class="hidden" {% if voice_option == DEFAULT_VOICE %}checked{% endif %}>
                     <div class="flex items-center mb-2">
                       <span class="font-medium text-white">{{ voice_option|capitalize }}</span>
                     </div>
-    <div class="text-xs text-dark-300">
-                      {% if voice_option == "tara" %}Female, conversational, clear
-                      {% elif voice_option == "leah" %}Female, warm, gentle
-                      {% elif voice_option == "jess" %}Female, energetic, youthful
-                      {% elif voice_option == "leo" %}Male, authoritative, deep
-                      {% elif voice_option == "dan" %}Male, friendly, casual
-                      {% elif voice_option == "mia" %}Female, professional, articulate
-                      {% elif voice_option == "zac" %}Male, enthusiastic, dynamic
-                      {% elif voice_option == "zoe" %}Female, calm, soothing
+                    <div class="text-xs text-dark-300">
+                      {% if voice_option == "tara" %}Female, English, conversational, clear
+                      {% elif voice_option == "leah" %}Female, English, warm, gentle
+                      {% elif voice_option == "jess" %}Female, English, energetic, youthful
+                      {% elif voice_option == "leo" %}Male, English, authoritative, deep
+                      {% elif voice_option == "dan" %}Male, English, friendly, casual
+                      {% elif voice_option == "mia" %}Female, English, professional, articulate
+                      {% elif voice_option == "zac" %}Male, English, enthusiastic, dynamic
+                      {% elif voice_option == "zoe" %}Female, English, calm, soothing
+                      
+                      <!-- French voices -->
+                      {% elif voice_option == "pierre" %}Male, French, sophisticated
+                      {% elif voice_option == "amelie" %}Female, French, elegant
+                      {% elif voice_option == "marie" %}Female, French, spirited
+                      
+                      <!-- German voices -->
+                      {% elif voice_option == "jana" %}Female, German, clear
+                      {% elif voice_option == "thomas" %}Male, German, authoritative
+                      {% elif voice_option == "max" %}Male, German, energetic
+                      
+                      <!-- Korean voices -->
+                      {% elif voice_option == "유나" %}Female, Korean, melodic
+                      {% elif voice_option == "준서" %}Male, Korean, confident
+                      
+                      <!-- Hindi voice -->
+                      {% elif voice_option == "ऋतिका" %}Female, Hindi, expressive
+                      
+                      <!-- Mandarin voices -->
+                      {% elif voice_option == "长乐" %}Female, Mandarin, gentle
+                      {% elif voice_option == "白芷" %}Female, Mandarin, clear
+                      
+                      <!-- Spanish voices -->
+                      {% elif voice_option == "javi" %}Male, Spanish, warm
+                      {% elif voice_option == "sergio" %}Male, Spanish, professional
+                      {% elif voice_option == "maria" %}Female, Spanish, friendly
+                      
+                      <!-- Italian voices -->
+                      {% elif voice_option == "pietro" %}Male, Italian, passionate
+                      {% elif voice_option == "giulia" %}Female, Italian, expressive
+                      {% elif voice_option == "carlo" %}Male, Italian, refined
                       {% endif %}
                     </div>
                   </div>
@@ -404,20 +451,83 @@
       // Initialize char count
       charCount.textContent = textArea.value.length;
       
-      // Voice selection
+      // Language selection
+      const languageOptions = document.querySelectorAll('.language-option');
       const voiceCards = document.querySelectorAll('.voice-card');
       
-      voiceCards.forEach(card => {
-        card.addEventListener('click', function() {
-          // Unselect all cards
-          voiceCards.forEach(c => c.classList.remove('active'));
+      languageOptions.forEach(option => {
+        option.addEventListener('click', function() {
+          // Unselect all language options
+          languageOptions.forEach(o => o.classList.remove('active'));
           
-          // Select this card
+          // Select this language option
           this.classList.add('active');
           
           // Check the radio button
           const radio = this.querySelector('input[type="radio"]');
           radio.checked = true;
+          
+          // Get the selected language
+          const selectedLanguage = this.getAttribute('data-language');
+          
+          // Show/hide voice cards based on language
+          let firstVisibleCard = null;
+          
+          voiceCards.forEach(card => {
+            const cardLanguage = card.getAttribute('data-language');
+            if (cardLanguage === selectedLanguage) {
+              card.style.display = '';
+              if (!firstVisibleCard) {
+                firstVisibleCard = card;
+              }
+            } else {
+              card.style.display = 'none';
+              // If this hidden card was selected, unselect it
+              if (card.classList.contains('active')) {
+                card.classList.remove('active');
+                const cardRadio = card.querySelector('input[type="radio"]');
+                if (cardRadio) {
+                  cardRadio.checked = false;
+                }
+              }
+            }
+          });
+          
+          // If no voice card is selected for this language, select the first one
+          if (firstVisibleCard && document.querySelectorAll(`.voice-card[data-language="${selectedLanguage}"].active:not([style*="display: none"])`).length === 0) {
+            firstVisibleCard.classList.add('active');
+            const firstVisibleRadio = firstVisibleCard.querySelector('input[type="radio"]');
+            if (firstVisibleRadio) {
+              firstVisibleRadio.checked = true;
+            }
+          }
+        });
+      });
+      
+      // Voice card selection
+      voiceCards.forEach(card => {
+        card.addEventListener('click', function() {
+          // Only allow selection of cards that are visible (not display:none)
+          if (this.style.display !== 'none') {
+            // Unselect all cards with the same language
+            const cardLanguage = this.getAttribute('data-language');
+            document.querySelectorAll(`.voice-card[data-language="${cardLanguage}"]`).forEach(c => {
+              c.classList.remove('active');
+              const radio = c.querySelector('input[type="radio"]');
+              if (radio) {
+                radio.checked = false;
+              }
+            });
+            
+            // Select this card
+            this.classList.add('active');
+            
+            // Check the radio button
+            const radio = this.querySelector('input[type="radio"]');
+            if (radio) {
+              radio.checked = true;
+            }
+          }
         });
       });
       

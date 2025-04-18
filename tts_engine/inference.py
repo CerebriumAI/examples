@@ -136,9 +136,42 @@ if not IS_RELOADER:
 # Parallel processing settings
 NUM_WORKERS = 4 if HIGH_END_GPU else 2
 
-# Available voices based on the Orpheus-TTS repository
-AVAILABLE_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
+# Define voices by language
+ENGLISH_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
+FRENCH_VOICES = ["pierre", "amelie", "marie"]
+GERMAN_VOICES = ["jana", "thomas", "max"]
+KOREAN_VOICES = ["유나", "준서"]
+HINDI_VOICES = ["ऋतिका"]
+MANDARIN_VOICES = ["长乐", "白芷"]
+SPANISH_VOICES = ["javi", "sergio", "maria"]
+ITALIAN_VOICES = ["pietro", "giulia", "carlo"]
+
+# Combined list for API compatibility
+AVAILABLE_VOICES = (
+    ENGLISH_VOICES + 
+    FRENCH_VOICES + 
+    GERMAN_VOICES + 
+    KOREAN_VOICES + 
+    HINDI_VOICES + 
+    MANDARIN_VOICES + 
+    SPANISH_VOICES + 
+    ITALIAN_VOICES
+)
 DEFAULT_VOICE = "tara"  # Best voice according to documentation
+
+# Map voices to languages for the UI
+VOICE_TO_LANGUAGE = {}
+VOICE_TO_LANGUAGE.update({voice: "english" for voice in ENGLISH_VOICES})
+VOICE_TO_LANGUAGE.update({voice: "french" for voice in FRENCH_VOICES})
+VOICE_TO_LANGUAGE.update({voice: "german" for voice in GERMAN_VOICES})
+VOICE_TO_LANGUAGE.update({voice: "korean" for voice in KOREAN_VOICES})
+VOICE_TO_LANGUAGE.update({voice: "hindi" for voice in HINDI_VOICES})
+VOICE_TO_LANGUAGE.update({voice: "mandarin" for voice in MANDARIN_VOICES})
+VOICE_TO_LANGUAGE.update({voice: "spanish" for voice in SPANISH_VOICES})
+VOICE_TO_LANGUAGE.update({voice: "italian" for voice in ITALIAN_VOICES})
+
+# Languages list for the UI
+AVAILABLE_LANGUAGES = ["english", "french", "german", "korean", "hindi", "mandarin", "spanish", "italian"]
 
 # Import the unified token handling from speechpipe
 from .speechpipe import turn_token_into_id, CUSTOM_TOKEN_PREFIX

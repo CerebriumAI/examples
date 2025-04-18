@@ -51,7 +51,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import json
 
-from tts_engine import generate_speech_from_api, AVAILABLE_VOICES, DEFAULT_VOICE
+from tts_engine import generate_speech_from_api, AVAILABLE_VOICES, DEFAULT_VOICE, VOICE_TO_LANGUAGE, AVAILABLE_LANGUAGES
 
 # Create FastAPI app
 app = FastAPI(
@@ -189,7 +189,12 @@ async def root(request: Request):
     """Redirect to web UI"""
     return templates.TemplateResponse(
         "tts.html",
-        {"request": request, "voices": AVAILABLE_VOICES}
+        {
+            "request": request, 
+            "voices": AVAILABLE_VOICES,
+            "VOICE_TO_LANGUAGE": VOICE_TO_LANGUAGE,
+            "AVAILABLE_LANGUAGES": AVAILABLE_LANGUAGES
+        }
     )
 
 @app.get("/web/", response_class=HTMLResponse)
@@ -199,7 +204,13 @@ async def web_ui(request: Request):
     config = get_current_config()
     return templates.TemplateResponse(
         "tts.html",
-        {"request": request, "voices": AVAILABLE_VOICES, "config": config}
+        {
+            "request": request, 
+            "voices": AVAILABLE_VOICES, 
+            "config": config,
+            "VOICE_TO_LANGUAGE": VOICE_TO_LANGUAGE,
+            "AVAILABLE_LANGUAGES": AVAILABLE_LANGUAGES
+        }
     )
 
 @app.get("/get_config")
@@ -301,7 +312,9 @@ async def generate_from_web(
             {
                 "request": request,
                 "error": "Please enter some text.",
-                "voices": AVAILABLE_VOICES
+                "voices": AVAILABLE_VOICES,
+                "VOICE_TO_LANGUAGE": VOICE_TO_LANGUAGE,
+                "AVAILABLE_LANGUAGES": AVAILABLE_LANGUAGES
             }
         )
     
@@ -334,7 +347,9 @@ async def generate_from_web(
             "voice": voice,
             "output_file": output_path,
             "generation_time": generation_time,
-            "voices": AVAILABLE_VOICES
+            "voices": AVAILABLE_VOICES,
+            "VOICE_TO_LANGUAGE": VOICE_TO_LANGUAGE,
+            "AVAILABLE_LANGUAGES": AVAILABLE_LANGUAGES
         }
     )
 

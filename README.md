@@ -4,9 +4,29 @@
 
 [![GitHub](https://img.shields.io/github/license/Lex-au/Orpheus-FastAPI)](https://github.com/Lex-au/Orpheus-FastAPI/blob/main/LICENSE.txt)
 
-High-performance Text-to-Speech server with OpenAI-compatible API, 8 voices, emotion tags, and modern web UI. Optimized for RTX GPUs.
+High-performance Text-to-Speech server with OpenAI-compatible API, multilingual support with 24 voices, emotion tags, and modern web UI. Optimized for RTX GPUs.
 
 ## Changelog
+
+**v1.3.0** (2025-04-18)
+- 🌐 Added comprehensive multilingual support with 16 new voice actors across 7 languages
+- 🗣️ New voice actors include:
+  - French: pierre, amelie, marie
+  - German: jana, thomas, max
+  - Korean: 유나, 준서
+  - Hindi: ऋतिका
+  - Mandarin: 长乐, 白芷
+  - Spanish: javi, sergio, maria
+  - Italian: pietro, giulia, carlo
+- 🔄 Enhanced UI with dynamic language selection and voice filtering
+- 🚀 Released language-specific optimized models:
+  - [Italian & Spanish Model](https://huggingface.co/lex-au/Orpheus-3b-Italian_Spanish-FT-Q8_0.gguf)
+  - [Korean Model](https://huggingface.co/lex-au/Orpheus-3b-Korean-FT-Q8_0.gguf)
+  - [French Model](https://huggingface.co/lex-au/Orpheus-3b-French-FT-Q8_0.gguf)
+  - [Hindi Model](https://huggingface.co/lex-au/Orpheus-3b-Hindi-FT-Q8_0.gguf)
+  - [Mandarin Model](https://huggingface.co/lex-au/Orpheus-3b-Chinese-FT-Q8_0.gguf)
+  - [German Model](https://huggingface.co/lex-au/Orpheus-3b-German-FT-Q8_0.gguf)
+- 🐳 Docker Compose users: To use a language-specific model, edit the `.env` file before installation and change `ORPHEUS_MODEL_NAME` to match the desired model repo ID (e.g., `Orpheus-3b-French-FT-Q8_0.gguf`)
 
 **v1.2.0** (2025-04-12)
 - ❤️ Added optional Docker Compose support with GPU-enabled `llama.cpp` server and Orpheus-FastAPI integration  
@@ -49,7 +69,7 @@ Listen to sample outputs with different voices and emotions:
 - **OpenAI API Compatible**: Drop-in replacement for OpenAI's `/v1/audio/speech` endpoint
 - **Modern Web Interface**: Clean, responsive UI with waveform visualization
 - **High Performance**: Optimized for RTX GPUs with parallel processing
-- **Multiple Voices**: 8 different voice options with different characteristics
+- **Multilingual Support**: 24 different voices across 8 languages (English, French, German, Korean, Hindi, Mandarin, Spanish, Italian)
 - **Emotion Tags**: Support for laughter, sighs, and other emotional expressions
 - **Unlimited Audio Length**: Generate audio of any length through intelligent batching
 - **Smooth Transitions**: Crossfaded audio segments for seamless listening experience
@@ -88,13 +108,22 @@ Orpheus-FastAPI/
 The docker compose file orchestrates the Orpheus-FastAPI for audio and a llama.cpp inference server for the base model token generation. The GGUF model is downloaded with the model-init service.
 
 ```bash
-cp .env.example .env # Nothing needs to be changed, but the file is required
+cp .env.example .env # Create your .env file from the example
 copy .env.example .env # For Windows CMD
 ```
 
+For multilingual models, edit the `.env` file and change the model name:
+```
+# Change this line in .env to use a language-specific model
+ORPHEUS_MODEL_NAME=Orpheus-3b-French-FT-Q8_0.gguf  # Example for French
+```
+
+Then start the services:
 ```bash
 docker compose up --build
 ```
+
+The system will automatically download the specified model from Hugging Face before starting the service.
 
 ### FastAPI Service Native Installation
 
@@ -194,6 +223,7 @@ curl -X POST http://localhost:5005/speak \
 
 ### Available Voices
 
+#### English
 - `tara`: Female, conversational, clear
 - `leah`: Female, warm, gentle
 - `jess`: Female, energetic, youthful
@@ -202,6 +232,37 @@ curl -X POST http://localhost:5005/speak \
 - `mia`: Female, professional, articulate
 - `zac`: Male, enthusiastic, dynamic
 - `zoe`: Female, calm, soothing
+
+#### French
+- `pierre`: Male, sophisticated
+- `amelie`: Female, elegant
+- `marie`: Female, spirited
+
+#### German
+- `jana`: Female, clear
+- `thomas`: Male, authoritative
+- `max`: Male, energetic
+
+#### Korean
+- `유나`: Female, melodic
+- `준서`: Male, confident
+
+#### Hindi
+- `ऋतिका`: Female, expressive
+
+#### Mandarin
+- `长乐`: Female, gentle
+- `白芷`: Female, clear
+
+#### Spanish
+- `javi`: Male, warm
+- `sergio`: Male, professional
+- `maria`: Female, friendly
+
+#### Italian
+- `pietro`: Male, passionate
+- `giulia`: Female, expressive
+- `carlo`: Male, refined
 
 ### Emotion Tags
 
@@ -286,7 +347,7 @@ You can easily integrate this TTS solution with [OpenWebUI](https://github.com/o
 3. Change TTS from Web API to OpenAI
 4. Set APIBASE URL to your server address (e.g., `http://localhost:5005/v1`)
 5. API Key can be set to "not-needed"
-6. Set TTS Voice to one of the available voices: `tara`, `leah`, `jess`, `leo`, `dan`, `mia`, `zac`, or `zoe`
+6. Set TTS Voice to any of the available voices (e.g., `tara`, `pierre`, `jana`, `유나`, etc.)
 7. Set TTS Model to `tts-1`
 
 ### External Inference Server
