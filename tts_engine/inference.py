@@ -135,7 +135,7 @@ if not IS_RELOADER:
     print(f"  REPETITION_PENALTY: {REPETITION_PENALTY}")
 
 # Parallel processing settings
-NUM_WORKERS = 176 if HIGH_END_GPU else 2
+NUM_WORKERS = 512 if HIGH_END_GPU else 8  # Increased from 176/2 for more parallel processing
 
 # Define voices by language
 ENGLISH_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
@@ -189,7 +189,7 @@ class PerformanceMonitor:
         self.token_count = 0
         self.audio_chunks = 0
         self.last_report_time = time.time()
-        self.report_interval = 2.0  # seconds
+        self.report_interval = 1.0  # Decreased from 2.0 seconds for more frequent updates
         
     def add_tokens(self, count: int = 1) -> None:
         self.token_count += count
@@ -375,61 +375,75 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     
     # Use different thresholds for first chunk vs. subsequent chunks
     first_chunk_processed = False
-    min_frames_first = 7  # Process after just 7 tokens for first chunk (ultra-low latency)
-    min_frames_subsequent = 28  # Default for reliability after first chunk (4 chunks of 7)
+    min_frames_first = 7  # Keep ultra-low latency for first chunk
+    min_frames_subsequent = 24  # Slightly reduced from 28 for faster processing
     process_every = 7  # Process every 7 tokens (standard for Orpheus model)
     
     start_time = time.time()
     last_log_time = start_time
     token_count = 0
     
-    async for token_text in token_gen:
-        token = turn_token_into_id(token_text, count)
-        if token is not None and token > 0:
-            # Add to buffer using simple append (reliable method)
-            buffer.append(token)
-            count += 1
-            token_count += 1
-            
-            # Log throughput periodically
-            current_time = time.time()
-            if current_time - last_log_time > 5.0:  # Every 5 seconds
-                elapsed = current_time - start_time
-                if elapsed > 0:
-                    print(f"Token processing rate: {token_count/elapsed:.1f} tokens/second")
-                last_log_time = current_time
-            
-            # Different processing paths based on whether first chunk has been processed
-            if not first_chunk_processed:
-                # For first audio output, process as soon as we have enough tokens for one chunk
-                if count >= min_frames_first:
-                    buffer_to_proc = buffer[-min_frames_first:]
-                    
-                    # Process the first chunk for immediate audio feedback
-                    print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
-                    if audio_samples is not None:
-                        first_chunk_processed = True  # Mark first chunk as processed
-                        yield audio_samples
-            else:
-                # For subsequent chunks, use standard processing with larger batch
-                if count % process_every == 0 and count >= min_frames_subsequent:
-                    # Use simple slice operation - reliable and correct
-                    buffer_to_proc = buffer[-min_frames_subsequent:]
-                    
-                    # Debug output to help diagnose issues
-                    if count % 28 == 0:
-                        print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
-                    
-                    # Process the tokens
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
-                    if audio_samples is not None:
-                        yield audio_samples
+    # Initialize token_text before loop to avoid potential reference errors
+    token_text = None
+    
+    # Process tokens with minimal awaiting to maximize throughput
+    try:
+        async for token_text in token_gen:
+            token = turn_token_into_id(token_text, count)
+            if token is not None and token > 0:
+                # Add to buffer using simple append (reliable method)
+                buffer.append(token)
+                count += 1
+                token_count += 1
+                
+                # Log throughput periodically
+                current_time = time.time()
+                if current_time - last_log_time > 3.0:  # Every 3 seconds (changed from 5)
+                    elapsed = current_time - last_log_time
+                    if elapsed > 0:
+                        print(f"Token processing rate: {token_count/elapsed:.1f} tokens/second")
+                    last_log_time = current_time
+                    token_count = 0
+                
+                # Different processing paths based on whether first chunk has been processed
+                if not first_chunk_processed:
+                    # For first audio output, process as soon as we have enough tokens for one chunk
+                    if count >= min_frames_first:
+                        buffer_to_proc = buffer[-min_frames_first:]
+                        
+                        # Process the first chunk for immediate audio feedback
+                        print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
+                        audio_samples = convert_to_audio(buffer_to_proc, count)
+                        if audio_samples is not None:
+                            first_chunk_processed = True  # Mark first chunk as processed
+                            yield audio_samples
+                            # Minimize awaiting to maximize throughput
+                            await asyncio.sleep(0)
+                else:
+                    # For subsequent chunks, use standard processing with larger batch
+                    if count % process_every == 0 and count >= min_frames_subsequent:
+                        # Use simple slice operation - reliable and correct
+                        buffer_to_proc = buffer[-min_frames_subsequent:]
+                        
+                        # Debug output only every 56 tokens (was 28) to reduce logging overhead
+                        if count % 56 == 0:
+                            print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
+                        
+                        # Process the tokens
+                        audio_samples = convert_to_audio(buffer_to_proc, count)
+                        if audio_samples is not None:
+                            yield audio_samples
+                            # Minimize awaiting to maximize throughput
+                            await asyncio.sleep(0)
+    except Exception as e:
+        print(f"Error in tokens_decoder: {e}")
+        import traceback
+        traceback.print_exc()
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
     # Use a larger queue for high-end systems
-    queue_size = 200 if HIGH_END_GPU else 50
+    queue_size = 400 if HIGH_END_GPU else 100  # Doubled from 200/50
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     
@@ -444,7 +458,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         wav_file.setframerate(SAMPLE_RATE)
     
     # Batch processing of tokens for improved throughput
-    batch_size = 128 if HIGH_END_GPU else 16
+    batch_size = 256 if HIGH_END_GPU else 32  # Doubled from 128/16
     
     # Thread synchronization for proper completion detection
     producer_done_event = threading.Event()
@@ -479,9 +493,9 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                     audio_queue.put(audio_chunk)
                     chunk_count += 1
                     
-                    # Log performance periodically
+                    # Log performance periodically - reduced to 2 seconds (was 3)
                     current_time = time.time()
-                    if current_time - last_log_time >= 3.0:  # Every 3 seconds
+                    if current_time - last_log_time >= 2.0:
                         elapsed = current_time - last_log_time
                         if elapsed > 0:
                             recent_chunks = chunk_count

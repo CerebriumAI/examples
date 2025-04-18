@@ -152,8 +152,8 @@ def convert_to_audio(multiframe, count):
   
     num_frames = len(multiframe) // 7
     
-    # Periodic GPU memory management to reduce fragmentation
-    if count % 1000 == 0 and snac_device == "cuda":
+    # Reduced frequency of GPU memory management to improve throughput
+    if count % 2000 == 0 and snac_device == "cuda":  # Changed from 1000 to 2000
         torch.cuda.empty_cache()
     
     # Run in secondary stream if available to overlap with other operations
@@ -161,75 +161,81 @@ def convert_to_audio(multiframe, count):
     stream_ctx = torch.cuda.stream(stream_to_use) if stream_to_use is not None else torch.no_grad()
     
     with stream_ctx, torch.inference_mode():
-        # Transfer data to GPU in one batch
-        frame_tensor = torch.tensor(multiframe[:num_frames*7], dtype=torch.int32, device=snac_device)
-        
-        # Pre-allocate output tensors
-        codes_0 = torch.zeros(1, num_frames, dtype=torch.int32, device=snac_device)
-        codes_1 = torch.zeros(1, num_frames * 2, dtype=torch.int32, device=snac_device)
-        codes_2 = torch.zeros(1, num_frames * 4, dtype=torch.int32, device=snac_device)
-        
-        # Vectorized operations for far better GPU utilization
-        # Reshape the input to make indexing more efficient
-        frame_reshaped = frame_tensor.view(-1, 7)
-        
-        # Direct vectorized assignment
-        codes_0[0, :] = frame_reshaped[:, 0]
-        
-        # For codes_1, we need indices 1 and 4 from each group of 7
-        codes_1_indices = torch.tensor([1, 4], device=snac_device)
-        codes_1_data = torch.index_select(frame_reshaped, 1, codes_1_indices)
-        codes_1[0, ::2] = codes_1_data[:, 0]  # Even indices get index 1
-        codes_1[0, 1::2] = codes_1_data[:, 1]  # Odd indices get index 4
-        
-        # For codes_2, we need indices 2, 3, 5 and 6
-        codes_2_indices = torch.tensor([2, 3, 5, 6], device=snac_device)
-        codes_2_data = torch.index_select(frame_reshaped, 1, codes_2_indices)
-        codes_2[0, ::4] = codes_2_data[:, 0]     # Indices 0, 4, 8...
-        codes_2[0, 1::4] = codes_2_data[:, 1]    # Indices 1, 5, 9...
-        codes_2[0, 2::4] = codes_2_data[:, 2]    # Indices 2, 6, 10...
-        codes_2[0, 3::4] = codes_2_data[:, 3]    # Indices 3, 7, 11...
-        
-        # Combine codes
-        codes = [codes_0, codes_1, codes_2]
-        
-        # Fix: Validate each tensor separately to avoid shape mismatch errors
-        valid_range = (
-            torch.all(codes[0] >= 0) and torch.all(codes[0] < 4096) and
-            torch.all(codes[1] >= 0) and torch.all(codes[1] < 4096) and
-            torch.all(codes[2] >= 0) and torch.all(codes[2] < 4096)
-        )
-        
-        if not valid_range:
-            return None
+        try:
+            # Pre-allocate output tensors - specify desired memory layout for potential speedup
+            codes_0 = torch.zeros(1, num_frames, dtype=torch.int32, device=snac_device)
+            codes_1 = torch.zeros(1, num_frames * 2, dtype=torch.int32, device=snac_device)
+            codes_2 = torch.zeros(1, num_frames * 4, dtype=torch.int32, device=snac_device)
             
-        # Use CUDA graphs if available for the decode operation
-        if decode_graphed is not None:
-            audio_hat = decode_graphed(codes)
-        else:
+            # Transfer data to GPU in one batch and reshape in a single operation
+            frame_reshaped = torch.tensor(multiframe[:num_frames*7], dtype=torch.int32, 
+                                        device=snac_device).view(-1, 7)
+            
+            # Vectorized operations utilizing GPU more efficiently
+            # Direct vectorized assignment
+            codes_0[0, :] = frame_reshaped[:, 0]
+            
+            # For codes_1, we need indices 1 and 4 from each group of 7
+            # Use static indices tensor to avoid recreation
+            if not hasattr(convert_to_audio, "codes_1_indices"):
+                convert_to_audio.codes_1_indices = torch.tensor([1, 4], device=snac_device)
+            
+            codes_1_data = torch.index_select(frame_reshaped, 1, convert_to_audio.codes_1_indices)
+            codes_1[0, ::2] = codes_1_data[:, 0]  # Even indices get index 1
+            codes_1[0, 1::2] = codes_1_data[:, 1]  # Odd indices get index 4
+            
+            # For codes_2, we need indices 2, 3, 5 and 6
+            # Use static indices tensor to avoid recreation
+            if not hasattr(convert_to_audio, "codes_2_indices"):
+                convert_to_audio.codes_2_indices = torch.tensor([2, 3, 5, 6], device=snac_device)
+                
+            codes_2_data = torch.index_select(frame_reshaped, 1, convert_to_audio.codes_2_indices)
+            codes_2[0, ::4] = codes_2_data[:, 0]     # Indices 0, 4, 8...
+            codes_2[0, 1::4] = codes_2_data[:, 1]    # Indices 1, 5, 9...
+            codes_2[0, 2::4] = codes_2_data[:, 2]    # Indices 2, 6, 10...
+            codes_2[0, 3::4] = codes_2_data[:, 3]    # Indices 3, 7, 11...
+            
+            # Combine codes
+            codes = [codes_0, codes_1, codes_2]
+            
+            # Fast validation - each tensor separately to avoid shape mismatch
+            # Use logical short-circuit to fail fast
+            if not (torch.all(codes[0] >= 0) and torch.all(codes[0] < 4096)):
+                return None
+            if not (torch.all(codes[1] >= 0) and torch.all(codes[1] < 4096)):
+                return None
+            if not (torch.all(codes[2] >= 0) and torch.all(codes[2] < 4096)):
+                return None
+            
+            # Use standard decode operation (CUDA graphs disabled)
             audio_hat = model.decode(codes)
+            
+            # Wait for CUDA stream to complete before continuing
+            if stream_to_use is not None:
+                stream_to_use.synchronize()
+            
+            # Extract the relevant slice
+            audio_slice = audio_hat[:, :, 2048:4096]
+            
+            # Process on GPU if possible - with specialized approaches for different backends
+            if snac_device == "cuda":
+                # Scale and convert to int16 directly on GPU 
+                # Use more direct conversion to int16
+                audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
+                # Minimize CPU-GPU transfer latency
+                audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
+            else:
+                # For non-CUDA devices, use the original approach
+                detached_audio = audio_slice.detach().cpu()
+                audio_np = detached_audio.numpy()
+                audio_int16 = (audio_np * 32767).astype(np.int16)
+                audio_bytes = audio_int16.tobytes()
+                
+            return audio_bytes
         
-        # Wait for CUDA stream to complete before continuing
-        if stream_to_use is not None:
-            stream_to_use.synchronize()
-        
-        # Extract the relevant slice
-        audio_slice = audio_hat[:, :, 2048:4096]
-        
-        # Process on GPU if possible
-        if snac_device == "cuda":
-            # Scale and convert to int16 directly on GPU
-            audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
-            # Minimize CPU-GPU transfer by only moving the final result
-            audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
-        else:
-            # For non-CUDA devices, use the original approach
-            detached_audio = audio_slice.detach().cpu()
-            audio_np = detached_audio.numpy()
-            audio_int16 = (audio_np * 32767).astype(np.int16)
-            audio_bytes = audio_int16.tobytes()
-    
-    return audio_bytes
+        except Exception as e:
+            print(f"Error in convert_to_audio: {e}")
+            return None
 
 # Define the custom token prefix
 CUSTOM_TOKEN_PREFIX = "<custom_token_"
@@ -391,12 +397,12 @@ def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
     # Use a larger queue for CUDA devices to maximize GPU utilization
     # Increased queue size for CUDA
-    max_queue_size = 128 if snac_device == "cuda" else 24  # Increased from 64/16
+    max_queue_size = 256 if snac_device == "cuda" else 48  # Further increased from 128/24
     audio_queue = queue.Queue(maxsize=max_queue_size)
     
     # Collect tokens in larger batches for higher throughput on CUDA
     # Increased batch size for CUDA
-    batch_size = 64 if snac_device == "cuda" else 12       # Increased from 32/8
+    batch_size = 128 if snac_device == "cuda" else 24  # Further increased from 64/12
     
     # Convert the synchronous token generator into an async generator with batching
     async def async_token_gen():
@@ -416,6 +422,7 @@ def tokens_decoder_sync(syn_token_gen):
         # Start timer for performance logging
         start_time = time.time()
         chunk_count = 0
+        last_log_time = start_time
         
         try:
             # Process audio chunks from the token decoder
@@ -424,10 +431,16 @@ def tokens_decoder_sync(syn_token_gen):
                     audio_queue.put(audio_chunk)
                     chunk_count += 1
                     
-                    # Log performance stats periodically
-                    if chunk_count % 10 == 0:
-                        elapsed = time.time() - start_time
-                        print(f"Generated {chunk_count} chunks in {elapsed:.2f}s ({chunk_count/elapsed:.2f} chunks/sec)")
+                    # Log performance stats more frequently (every 5 chunks instead of 10)
+                    if chunk_count % 5 == 0:
+                        current_time = time.time()
+                        elapsed = current_time - last_log_time
+                        if elapsed > 0:
+                            chunks_per_sec = chunk_count / elapsed
+                            print(f"Generated {chunk_count} chunks in {elapsed:.2f}s ({chunks_per_sec:.2f} chunks/sec)")
+                            # Reset counters for more accurate recent measurements
+                            chunk_count = 0
+                            last_log_time = current_time
         except Exception as e:
             print(f"Error in audio producer: {e}")
             import traceback
