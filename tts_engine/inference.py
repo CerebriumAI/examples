@@ -134,7 +134,7 @@ if not IS_RELOADER:
     print(f"  REPETITION_PENALTY: {REPETITION_PENALTY}")
 
 # Parallel processing settings
-NUM_WORKERS = 4 if HIGH_END_GPU else 2
+NUM_WORKERS = 176 if HIGH_END_GPU else 2
 
 # Define voices by language
 ENGLISH_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
@@ -443,7 +443,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         wav_file.setframerate(SAMPLE_RATE)
     
     # Batch processing of tokens for improved throughput
-    batch_size = 32 if HIGH_END_GPU else 16
+    batch_size = 128 if HIGH_END_GPU else 16
     
     # Thread synchronization for proper completion detection
     producer_done_event = threading.Event()
