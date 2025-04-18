@@ -192,21 +192,22 @@ async def tokens_decoder(token_gen):
     processed_count = 0
     total_count = 0
     
+    # Maintain a sliding window to ensure proper sentence continuity
+    sliding_window = []
+    last_processed_window = []
+    overlap_tokens = 4  # Optimal overlap for sentence continuity
+    
     # Optimized thresholds for first chunk and subsequent processing
     first_chunk_processed = False
-    min_frames_first = 5  # Reduced from 7 to 5 for faster first chunk
+    min_frames_first = 5     # Reduced from 7 to 5 for faster first chunk
     min_frames_subsequent = 24  # Reduced from 28 to 24 for higher throughput
-    ideal_frames = 64  # Increased from 49 to 64 for better GPU utilization
-    process_every_n = 4  # Reduced from 7 to 4 for more frequent updates
+    ideal_frames = 64        # Increased from 49 to 64 for better GPU utilization
+    process_every_n = 4      # Reduced from 7 to 4 for more frequent updates
     
     # Additional GPU optimization parameters
-    max_batch_size = 256  # Maximum batch size for GPU processing
-    batch_scale_factor = 1.5  # Scale batch size over time for better throughput
+    max_batch_size = 256     # Maximum batch size for GPU processing
+    batch_scale_factor = 1.5 # Scale batch size over time for better throughput
     current_batch_size = min_frames_subsequent  # Start with minimum
-    
-    # Pre-allocate audio buffer for more efficient memory usage
-    audio_buffer = bytearray(32768)  # 32KB initial buffer
-    audio_buffer_pos = 0
     
     # Performance tracking
     start_time = time.time()
@@ -214,9 +215,6 @@ async def tokens_decoder(token_gen):
     last_log_time = start_time
     last_yield_time = start_time
     processed_batches = 0
-    
-    # Tensor caching for better GPU performance
-    cached_tensors = {}
     
     # Process incoming tokens with adaptive batching
     async for token_sim in token_gen:
@@ -227,10 +225,12 @@ async def tokens_decoder(token_gen):
         token = turn_token_into_id(token_sim, processed_count)
         
         if token is not None and token > 0:
+            # Add to sliding window for boundary detection
+            sliding_window.append(token)
             buffer.append(token)
             processed_count += 1
             
-            # Minimal performance logging (reduced frequency)
+            # Minimal performance logging
             current_time = time.time()
             if current_time - last_log_time > 10.0:  # Reduced logging frequency
                 elapsed = current_time - last_log_time
@@ -249,6 +249,8 @@ async def tokens_decoder(token_gen):
                     audio_samples = convert_to_audio(buffer_to_proc, processed_count)
                     if audio_samples is not None:
                         first_chunk_processed = True
+                        # Save this window to avoid repeats
+                        last_processed_window = buffer_to_proc.copy()
                         yield audio_samples
                         last_yield_time = time.time()
             else:
@@ -275,15 +277,29 @@ async def tokens_decoder(token_gen):
                     # Use larger batch sizes when more tokens are available
                     buffer_to_proc = buffer[-batch_size:]
                     
+                    # Check for overlap with previous window to avoid repeats
+                    if last_processed_window:
+                        # Find overlap point to ensure smooth transitions
+                        overlap_point = find_window_overlap(last_processed_window, buffer_to_proc, overlap_tokens)
+                        if overlap_point > 0:
+                            # Skip already processed tokens to avoid repeats
+                            buffer_to_proc = buffer_to_proc[overlap_point:]
+                    
+                    # Skip processing if we'd generate an empty buffer
+                    if len(buffer_to_proc) < min_frames_first:
+                        continue
+                    
                     # Process audio with GPU acceleration
                     audio_samples = convert_to_audio(buffer_to_proc, processed_count)
                     if audio_samples is not None:
+                        # Save this window to check future overlaps
+                        last_processed_window = buffer_to_proc.copy()
+                        
                         yield audio_samples
                         last_yield_time = time.time()
                         processed_batches += 1
                         
                         # Gradually increase batch size for better GPU utilization
-                        # This takes advantage of GPU's ability to process larger batches more efficiently
                         if processed_batches % 5 == 0 and current_batch_size < max_batch_size:
                             current_batch_size = min(
                                 max_batch_size, 
@@ -299,25 +315,52 @@ async def tokens_decoder(token_gen):
         if remaining_tokens >= min_frames_subsequent:
             batch_size = min(remaining_tokens, current_batch_size)
             buffer_to_proc = buffer[-batch_size:]
-            audio_samples = convert_to_audio(buffer_to_proc, processed_count)
-            if audio_samples is not None:
-                yield audio_samples
-        # For very short remaining sequences, pad with previous tokens to reach minimum size
-        elif remaining_tokens >= 3:  # Only process if we have at least a few tokens
-            padding_needed = min_frames_subsequent - remaining_tokens
-            if padding_needed > 0:
-                # Use the last token for padding to maintain audio consistency
-                last_token = buffer[-1]
-                padded_buffer = buffer + [last_token] * padding_needed
-                audio_samples = convert_to_audio(padded_buffer, processed_count)
+            
+            # Check for overlap with previous window 
+            if last_processed_window:
+                overlap_point = find_window_overlap(last_processed_window, buffer_to_proc, overlap_tokens)
+                if overlap_point > 0:
+                    buffer_to_proc = buffer_to_proc[overlap_point:]
+            
+            # Only process if we have enough tokens
+            if len(buffer_to_proc) >= min_frames_first:
+                audio_samples = convert_to_audio(buffer_to_proc, processed_count)
                 if audio_samples is not None:
                     yield audio_samples
+        
+        # For very short remaining sequences, process as is
+        elif remaining_tokens >= 3:  # Only process if we have at least a few tokens
+            audio_samples = convert_to_audio(buffer[-remaining_tokens:], processed_count)
+            if audio_samples is not None:
+                yield audio_samples
     
     # Report final performance stats
     total_time = time.time() - start_time
     if total_time > 0 and total_count > 0:
         final_tokens_per_sec = total_count / total_time
         print(f"Final token processing rate: {final_tokens_per_sec:.1f} tokens/second")
+
+# Helper function to find overlap between token windows
+def find_window_overlap(previous_window, current_window, min_overlap):
+    """
+    Find the point where current_window overlaps with previous_window.
+    Returns the index where non-overlapping tokens start, or 0 if no overlap found.
+    """
+    # No need to check if either window is too small
+    if len(previous_window) < min_overlap or len(current_window) < min_overlap:
+        return 0
+        
+    # Check for overlap starting from the end of previous window
+    for i in range(min(len(previous_window), len(current_window) - min_overlap + 1)):
+        prev_end = previous_window[-min_overlap-i:]
+        curr_start = current_window[:min_overlap+i]
+        
+        # If we found matching tokens, return the overlap point
+        if prev_end == curr_start[:len(prev_end)]:
+            return len(prev_end)
+    
+    # No significant overlap found
+    return 0
 
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
