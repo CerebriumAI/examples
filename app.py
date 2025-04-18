@@ -56,7 +56,7 @@ from pydantic import BaseModel
 
 from tts_engine import (
     generate_speech_from_api, 
-    stream_speech_from_api,  # Added for streaming endpoint
+    # stream_speech_from_api,  # Removed: function no longer exists
     AVAILABLE_VOICES, 
     DEFAULT_VOICE, 
     VOICE_TO_LANGUAGE, 
