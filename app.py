@@ -247,8 +247,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
             # Stream audio chunks from TTS engine with optimized batching
             async for audio_chunk in stream_speech_from_api(
                 prompt=request.input,
-                voice=request.voice,
-                use_cuda=True  # Always use CUDA for streaming for best performance
+                voice=request.voice
             ):
                 if not audio_chunk:
                     continue
@@ -586,7 +585,7 @@ async def stream_speech(
         
         try:
             # Stream audio chunks with maximum throughput
-            async for chunk in stream_speech_from_api(text, voice, use_cuda):
+            async for chunk in stream_speech_from_api(text, voice):
                 if not chunk:
                     continue
                     
