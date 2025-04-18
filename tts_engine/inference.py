@@ -8,7 +8,7 @@ import numpy as np
 import sounddevice as sd
 import argparse
 import threading
-import queue
+import queue as queue_module  # Import as queue_module to avoid naming conflicts
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional, Generator, Union, Tuple, AsyncGenerator
@@ -195,11 +195,11 @@ class PerformanceMonitor:
     def add_tokens(self, count: int = 1) -> None:
         self.token_count += count
         self.input_tokens_processed += count
-        self._check_report()
+        self.check_report()
         
     def add_audio_chunk(self) -> None:
         self.audio_chunks += 1
-        self._check_report()
+        self.check_report()
         
     def add_output_bytes(self, bytes_count: int) -> None:
         """Track total bytes generated for accurate throughput measurement"""
@@ -217,7 +217,7 @@ class PerformanceMonitor:
         """Get total bytes of audio generated"""
         return self.output_bytes
         
-    def _check_report(self) -> None:
+    def check_report(self) -> None:
         current_time = time.time()
         if current_time - self.last_report_time >= self.report_interval:
             self.report()
@@ -394,14 +394,13 @@ def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
 async def tokens_decoder(
     tokens_generator,
     performance_monitor: Optional[PerformanceMonitor] = None,
-    use_cuda: bool = True,
 ) -> AsyncGenerator[bytes, None]:
     """Optimized asynchronous generator that decodes tokens to audio chunks with minimal latency.
     
     Uses batching and parallel processing to maximize throughput while maintaining
     responsiveness for streaming applications.
     """
-    queue = queue.Queue(maxsize=512)  # Increased queue size for high throughput
+    audio_queue = asyncio.Queue(maxsize=512)  # Increased queue size for high throughput
     end_flag = object()
     is_done = False
     
@@ -426,22 +425,22 @@ async def tokens_decoder(
                     # Process batch when it reaches target size
                     if len(token_batch) >= current_batch_size:
                         # Avoid blocking on queue.put to prevent backpressure
-                        if not queue.full():
-                            await queue.put(token_batch.copy())
-                            token_batch.clear()
-                        else:
+                        if audio_queue.full():
                             # If queue is full, use smaller batches to reduce latency
                             half_batch = len(token_batch) // 2
                             if half_batch > 0:
-                                await queue.put(token_batch[:half_batch])
+                                await audio_queue.put(token_batch[:half_batch])
                                 token_batch = token_batch[half_batch:]
+                        else:
+                            await audio_queue.put(token_batch.copy())
+                            token_batch.clear()
                         
                         # Small yield to allow consumer to process
                         await asyncio.sleep(0)
             
             # Put any remaining tokens in the queue
             if token_batch:
-                await queue.put(token_batch.copy())
+                await audio_queue.put(token_batch.copy())
                 token_batch.clear()
                 
         except Exception as e:
@@ -450,14 +449,12 @@ async def tokens_decoder(
             traceback.print_exc()
         finally:
             # Signal end of token stream
-            await queue.put(end_flag)
+            await audio_queue.put(end_flag)
             is_done = True
     
     # Consumer task to process batched tokens into audio chunks
     async def consumer():
         try:
-            audio_converter = SpeechPipe.get_instance()
-            
             # Start with small buffer, grow for subsequent chunks
             audio_buffer_size = 2048  # Starting buffer size
             audio_buffer = bytearray(audio_buffer_size)
@@ -466,11 +463,11 @@ async def tokens_decoder(
             tokens_processed = 0
             current_batch = None
             
-            while not is_done or not queue.empty() or current_batch:
+            while not is_done or not audio_queue.empty() or current_batch:
                 # Get next batch from queue
                 if current_batch is None:
                     try:
-                        current_batch = queue.get_nowait()
+                        current_batch = await audio_queue.get()
                         # Check for end flag
                         if current_batch is end_flag:
                             break
@@ -489,12 +486,16 @@ async def tokens_decoder(
                     token = current_batch[i]
                     tokens_processed += 1
                     
-                    # Convert token to audio data
-                    ret, audio = audio_converter.convert_to_audio(token, use_cuda)
-                    
-                    if not ret:
-                        print(f"Failed to convert token {token} to audio")
+                    # Build a frame from the token
+                    token_frame = []
+                    token_id = turn_token_into_id(token, tokens_processed)
+                    if token_id is not None and token_id > 0:
+                        token_frame.append(token_id)
+                    else:
                         continue
+                    
+                    # Process the token frame
+                    audio = convert_to_audio(token_frame, tokens_processed)
                     
                     # Process valid audio data
                     if audio is not None and len(audio) > 0:
@@ -517,7 +518,7 @@ async def tokens_decoder(
                         if tokens_processed < 5 or buffer_position >= 4096 or i == batch_tokens - 1:
                             if buffer_position > 0:
                                 if performance_monitor:
-                                    performance_monitor.add_output_chunk(buffer_position)
+                                    performance_monitor.add_output_bytes(buffer_position)
                                 
                                 yield bytes(audio_buffer[:buffer_position])
                                 buffer_position = 0
@@ -549,7 +550,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     """High-throughput synchronous processor with optimized memory and I/O handling."""
     # Use larger queue and batch sizes for high-end systems
     queue_size = 512 if HIGH_END_GPU else 128  # Increased from 400/100 to 512/128
-    audio_queue = queue.Queue(maxsize=queue_size)
+    audio_queue = queue_module.Queue(maxsize=queue_size)
     audio_segments = []
     
     # If output_file is provided, prepare WAV file with efficient I/O
@@ -674,7 +675,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                     wav_file.writeframes(write_buffer)
                     write_buffer = bytearray()  # Reset buffer
         
-        except queue.Empty:
+        except queue_module.Empty:
             # No data available right now
             current_time = time.time()
             
