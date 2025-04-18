@@ -698,7 +698,7 @@ async def stream_speech_from_api(prompt: str, voice: str = DEFAULT_VOICE, temper
     perf_monitor = PerformanceMonitor()
     start_time = time.time()
 
-    # Generate tokens from the API
+    # Generate tokens from the API (synchronous generator)
     token_generator = generate_tokens_from_api(
         prompt=prompt,
         voice=voice,
@@ -708,12 +708,24 @@ async def stream_speech_from_api(prompt: str, voice: str = DEFAULT_VOICE, temper
         repetition_penalty=repetition_penalty # Use provided or default penalty
     )
 
-    # Decode tokens into audio chunks asynchronously
-    async for audio_chunk in tokens_decoder(token_generator):
-        if audio_chunk:
-            yield audio_chunk
-        # Allow other tasks to run
-        await asyncio.sleep(0.001)
+    # Convert synchronous generator to async generator
+    async def async_token_generator():
+        for token in token_generator:
+            yield token
+            # Allow minimal cooperative multitasking
+            await asyncio.sleep(0)
+
+    try:
+        # Decode tokens into audio chunks asynchronously using the async generator
+        async for audio_chunk in tokens_decoder(async_token_generator()):
+            if audio_chunk:
+                yield audio_chunk
+            # Allow other tasks to run
+            await asyncio.sleep(0.001)
+    except Exception as e:
+        print(f"Error during streaming: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Report final performance metrics
     end_time = time.time()
