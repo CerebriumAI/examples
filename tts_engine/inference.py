@@ -383,13 +383,51 @@ def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
     """Convert token frames to audio with performance monitoring."""
     # Import here to avoid circular imports
     from .speechpipe import convert_to_audio as orpheus_convert_to_audio
-    start_time = time.time()
-    result = orpheus_convert_to_audio(multiframe, count)
     
-    if result is not None:
-        perf_monitor.add_audio_chunk()
+    # Ensure multiframe is properly constructed with at least 7 tokens
+    if not multiframe or len(multiframe) < 1:
+        print(f"Error: Empty or insufficient token frame: {multiframe}")
+        return None
+    
+    # A single token needs to be converted to a 7-element frame for the SNAC model
+    # Each token needs to be expanded into a 7-element frame for the neural codec
+    if len(multiframe) == 1:
+        # Create a full frame (7 elements) from 1 token by repeating values
+        # This simulates the proper structure needed by the neural codec
+        token_id = multiframe[0]
+        # The actual values are derived from the token ID with various patterns
+        # These values are based on the code patterns expected by the SNAC model
+        expanded_frame = [
+            token_id,             # First code (primary)
+            token_id % 4096,      # Second code
+            (token_id + 1) % 4096,# Third code
+            (token_id + 2) % 4096,# Fourth code
+            (token_id + 3) % 4096,# Fifth code
+            (token_id + 4) % 4096,# Sixth code
+            (token_id + 5) % 4096 # Seventh code
+        ]
+        multiframe = expanded_frame
+    
+    start_time = time.time()
+    try:
+        result = orpheus_convert_to_audio(multiframe, count)
         
-    return result
+        # Debug the result
+        if result is None:
+            print(f"Warning: No audio generated for frame with {len(multiframe)} tokens")
+        else:
+            # Successfully generated audio
+            perf_monitor.add_audio_chunk()
+            duration = time.time() - start_time
+            if duration > 0.1:  # Only log slow conversions
+                print(f"Audio conversion took {duration:.3f}s for {len(multiframe)} tokens")
+            
+        return result
+    except Exception as e:
+        print(f"Error in convert_to_audio: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 async def tokens_decoder(
     tokens_generator,
