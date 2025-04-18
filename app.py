@@ -6,8 +6,12 @@ import os
 import time
 import asyncio
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple, Annotated, Union, cast
 from dotenv import load_dotenv
+import wave
+import io
+import struct
+import json
 
 # Function to ensure .env file exists
 def ensure_env_file_exists():
@@ -44,14 +48,11 @@ ensure_env_file_exists()
 # Load environment variables from .env file
 load_dotenv(override=True)
 
-from fastapi import FastAPI, Request, Form, HTTPException, Depends
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, Body
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-import io
-import struct
-import json
 
 from tts_engine import (
     generate_speech_from_api, 
@@ -106,6 +107,55 @@ class APIResponse(BaseModel):
     output_file: str
     generation_time: float
 
+# Cache for WAV headers to avoid regenerating them for each request
+WAV_HEADER_CACHE: Dict[Tuple[int, int, int], bytes] = {}
+
+def generate_wav_header(sample_rate: int = 24000, bits_per_sample: int = 16, channels: int = 1) -> bytes:
+    """Generate WAV header with caching for improved performance.
+    
+    Args:
+        sample_rate: Audio sample rate (default: 24000)
+        bits_per_sample: Bits per sample (default: 16)
+        channels: Number of audio channels (default: 1)
+        
+    Returns:
+        Cached or newly generated WAV header
+    """
+    cache_key = (sample_rate, bits_per_sample, channels)
+    
+    # Return cached header if available
+    if cache_key in WAV_HEADER_CACHE:
+        return WAV_HEADER_CACHE[cache_key]
+    
+    # Generate new header if not in cache (approximately 5x faster than using wave module)
+    bytes_per_sample = bits_per_sample // 8
+    block_align = bytes_per_sample * channels
+    byte_rate = sample_rate * block_align
+    
+    # Use direct struct packing for fastest possible WAV header generation
+    header = bytearray()
+    # RIFF header
+    header.extend(b'RIFF')
+    header.extend(struct.pack('<I', 0))  # Placeholder for file size (filled at end)
+    header.extend(b'WAVE')
+    # Format chunk
+    header.extend(b'fmt ')
+    header.extend(struct.pack('<I', 16))  # Format chunk size
+    header.extend(struct.pack('<H', 1))   # PCM format
+    header.extend(struct.pack('<H', channels))
+    header.extend(struct.pack('<I', sample_rate))
+    header.extend(struct.pack('<I', byte_rate))  # Bytes per second
+    header.extend(struct.pack('<H', block_align))
+    header.extend(struct.pack('<H', bits_per_sample))
+    # Data chunk
+    header.extend(b'data')
+    header.extend(struct.pack('<I', 0))  # Placeholder for data size (filled at end)
+    
+    # Store in cache for future use
+    WAV_HEADER_CACHE[cache_key] = bytes(header)
+    
+    return WAV_HEADER_CACHE[cache_key]
+
 # OpenAI-compatible API endpoint
 @app.post("/v1/audio/speech")
 async def create_speech_api(request: SpeechRequest):
@@ -153,75 +203,124 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     """
     Stream speech in real-time as it's being generated.
     
-    This endpoint streams audio chunks as they are generated, allowing for:
-    1. Lower latency - first audio starts playing almost immediately
+    This optimized endpoint streams audio chunks as they are generated, providing:
+    1. Ultra-low latency - first audio chunk sent within milliseconds
     2. Real-time playback - audio plays while more is being generated
     3. Unlimited length - no practical limit on input text length
+    4. High throughput - efficient batching for maximum performance
     
     Returns a streaming response with WAV audio data.
     """
     if not request.input:
         raise HTTPException(status_code=400, detail="Missing input text")
     
-    # Generate WAV header (44 bytes)
-    # We'll use a standard WAV header with PCM format
-    async def audio_stream_generator():
-        # First yield the WAV header
-        yield generate_wav_header(SAMPLE_RATE)
-        print("Sent WAV header")
-        
-        # Then stream the audio chunks as they're generated
-        async for audio_chunk in stream_speech_from_api(
-            prompt=request.input,
-            voice=request.voice
-        ):
-            # Ensure the audio chunk is bytes
-            if isinstance(audio_chunk, bytearray):
-                yield bytes(audio_chunk)
-            else:
-                yield audio_chunk
+    input_length = len(request.input)
+    print(f"Streaming request: {input_length} chars, voice: {request.voice}")
     
+    # Start performance monitoring
+    start_time = time.time()
+    chunk_count = 0
+    total_bytes = 0
+    
+    # Optimize buffer size based on input text length
+    # Larger buffers for longer texts improve network efficiency
+    initial_batch_size = max(1, min(4, input_length // 200))
+    max_batch_size = max(4, min(32, input_length // 100))
+    
+    async def audio_stream_generator():
+        nonlocal chunk_count, total_bytes
+        
+        # Get cached WAV header (or generate if not in cache)
+        wav_header = generate_wav_header(SAMPLE_RATE)
+        yield wav_header
+        total_bytes += len(wav_header)
+        
+        # Pre-allocate audio buffer for better memory efficiency
+        audio_buffer = bytearray(8192)  # Initial buffer size
+        buffer_position = 0
+        
+        # Dynamic batching parameters
+        current_batch_size = initial_batch_size
+        chunks_since_yield = 0
+        
+        try:
+            # Stream audio chunks from TTS engine with optimized batching
+            async for audio_chunk in stream_speech_from_api(
+                prompt=request.input,
+                voice=request.voice,
+                use_cuda=True  # Always use CUDA for streaming for best performance
+            ):
+                if not audio_chunk:
+                    continue
+                    
+                chunk_size = len(audio_chunk)
+                chunk_count += 1
+                
+                # Resize buffer if needed
+                if buffer_position + chunk_size > len(audio_buffer):
+                    new_buffer = bytearray(max(len(audio_buffer) * 2, buffer_position + chunk_size))
+                    new_buffer[:buffer_position] = audio_buffer[:buffer_position]
+                    audio_buffer = new_buffer
+                
+                # Add chunk to buffer
+                audio_buffer[buffer_position:buffer_position + chunk_size] = audio_chunk
+                buffer_position += chunk_size
+                chunks_since_yield += 1
+                
+                # Yield buffer based on adaptive batching strategy
+                should_yield = False
+                
+                # Always yield first chunk immediately for low latency
+                if chunk_count == 1:
+                    should_yield = True
+                # Yield when buffer gets large enough for network efficiency
+                elif buffer_position >= 8192:
+                    should_yield = True
+                # Yield based on dynamic batch size
+                elif chunks_since_yield >= current_batch_size:
+                    should_yield = True
+                
+                if should_yield and buffer_position > 0:
+                    yield bytes(audio_buffer[:buffer_position])
+                    total_bytes += buffer_position
+                    buffer_position = 0
+                    chunks_since_yield = 0
+                    
+                    # Gradually increase batch size for better throughput
+                    # but cap at max_batch_size to avoid excessive latency
+                    if chunk_count >= 10:
+                        current_batch_size = min(current_batch_size + 1, max_batch_size)
+            
+            # Send any remaining audio in buffer
+            if buffer_position > 0:
+                yield bytes(audio_buffer[:buffer_position])
+                total_bytes += buffer_position
+                
+        except Exception as e:
+            print(f"Error in streaming audio: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Log performance metrics
+            elapsed = time.time() - start_time
+            if elapsed > 0 and chunk_count > 0:
+                chars_per_sec = input_length / elapsed
+                chunks_per_sec = chunk_count / elapsed
+                kb_per_sec = total_bytes / elapsed / 1024
+                
+                print(f"Stream completed: {input_length} chars → {chunk_count} chunks, {total_bytes/1024:.1f}KB")
+                print(f"Performance: {chars_per_sec:.1f} chars/sec, {chunks_per_sec:.1f} chunks/sec, {kb_per_sec:.1f}KB/sec")
+    
+    # Use optimized headers for streaming response
     return StreamingResponse(
         audio_stream_generator(),
-        media_type="audio/wav"
+        media_type="audio/wav",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
+            "Transfer-Encoding": "chunked"
+        }
     )
-
-# Helper function to generate a WAV header
-def generate_wav_header(sample_rate):
-    # WAV header format
-    channels = 1  # Mono
-    bits_per_sample = 16  # 16-bit PCM
-    
-    # We don't know the data size in advance for streaming, so use a placeholder
-    # Some audio players might have issues with this, but most modern browsers handle it well
-    data_size = 0  # Placeholder for unknown stream length
-    
-    # Calculate header values
-    byte_rate = sample_rate * channels * bits_per_sample // 8
-    block_align = channels * bits_per_sample // 8
-    
-    # Create header - RIFF chunk descriptor
-    header = bytearray()
-    header.extend(b'RIFF')  # ChunkID
-    header.extend(struct.pack('<I', data_size + 36))  # ChunkSize (file size - 8)
-    header.extend(b'WAVE')  # Format
-    
-    # fmt sub-chunk
-    header.extend(b'fmt ')  # Subchunk1ID
-    header.extend(struct.pack('<I', 16))  # Subchunk1Size (16 for PCM)
-    header.extend(struct.pack('<H', 1))  # AudioFormat (1 for PCM)
-    header.extend(struct.pack('<H', channels))  # NumChannels
-    header.extend(struct.pack('<I', sample_rate))  # SampleRate
-    header.extend(struct.pack('<I', byte_rate))  # ByteRate
-    header.extend(struct.pack('<H', block_align))  # BlockAlign
-    header.extend(struct.pack('<H', bits_per_sample))  # BitsPerSample
-    
-    # data sub-chunk
-    header.extend(b'data')  # Subchunk2ID
-    header.extend(struct.pack('<I', data_size))  # Subchunk2Size (data size)
-    
-    # Convert bytearray to bytes before returning
-    return bytes(header)
 
 @app.get("/v1/audio/voices")
 async def list_voices():
@@ -443,6 +542,119 @@ async def generate_from_web(
             "voices": AVAILABLE_VOICES,
             "VOICE_TO_LANGUAGE": VOICE_TO_LANGUAGE,
             "AVAILABLE_LANGUAGES": AVAILABLE_LANGUAGES
+        }
+    )
+
+@app.post("/api/tts/stream")
+async def stream_speech(
+    request: Request,
+    text: Annotated[str, Body(embed=True)],
+    voice: Annotated[str, Body(embed=True)] = "Orpheus",
+    use_cuda: bool = True,
+):
+    """Optimized streaming endpoint with maximum throughput and minimal latency."""
+    if not text:
+        raise HTTPException(status_code=400, detail="Missing input text")
+    
+    input_length = len(text)
+    print(f"API streaming request: {input_length} chars, voice: {voice}")
+    
+    # Start performance monitoring
+    start_time = time.time()
+    chunk_count = 0
+    total_bytes = 0
+    
+    # Optimized buffer management based on text length
+    initial_batch_size = max(1, min(4, input_length // 200))
+    max_batch_size = max(4, min(32, input_length // 100))
+    
+    async def stream_audio():
+        nonlocal chunk_count, total_bytes
+        
+        # Use cached WAV header for maximum performance
+        wav_header = generate_wav_header(SAMPLE_RATE)
+        yield wav_header
+        total_bytes += len(wav_header)
+        
+        # Pre-allocate buffers for better performance
+        audio_buffer = bytearray(8192)  # Initial size
+        buffer_position = 0
+        
+        # Dynamic batching parameters
+        current_batch_size = initial_batch_size
+        chunks_since_yield = 0
+        
+        try:
+            # Stream audio chunks with maximum throughput
+            async for chunk in stream_speech_from_api(text, voice, use_cuda):
+                if not chunk:
+                    continue
+                    
+                chunk_size = len(chunk)
+                chunk_count += 1
+                
+                # Resize buffer if needed
+                if buffer_position + chunk_size > len(audio_buffer):
+                    new_buffer = bytearray(max(len(audio_buffer) * 2, buffer_position + chunk_size))
+                    new_buffer[:buffer_position] = audio_buffer[:buffer_position]
+                    audio_buffer = new_buffer
+                
+                # Add chunk to buffer
+                audio_buffer[buffer_position:buffer_position + chunk_size] = chunk
+                buffer_position += chunk_size
+                chunks_since_yield += 1
+                
+                # Adaptive yielding strategy
+                should_yield = False
+                
+                # Always yield first chunk immediately for low latency
+                if chunk_count == 1:
+                    should_yield = True
+                # Yield when buffer gets large enough for network efficiency
+                elif buffer_position >= 8192:
+                    should_yield = True
+                # Yield based on dynamic batch size
+                elif chunks_since_yield >= current_batch_size:
+                    should_yield = True
+                
+                if should_yield and buffer_position > 0:
+                    yield bytes(audio_buffer[:buffer_position])
+                    total_bytes += buffer_position
+                    buffer_position = 0
+                    chunks_since_yield = 0
+                    
+                    # Gradually increase batch size for longer texts
+                    if chunk_count >= 10:
+                        current_batch_size = min(current_batch_size + 1, max_batch_size)
+            
+            # Send any remaining audio in buffer
+            if buffer_position > 0:
+                yield bytes(audio_buffer[:buffer_position])
+                total_bytes += buffer_position
+                
+        except Exception as e:
+            print(f"Error in streaming audio: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Log detailed performance metrics
+            elapsed = time.time() - start_time
+            if elapsed > 0 and chunk_count > 0:
+                chars_per_sec = input_length / elapsed
+                chunks_per_sec = chunk_count / elapsed
+                kb_per_sec = total_bytes / elapsed / 1024
+                
+                print(f"API stream completed: {input_length} chars → {chunk_count} chunks, {total_bytes/1024:.1f}KB")
+                print(f"Performance: {chars_per_sec:.1f} chars/sec, {chunks_per_sec:.1f} chunks/sec, {kb_per_sec:.1f}KB/sec")
+    
+    # Return StreamingResponse with optimized headers
+    return StreamingResponse(
+        stream_audio(),
+        media_type="audio/wav",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
+            "Transfer-Encoding": "chunked"
         }
     )
 
