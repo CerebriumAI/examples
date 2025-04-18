@@ -11,9 +11,8 @@ import threading
 import queue
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Optional, Generator, Union, Tuple, AsyncGenerator
+from typing import List, Dict, Any, Optional, Generator, Union, Tuple
 from dotenv import load_dotenv
-from io import BytesIO
 
 # Helper to detect if running in Uvicorn's reloader
 def is_reloader_process():
@@ -135,7 +134,7 @@ if not IS_RELOADER:
     print(f"  REPETITION_PENALTY: {REPETITION_PENALTY}")
 
 # Parallel processing settings
-NUM_WORKERS = 512 if HIGH_END_GPU else 8  # Increased from 176/2 for more parallel processing
+NUM_WORKERS = 4 if HIGH_END_GPU else 2
 
 # Define voices by language
 ENGLISH_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
@@ -189,7 +188,7 @@ class PerformanceMonitor:
         self.token_count = 0
         self.audio_chunks = 0
         self.last_report_time = time.time()
-        self.report_interval = 1.0  # Decreased from 2.0 seconds for more frequent updates
+        self.report_interval = 2.0  # seconds
         
     def add_tokens(self, count: int = 1) -> None:
         self.token_count += count
@@ -375,75 +374,61 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     
     # Use different thresholds for first chunk vs. subsequent chunks
     first_chunk_processed = False
-    min_frames_first = 7  # Keep ultra-low latency for first chunk
-    min_frames_subsequent = 24  # Slightly reduced from 28 for faster processing
+    min_frames_first = 7  # Process after just 7 tokens for first chunk (ultra-low latency)
+    min_frames_subsequent = 28  # Default for reliability after first chunk (4 chunks of 7)
     process_every = 7  # Process every 7 tokens (standard for Orpheus model)
     
     start_time = time.time()
     last_log_time = start_time
     token_count = 0
     
-    # Initialize token_text before loop to avoid potential reference errors
-    token_text = None
-    
-    # Process tokens with minimal awaiting to maximize throughput
-    try:
-        async for token_text in token_gen:
-            token = turn_token_into_id(token_text, count)
-            if token is not None and token > 0:
-                # Add to buffer using simple append (reliable method)
-                buffer.append(token)
-                count += 1
-                token_count += 1
-                
-                # Log throughput periodically
-                current_time = time.time()
-                if current_time - last_log_time > 3.0:  # Every 3 seconds (changed from 5)
-                    elapsed = current_time - last_log_time
-                    if elapsed > 0:
-                        print(f"Token processing rate: {token_count/elapsed:.1f} tokens/second")
-                    last_log_time = current_time
-                    token_count = 0
-                
-                # Different processing paths based on whether first chunk has been processed
-                if not first_chunk_processed:
-                    # For first audio output, process as soon as we have enough tokens for one chunk
-                    if count >= min_frames_first:
-                        buffer_to_proc = buffer[-min_frames_first:]
-                        
-                        # Process the first chunk for immediate audio feedback
-                        print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
-                        audio_samples = convert_to_audio(buffer_to_proc, count)
-                        if audio_samples is not None:
-                            first_chunk_processed = True  # Mark first chunk as processed
-                            yield audio_samples
-                            # Minimize awaiting to maximize throughput
-                            await asyncio.sleep(0)
-                else:
-                    # For subsequent chunks, use standard processing with larger batch
-                    if count % process_every == 0 and count >= min_frames_subsequent:
-                        # Use simple slice operation - reliable and correct
-                        buffer_to_proc = buffer[-min_frames_subsequent:]
-                        
-                        # Debug output only every 56 tokens (was 28) to reduce logging overhead
-                        if count % 56 == 0:
-                            print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
-                        
-                        # Process the tokens
-                        audio_samples = convert_to_audio(buffer_to_proc, count)
-                        if audio_samples is not None:
-                            yield audio_samples
-                            # Minimize awaiting to maximize throughput
-                            await asyncio.sleep(0)
-    except Exception as e:
-        print(f"Error in tokens_decoder: {e}")
-        import traceback
-        traceback.print_exc()
+    async for token_text in token_gen:
+        token = turn_token_into_id(token_text, count)
+        if token is not None and token > 0:
+            # Add to buffer using simple append (reliable method)
+            buffer.append(token)
+            count += 1
+            token_count += 1
+            
+            # Log throughput periodically
+            current_time = time.time()
+            if current_time - last_log_time > 5.0:  # Every 5 seconds
+                elapsed = current_time - start_time
+                if elapsed > 0:
+                    print(f"Token processing rate: {token_count/elapsed:.1f} tokens/second")
+                last_log_time = current_time
+            
+            # Different processing paths based on whether first chunk has been processed
+            if not first_chunk_processed:
+                # For first audio output, process as soon as we have enough tokens for one chunk
+                if count >= min_frames_first:
+                    buffer_to_proc = buffer[-min_frames_first:]
+                    
+                    # Process the first chunk for immediate audio feedback
+                    print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
+                    if audio_samples is not None:
+                        first_chunk_processed = True  # Mark first chunk as processed
+                        yield audio_samples
+            else:
+                # For subsequent chunks, use standard processing with larger batch
+                if count % process_every == 0 and count >= min_frames_subsequent:
+                    # Use simple slice operation - reliable and correct
+                    buffer_to_proc = buffer[-min_frames_subsequent:]
+                    
+                    # Debug output to help diagnose issues
+                    if count % 28 == 0:
+                        print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
+                    
+                    # Process the tokens
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
+                    if audio_samples is not None:
+                        yield audio_samples
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
     # Use a larger queue for high-end systems
-    queue_size = 400 if HIGH_END_GPU else 100  # Doubled from 200/50
+    queue_size = 100 if HIGH_END_GPU else 50
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     
@@ -458,7 +443,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         wav_file.setframerate(SAMPLE_RATE)
     
     # Batch processing of tokens for improved throughput
-    batch_size = 256 if HIGH_END_GPU else 32  # Doubled from 128/16
+    batch_size = 32 if HIGH_END_GPU else 16
     
     # Thread synchronization for proper completion detection
     producer_done_event = threading.Event()
@@ -493,9 +478,9 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                     audio_queue.put(audio_chunk)
                     chunk_count += 1
                     
-                    # Log performance periodically - reduced to 2 seconds (was 3)
+                    # Log performance periodically
                     current_time = time.time()
-                    if current_time - last_log_time >= 2.0:
+                    if current_time - last_log_time >= 3.0:  # Every 3 seconds
                         elapsed = current_time - last_log_time
                         if elapsed > 0:
                             recent_chunks = chunk_count
@@ -532,7 +517,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     # Optimized I/O approach for all systems
     # This approach is simpler and more reliable than separate code paths
     write_buffer = bytearray()
-    buffer_max_size = 8 * 1024 * 1024  # 8MB for faster I/O
+    buffer_max_size = 1024 * 1024  # 1MB max buffer size (adjustable)
     
     # Keep track of the last time we checked for completion
     last_check_time = time.time()
@@ -636,6 +621,7 @@ def stream_audio(audio_buffer):
 
 import re
 import numpy as np
+from io import BytesIO
 import wave
 
 def split_text_into_sentences(text):
@@ -683,58 +669,8 @@ def split_text_into_sentences(text):
     
     return combined_sentences
 
-async def stream_speech_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperature: float = TEMPERATURE,
-                                 top_p: float = TOP_P, max_tokens: int = MAX_TOKENS,
-                                 repetition_penalty: float = REPETITION_PENALTY) -> AsyncGenerator[bytes, None]:
-    """
-    Generate speech from text using Orpheus model and stream audio chunks.
-    This version yields raw audio bytes suitable for StreamingResponse.
-    """
-    print(f"Starting streaming speech generation for '{prompt[:50]}{'...' if len(prompt) > 50 else ''}'")
-    print(f"Using voice: {voice}, GPU acceleration: {'Yes (High-end)' if HIGH_END_GPU else 'Yes' if torch.cuda.is_available() else 'No'}")
-
-    # Reset performance monitor
-    global perf_monitor
-    perf_monitor = PerformanceMonitor()
-    start_time = time.time()
-
-    # Generate tokens from the API (synchronous generator)
-    token_generator = generate_tokens_from_api(
-        prompt=prompt,
-        voice=voice,
-        temperature=temperature,
-        top_p=top_p,
-        max_tokens=max_tokens,
-        repetition_penalty=repetition_penalty # Use provided or default penalty
-    )
-
-    # Convert synchronous generator to async generator
-    async def async_token_generator():
-        for token in token_generator:
-            yield token
-            # Allow minimal cooperative multitasking
-            await asyncio.sleep(0)
-
-    try:
-        # Decode tokens into audio chunks asynchronously using the async generator
-        async for audio_chunk in tokens_decoder(async_token_generator()):
-            if audio_chunk:
-                yield audio_chunk
-            # Allow other tasks to run
-            await asyncio.sleep(0.001)
-    except Exception as e:
-        print(f"Error during streaming: {e}")
-        import traceback
-        traceback.print_exc()
-
-    # Report final performance metrics
-    end_time = time.time()
-    total_time = end_time - start_time
-    print(f"Total streaming speech generation completed in {total_time:.2f} seconds")
-    perf_monitor.report() # Ensure final report is printed
-
-def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE,
-                     top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=None,
+def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE, 
+                     top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=None, 
                      use_batching=True, max_batch_chars=1000):
     """Generate speech from text using Orpheus model with performance optimizations."""
     print(f"Starting speech generation for '{prompt[:50]}{'...' if len(prompt) > 50 else ''}'")
