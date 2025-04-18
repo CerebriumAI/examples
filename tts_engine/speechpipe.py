@@ -64,6 +64,7 @@ def convert_to_audio(multiframe, count):
     and reduces CPU-GPU transfers for much faster inference on high-end GPUs.
     """
     if len(multiframe) < 7:
+        print(f"Debug: convert_to_audio called with frame size {len(multiframe)}, needs 7.")
         return None
   
     num_frames = len(multiframe) // 7
@@ -101,37 +102,84 @@ def convert_to_audio(multiframe, count):
         codes_2.unsqueeze(0)
     ]
     
-    # Check tokens are in valid range
-    if (torch.any(codes[0] < 0) or torch.any(codes[0] > 4096) or 
-        torch.any(codes[1] < 0) or torch.any(codes[1] > 4096) or 
-        torch.any(codes[2] < 0) or torch.any(codes[2] > 4096)):
+    # Add detailed debugging for token validation
+    valid_range = True
+    invalid_codes = []
+    if torch.any(codes[0] < 0) or torch.any(codes[0] > 4096):
+        invalid_codes.append(f"codes[0] out of range: {codes[0].tolist()}")
+        valid_range = False
+    if torch.any(codes[1] < 0) or torch.any(codes[1] > 4096):
+        invalid_codes.append(f"codes[1] out of range: {codes[1].tolist()}")
+        valid_range = False
+    if torch.any(codes[2] < 0) or torch.any(codes[2] > 4096):
+        invalid_codes.append(f"codes[2] out of range: {codes[2].tolist()}")
+        valid_range = False
+        
+    if not valid_range:
+        print(f"Debug: Token validation failed for frame {count}. Invalid codes: {'; '.join(invalid_codes)}")
         return None
 
     # Use CUDA stream for parallel processing if available
     stream_ctx = torch.cuda.stream(cuda_stream) if cuda_stream is not None else torch.no_grad()
     
-    with stream_ctx, torch.inference_mode():
-        # Decode the audio
-        audio_hat = model.decode(codes)
-        
-        # Extract the relevant slice and efficiently convert to bytes
-        # Keep data on GPU as long as possible
-        audio_slice = audio_hat[:, :, 2048:4096]
-        
-        # Process on GPU if possible, with minimal data transfer
-        if snac_device == "cuda":
-            # Scale directly on GPU
-            audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
-            # Only transfer the final result to CPU
-            audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
-        else:
-            # For non-CUDA devices, fall back to the original approach
-            detached_audio = audio_slice.detach().cpu()
-            audio_np = detached_audio.numpy()
-            audio_int16 = (audio_np * 32767).astype(np.int16)
-            audio_bytes = audio_int16.tobytes()
+    audio_hat = None
+    audio_slice = None
+    try:
+        with stream_ctx, torch.inference_mode():
+            # Decode the audio
+            audio_hat = model.decode(codes)
             
-    return audio_bytes
+            # Check if audio_hat is valid
+            if audio_hat is None or audio_hat.numel() == 0:
+                print(f"Debug: model.decode returned empty or None for frame {count}")
+                return None
+            
+            # Extract the relevant slice and efficiently convert to bytes
+            # Keep data on GPU as long as possible
+            audio_slice = audio_hat[:, :, 2048:4096]
+            
+            if audio_slice is None or audio_slice.numel() == 0:
+                print(f"Debug: audio_slice is empty or None after slicing for frame {count}")
+                return None
+            
+            # Check for NaNs or Infs which indicate model instability
+            if torch.isnan(audio_slice).any() or torch.isinf(audio_slice).any():
+                print(f"Debug: NaN or Inf detected in audio_slice for frame {count}")
+                return None
+            
+            # Process on GPU if possible, with minimal data transfer
+            if snac_device == "cuda":
+                # Scale directly on GPU
+                audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
+                # Only transfer the final result to CPU
+                audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
+            else:
+                # For non-CUDA devices, fall back to the original approach
+                detached_audio = audio_slice.detach().cpu()
+                audio_np = detached_audio.numpy()
+                audio_int16 = (audio_np * 32767).astype(np.int16)
+                audio_bytes = audio_int16.tobytes()
+                
+        # Final check on the output bytes
+        if not audio_bytes or len(audio_bytes) == 0:
+            print(f"Debug: Final audio_bytes is empty for frame {count}")
+            return None
+            
+        return audio_bytes
+        
+    except Exception as e:
+        print(f"Error during model.decode or audio processing for frame {count}: {e}")
+        # Print details about the tensors involved if an error occurs
+        print(f"  Input codes[0] shape: {codes[0].shape}, device: {codes[0].device}")
+        print(f"  Input codes[1] shape: {codes[1].shape}, device: {codes[1].device}")
+        print(f"  Input codes[2] shape: {codes[2].shape}, device: {codes[2].device}")
+        if audio_hat is not None:
+            print(f"  audio_hat shape: {audio_hat.shape}, device: {audio_hat.device}")
+        if audio_slice is not None:
+            print(f"  audio_slice shape: {audio_slice.shape}, device: {audio_slice.device}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 # Define the custom token prefix
 CUSTOM_TOKEN_PREFIX = "<custom_token_"
@@ -199,7 +247,7 @@ async def tokens_decoder(token_gen):
     
     # Optimized thresholds for first chunk and subsequent processing
     first_chunk_processed = False
-    min_frames_first = 5     # Reduced from 7 to 5 for faster first chunk
+    min_frames_first = 7     # Must accumulate at least 7 tokens for a full frame
     min_frames_subsequent = 24  # Reduced from 28 to 24 for higher throughput
     ideal_frames = 64        # Increased from 49 to 64 for better GPU utilization
     process_every_n = 4      # Reduced from 7 to 4 for more frequent updates
@@ -218,6 +266,10 @@ async def tokens_decoder(token_gen):
     
     # Process incoming tokens with adaptive batching
     async for token_sim in token_gen:
+        # Skip non-custom markup tokens
+        if token_sim.startswith("<") and token_sim.endswith(">") and CUSTOM_TOKEN_PREFIX not in token_sim:
+            continue
+        
         token_count += 1
         total_count += 1
         
