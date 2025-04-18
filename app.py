@@ -229,7 +229,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     
     # Add short silence at the beginning to give client more buffering time
     # This helps prevent buffer underruns during playback startup
-    SILENCE_DURATION_MS = 250  # 250ms of silence
+    SILENCE_DURATION_MS = 50  # 50ms of silence
     SAMPLE_RATE_BYTES_PER_MS = SAMPLE_RATE * 2 // 1000  # 2 bytes per sample
     silence_bytes = bytearray(SILENCE_DURATION_MS * SAMPLE_RATE_BYTES_PER_MS)
     
@@ -252,7 +252,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         
         # Track timing for consistent delivery
         last_yield_time = time.time()
-        target_chunk_duration_ms = 100  # Target ~100ms per chunk for smooth playback
+        target_chunk_duration_ms = 50  # Target ~50ms per chunk for lower latency
         
         # Dynamic batching parameters with better consistency
         current_batch_size = initial_batch_size
@@ -261,7 +261,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         # Collect initial incoming chunks for more consistent delivery
         initial_chunks = []
         initial_collection_complete = False
-        initial_collection_target = 5  # Collect first 5 chunks before starting to yield
+        initial_collection_target = 1  # Collect first chunk before yielding for lower latency
         
         try:
             # Stream audio chunks from TTS engine with optimized batching
@@ -315,7 +315,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                 current_time = time.time()
                 elapsed_since_last_yield = (current_time - last_yield_time) * 1000  # in ms
                 
-                # Yield based on consistent timing (~100ms chunks) for smooth playback
+                # Yield based on consistent timing (~50ms chunks) for smooth playback
                 if elapsed_since_last_yield >= target_chunk_duration_ms:
                     should_yield = True
                 # Also yield if buffer gets very large
@@ -619,7 +619,7 @@ async def stream_speech(
     max_batch_size = max(8, min(32, input_length // 100))
     
     # Add short silence at the beginning to give client more buffering time
-    SILENCE_DURATION_MS = 250  # 250ms of silence
+    SILENCE_DURATION_MS = 50  # 50ms of silence
     SAMPLE_RATE_BYTES_PER_MS = SAMPLE_RATE * 2 // 1000  # 2 bytes per sample
     silence_bytes = bytearray(SILENCE_DURATION_MS * SAMPLE_RATE_BYTES_PER_MS)
     
@@ -642,7 +642,7 @@ async def stream_speech(
         
         # Track timing for consistent delivery
         last_yield_time = time.time()
-        target_chunk_duration_ms = 100  # Target ~100ms per chunk
+        target_chunk_duration_ms = 50  # Target ~50ms per chunk
         
         # Dynamic batching parameters
         current_batch_size = initial_batch_size
@@ -651,7 +651,7 @@ async def stream_speech(
         # Collect initial incoming chunks for more consistent delivery
         initial_chunks = []
         initial_collection_complete = False
-        initial_collection_target = 5  # Collect first 5 chunks before starting to yield
+        initial_collection_target = 1  # Collect first chunk before yielding for lower latency
         
         try:
             # Stream audio chunks with maximum throughput
@@ -702,7 +702,7 @@ async def stream_speech(
                 current_time = time.time()
                 elapsed_since_last_yield = (current_time - last_yield_time) * 1000  # in ms
                 
-                # Yield based on consistent timing (~100ms chunks) for smooth playback
+                # Yield based on consistent timing (~50ms chunks) for smooth playback
                 if elapsed_since_last_yield >= target_chunk_duration_ms:
                     should_yield = True
                 # Also yield if buffer gets very large
