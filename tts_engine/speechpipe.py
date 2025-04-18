@@ -71,7 +71,8 @@ model = model.to(snac_device)
 
 if torch.cuda.is_available():
     # Allow using the full memory of the selected device
-    torch.cuda.set_per_process_memory_fraction(1.0, device=snac_device)
+    # Use device index 0 instead of the string "cuda"
+    torch.cuda.set_per_process_memory_fraction(1.0, device=0)
     print("Set per-process memory fraction to 100% of GPU memory")
 
 # Disable torch.compile as it requires Triton which isn't installed
