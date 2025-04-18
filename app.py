@@ -45,13 +45,23 @@ ensure_env_file_exists()
 load_dotenv(override=True)
 
 from fastapi import FastAPI, Request, Form, HTTPException, Depends
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+import io
+import struct
 import json
 
-from tts_engine import generate_speech_from_api, AVAILABLE_VOICES, DEFAULT_VOICE, VOICE_TO_LANGUAGE, AVAILABLE_LANGUAGES
+from tts_engine import (
+    generate_speech_from_api, 
+    stream_speech_from_api,  # Added for streaming endpoint
+    AVAILABLE_VOICES, 
+    DEFAULT_VOICE, 
+    VOICE_TO_LANGUAGE, 
+    AVAILABLE_LANGUAGES,
+    SAMPLE_RATE  # Added for WAV header generation
+)
 
 # Create FastAPI app
 app = FastAPI(
@@ -77,6 +87,13 @@ templates = Jinja2Templates(directory="templates")
 
 # API models
 class SpeechRequest(BaseModel):
+    input: str
+    model: str = "orpheus"
+    voice: str = DEFAULT_VOICE
+    response_format: str = "wav"
+    speed: float = 1.0
+
+class StreamingSpeechRequest(BaseModel):
     input: str
     model: str = "orpheus"
     voice: str = DEFAULT_VOICE
@@ -129,6 +146,77 @@ async def create_speech_api(request: SpeechRequest):
         media_type="audio/wav",
         filename=f"{request.voice}_{timestamp}.wav"
     )
+
+# New streaming endpoint
+@app.post("/v1/audio/speech/stream")
+async def stream_speech_api(request: StreamingSpeechRequest):
+    """
+    Stream speech in real-time as it's being generated.
+    
+    This endpoint streams audio chunks as they are generated, allowing for:
+    1. Lower latency - first audio starts playing almost immediately
+    2. Real-time playback - audio plays while more is being generated
+    3. Unlimited length - no practical limit on input text length
+    
+    Returns a streaming response with WAV audio data.
+    """
+    if not request.input:
+        raise HTTPException(status_code=400, detail="Missing input text")
+    
+    # Generate WAV header (44 bytes)
+    # We'll use a standard WAV header with PCM format
+    async def audio_stream_generator():
+        # First yield the WAV header
+        yield generate_wav_header(SAMPLE_RATE)
+        print("Sent WAV header")
+        
+        # Then stream the audio chunks as they're generated
+        async for audio_chunk in stream_speech_from_api(
+            prompt=request.input,
+            voice=request.voice
+        ):
+            yield audio_chunk
+    
+    return StreamingResponse(
+        audio_stream_generator(),
+        media_type="audio/wav"
+    )
+
+# Helper function to generate a WAV header
+def generate_wav_header(sample_rate):
+    # WAV header format
+    channels = 1  # Mono
+    bits_per_sample = 16  # 16-bit PCM
+    
+    # We don't know the data size in advance for streaming, so use a placeholder
+    # Some audio players might have issues with this, but most modern browsers handle it well
+    data_size = 0  # Placeholder for unknown stream length
+    
+    # Calculate header values
+    byte_rate = sample_rate * channels * bits_per_sample // 8
+    block_align = channels * bits_per_sample // 8
+    
+    # Create header - RIFF chunk descriptor
+    header = bytearray()
+    header.extend(b'RIFF')  # ChunkID
+    header.extend(struct.pack('<I', data_size + 36))  # ChunkSize (file size - 8)
+    header.extend(b'WAVE')  # Format
+    
+    # fmt sub-chunk
+    header.extend(b'fmt ')  # Subchunk1ID
+    header.extend(struct.pack('<I', 16))  # Subchunk1Size (16 for PCM)
+    header.extend(struct.pack('<H', 1))  # AudioFormat (1 for PCM)
+    header.extend(struct.pack('<H', channels))  # NumChannels
+    header.extend(struct.pack('<I', sample_rate))  # SampleRate
+    header.extend(struct.pack('<I', byte_rate))  # ByteRate
+    header.extend(struct.pack('<H', block_align))  # BlockAlign
+    header.extend(struct.pack('<H', bits_per_sample))  # BitsPerSample
+    
+    # data sub-chunk
+    header.extend(b'data')  # Subchunk2ID
+    header.extend(struct.pack('<I', data_size))  # Subchunk2Size (data size)
+    
+    return header
 
 @app.get("/v1/audio/voices")
 async def list_voices():
