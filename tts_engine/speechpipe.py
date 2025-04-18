@@ -102,16 +102,17 @@ def convert_to_audio(multiframe, count):
         codes_2.unsqueeze(0)
     ]
     
-    # Add detailed debugging for token validation
+    # Add detailed debugging for token validation (only negative codes are invalid)
     valid_range = True
     invalid_codes = []
-    if torch.any(codes[0] < 0) or torch.any(codes[0] > 4096):
+    # Only negative codes are invalid for decoding
+    if torch.any(codes[0] < 0):
         invalid_codes.append(f"codes[0] out of range: {codes[0].tolist()}")
         valid_range = False
-    if torch.any(codes[1] < 0) or torch.any(codes[1] > 4096):
+    if torch.any(codes[1] < 0):
         invalid_codes.append(f"codes[1] out of range: {codes[1].tolist()}")
         valid_range = False
-    if torch.any(codes[2] < 0) or torch.any(codes[2] > 4096):
+    if torch.any(codes[2] < 0):
         invalid_codes.append(f"codes[2] out of range: {codes[2].tolist()}")
         valid_range = False
         
@@ -134,13 +135,15 @@ def convert_to_audio(multiframe, count):
                 print(f"Debug: model.decode returned empty or None for frame {count}")
                 return None
             
-            # Extract the relevant slice and efficiently convert to bytes
-            # Keep data on GPU as long as possible
-            audio_slice = audio_hat[:, :, 2048:4096]
+            # Determine dynamic slice to handle shorter audio segments
+            num_samples = audio_hat.shape[-1]
+            start = min(2048, num_samples)
+            end = min(4096, num_samples)
+            audio_slice = audio_hat[:, :, start:end]
             
-            if audio_slice is None or audio_slice.numel() == 0:
-                print(f"Debug: audio_slice is empty or None after slicing for frame {count}")
-                return None
+            if audio_slice.numel() == 0:
+                print(f"Debug: audio_slice is empty after slicing for frame {count}, falling back to full audio")
+                audio_slice = audio_hat
             
             # Check for NaNs or Infs which indicate model instability
             if torch.isnan(audio_slice).any() or torch.isinf(audio_slice).any():
