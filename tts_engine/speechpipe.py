@@ -65,39 +65,42 @@ def convert_to_audio(multiframe, count):
     """
     if len(multiframe) < 7:
         return None
-
+  
     num_frames = len(multiframe) // 7
     frame = multiframe[:num_frames*7]
-
+    
     # Pre-allocate tensors instead of incrementally building them
     codes_0 = torch.zeros(num_frames, dtype=torch.int32, device=snac_device)
     codes_1 = torch.zeros(num_frames * 2, dtype=torch.int32, device=snac_device)
     codes_2 = torch.zeros(num_frames * 4, dtype=torch.int32, device=snac_device)
-
+    
     # Use vectorized operations where possible
     frame_tensor = torch.tensor(frame, dtype=torch.int32, device=snac_device)
-
+    
     # Direct indexing is much faster than concatenation in a loop
     for j in range(num_frames):
         idx = j * 7
+        
         # Code 0 - single value per frame
         codes_0[j] = frame_tensor[idx]
+        
         # Code 1 - two values per frame
         codes_1[j*2] = frame_tensor[idx+1]
         codes_1[j*2+1] = frame_tensor[idx+4]
+        
         # Code 2 - four values per frame
         codes_2[j*4] = frame_tensor[idx+2]
         codes_2[j*4+1] = frame_tensor[idx+3]
         codes_2[j*4+2] = frame_tensor[idx+5]
         codes_2[j*4+3] = frame_tensor[idx+6]
-
+    
     # Reshape codes into expected format
     codes = [
-        codes_0.unsqueeze(0),
-        codes_1.unsqueeze(0),
+        codes_0.unsqueeze(0), 
+        codes_1.unsqueeze(0), 
         codes_2.unsqueeze(0)
     ]
-
+    
     # Check tokens are in valid range
     if (torch.any(codes[0] < 0) or torch.any(codes[0] > 4096) or 
         torch.any(codes[1] < 0) or torch.any(codes[1] > 4096) or 
@@ -106,13 +109,15 @@ def convert_to_audio(multiframe, count):
 
     # Use CUDA stream for parallel processing if available
     stream_ctx = torch.cuda.stream(cuda_stream) if cuda_stream is not None else torch.no_grad()
-
+    
     with stream_ctx, torch.inference_mode():
         # Decode the audio
         audio_hat = model.decode(codes)
+        
         # Extract the relevant slice and efficiently convert to bytes
         # Keep data on GPU as long as possible
         audio_slice = audio_hat[:, :, 2048:4096]
+        
         # Process on GPU if possible, with minimal data transfer
         if snac_device == "cuda":
             # Scale directly on GPU
@@ -125,7 +130,7 @@ def convert_to_audio(multiframe, count):
             audio_np = detached_audio.numpy()
             audio_int16 = (audio_np * 32767).astype(np.int16)
             audio_bytes = audio_int16.tobytes()
-
+            
     return audio_bytes
 
 # Define the custom token prefix
@@ -133,7 +138,7 @@ CUSTOM_TOKEN_PREFIX = "<custom_token_"
 
 # Use a single global cache for token processing
 token_id_cache = {}
-MAX_CACHE_SIZE = 25000  # Increased cache size for better performance
+MAX_CACHE_SIZE = 10000  # Increased cache size for better performance
 
 def turn_token_into_id(token_string, index):
     """
@@ -181,186 +186,108 @@ def turn_token_into_id(token_string, index):
         return None
 
 async def tokens_decoder(token_gen):
-    """High-performance token decoder optimized for maximum GPU throughput"""
-    # Pre-allocate larger buffers for better performance
+    """Optimized token decoder with early first-chunk processing for lower latency"""
     buffer = []
-    processed_count = 0
-    total_count = 0
+    count = 0
     
-    # Maintain a sliding window to ensure proper sentence continuity
-    sliding_window = []
-    last_processed_window = []
-    overlap_tokens = 4  # Optimal overlap for sentence continuity
-    
-    # Optimized thresholds for first chunk and subsequent processing
+    # Track if first chunk has been processed
     first_chunk_processed = False
-    min_frames_first = 7     # Must accumulate at least 7 tokens for a full frame
-    min_frames_subsequent = 24  # Reduced from 28 to 24 for higher throughput
-    ideal_frames = 64        # Increased from 49 to 64 for better GPU utilization
-    process_every_n = 4      # Reduced from 7 to 4 for more frequent updates
     
-    # Additional GPU optimization parameters
-    max_batch_size = 256     # Maximum batch size for GPU processing
-    batch_scale_factor = 1.5 # Scale batch size over time for better throughput
-    current_batch_size = min_frames_subsequent  # Start with minimum
+    # Use different thresholds for first chunk vs. subsequent chunks
+    min_frames_first = 7  # Just one chunk (7 tokens) for first audio - ultra-low latency
+    min_frames_subsequent = 28  # Standard minimum (4 chunks of 7 tokens) after first audio
+    ideal_frames = 49  # Ideal standard frame size (7×7 window) - unchanged
+    process_every_n = 7  # Process every 7 tokens (standard for Orpheus model) - unchanged
     
-    # Performance tracking
     start_time = time.time()
     token_count = 0
     last_log_time = start_time
-    last_yield_time = start_time
-    processed_batches = 0
     
-    # Process incoming tokens with adaptive batching
     async for token_sim in token_gen:
-        # Skip non-custom markup tokens
-        if token_sim.startswith("<") and token_sim.endswith(">") and CUSTOM_TOKEN_PREFIX not in token_sim:
-            continue
-        
         token_count += 1
-        total_count += 1
         
-        # Process token with caching to reduce overhead
-        token = turn_token_into_id(token_sim, processed_count)
+        # Use the unified turn_token_into_id which already handles caching
+        token = turn_token_into_id(token_sim, count)
         
         if token is not None and token > 0:
-            # Add to sliding window for boundary detection
-            sliding_window.append(token)
             buffer.append(token)
-            processed_count += 1
-            
-            # Minimal performance logging
+            count += 1
+
+            # Log throughput periodically
             current_time = time.time()
-            if current_time - last_log_time > 10.0:  # Reduced logging frequency
+            if current_time - last_log_time > 5.0:  # Every 5 seconds
                 elapsed = current_time - last_log_time
-                tokens_per_sec = token_count / elapsed if elapsed > 0 else 0
-                # Only log if significant tokens processed
-                if token_count > 100:
-                    print(f"Processing rate: {tokens_per_sec:.1f} tokens/s, batch size: {current_batch_size}")
+                if elapsed > 0:
+                    recent_tokens = token_count
+                    tokens_per_sec = recent_tokens / elapsed
+                    print(f"Token processing rate: {tokens_per_sec:.1f} tokens/second")
                 last_log_time = current_time
                 token_count = 0
             
-            # Ultra-low latency for first audio chunk
+            # Different processing logic based on whether first chunk has been processed
             if not first_chunk_processed:
-                if processed_count >= min_frames_first:
-                    # Process small batch quickly for first chunk
+                # Process first chunk as soon as possible for minimal latency
+                if count >= min_frames_first:
                     buffer_to_proc = buffer[-min_frames_first:]
-                    audio_samples = convert_to_audio(buffer_to_proc, processed_count)
+                    
+                    # Process the first chunk of audio for immediate feedback
+                    print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens for low latency")
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
                     if audio_samples is not None:
-                        first_chunk_processed = True
-                        # Save this window to avoid repeats
-                        last_processed_window = buffer_to_proc.copy()
+                        first_chunk_processed = True  # Mark first chunk as processed
                         yield audio_samples
-                        last_yield_time = time.time()
             else:
-                # GPU-optimized batch processing for subsequent chunks
-                should_process = False
-                
-                # Process based on count for regular cadence
-                if processed_count % process_every_n == 0:
-                    should_process = True
-                
-                # Process when we have enough for an ideal batch
-                elif len(buffer) >= current_batch_size:
-                    should_process = True
-                    
-                # Also ensure we don't go too long without yielding audio
-                elapsed_since_yield = current_time - last_yield_time
-                if elapsed_since_yield > 0.1:  # Max 100ms without yielding
-                    should_process = True
-                
-                if should_process and len(buffer) >= min_frames_subsequent:
-                    # Determine optimal batch size based on available tokens
-                    batch_size = min(len(buffer), current_batch_size)
-                    
-                    # Use larger batch sizes when more tokens are available
-                    buffer_to_proc = buffer[-batch_size:]
-                    
-                    # Check for overlap with previous window to avoid repeats
-                    if last_processed_window:
-                        # Find overlap point to ensure smooth transitions
-                        overlap_point = find_window_overlap(last_processed_window, buffer_to_proc, overlap_tokens)
-                        if overlap_point > 0:
-                            # Skip already processed tokens to avoid repeats
-                            buffer_to_proc = buffer_to_proc[overlap_point:]
-                    
-                    # Skip processing if we'd generate an empty buffer
-                    if len(buffer_to_proc) < min_frames_first:
+                # For subsequent chunks, use original processing with proper batching
+                if count % process_every_n == 0:
+                    # Use same prioritization logic as before
+                    if len(buffer) >= ideal_frames:
+                        buffer_to_proc = buffer[-ideal_frames:]
+                    elif len(buffer) >= min_frames_subsequent:
+                        buffer_to_proc = buffer[-min_frames_subsequent:]
+                    else:
                         continue
                     
-                    # Process audio with GPU acceleration
-                    audio_samples = convert_to_audio(buffer_to_proc, processed_count)
+                    # Debug output to help diagnose issues
+                    if count % 28 == 0:
+                        print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
+                    
+                    # Process the tokens
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
                     if audio_samples is not None:
-                        # Save this window to check future overlaps
-                        last_processed_window = buffer_to_proc.copy()
-                        
                         yield audio_samples
-                        last_yield_time = time.time()
-                        processed_batches += 1
-                        
-                        # Gradually increase batch size for better GPU utilization
-                        if processed_batches % 5 == 0 and current_batch_size < max_batch_size:
-                            current_batch_size = min(
-                                max_batch_size, 
-                                int(current_batch_size * batch_scale_factor)
-                            )
     
-    # End-of-stream processing - handle remaining tokens
-    remaining_tokens = len(buffer)
-    if remaining_tokens > 0:
-        print(f"Processing {remaining_tokens} remaining tokens at end of stream")
-        
-        # Process complete frames if possible
-        if remaining_tokens >= min_frames_subsequent:
-            batch_size = min(remaining_tokens, current_batch_size)
-            buffer_to_proc = buffer[-batch_size:]
+    # CRITICAL: End-of-generation handling - process all remaining frames
+    # Process remaining complete frames (ideal size)
+    if len(buffer) >= ideal_frames:
+        buffer_to_proc = buffer[-ideal_frames:]
+        audio_samples = convert_to_audio(buffer_to_proc, count)
+        if audio_samples is not None:
+            yield audio_samples
             
-            # Check for overlap with previous window 
-            if last_processed_window:
-                overlap_point = find_window_overlap(last_processed_window, buffer_to_proc, overlap_tokens)
-                if overlap_point > 0:
-                    buffer_to_proc = buffer_to_proc[overlap_point:]
+    # Process any additional complete frames (minimum size)
+    elif len(buffer) >= min_frames_subsequent:
+        buffer_to_proc = buffer[-min_frames_subsequent:]
+        audio_samples = convert_to_audio(buffer_to_proc, count)
+        if audio_samples is not None:
+            yield audio_samples
             
-            # Only process if we have enough tokens
-            if len(buffer_to_proc) >= min_frames_first:
-                audio_samples = convert_to_audio(buffer_to_proc, processed_count)
-                if audio_samples is not None:
-                    yield audio_samples
+    # Final special case: even if we don't have minimum frames, try to process
+    # what we have by padding with silence tokens that won't affect the audio
+    elif len(buffer) >= process_every_n:
+        # Pad to minimum frame requirement with copies of the final token
+        # This is more continuous than using unrelated tokens from the beginning
+        last_token = buffer[-1]
+        padding_needed = min_frames_subsequent - len(buffer)
         
-        # For very short remaining sequences, process as is
-        elif remaining_tokens >= 3:  # Only process if we have at least a few tokens
-            audio_samples = convert_to_audio(buffer[-remaining_tokens:], processed_count)
-            if audio_samples is not None:
-                yield audio_samples
-    
-    # Report final performance stats
-    total_time = time.time() - start_time
-    if total_time > 0 and total_count > 0:
-        final_tokens_per_sec = total_count / total_time
-        print(f"Final token processing rate: {final_tokens_per_sec:.1f} tokens/second")
-
-# Helper function to find overlap between token windows
-def find_window_overlap(previous_window, current_window, min_overlap):
-    """
-    Find the point where current_window overlaps with previous_window.
-    Returns the index where non-overlapping tokens start, or 0 if no overlap found.
-    """
-    # No need to check if either window is too small
-    if len(previous_window) < min_overlap or len(current_window) < min_overlap:
-        return 0
+        # Create a padding array of copies of the last token
+        # This maintains continuity much better than circular buffering
+        padding = [last_token] * padding_needed
+        padded_buffer = buffer + padding
         
-    # Check for overlap starting from the end of previous window
-    for i in range(min(len(previous_window), len(current_window) - min_overlap + 1)):
-        prev_end = previous_window[-min_overlap-i:]
-        curr_start = current_window[:min_overlap+i]
-        
-        # If we found matching tokens, return the overlap point
-        if prev_end == curr_start[:len(prev_end)]:
-            return len(prev_end)
-    
-    # No significant overlap found
-    return 0
-
+        print(f"Processing final partial frame: {len(buffer)} tokens + {padding_needed} repeated-token padding")
+        audio_samples = convert_to_audio(padded_buffer, count)
+        if audio_samples is not None:
+            yield audio_samples
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
