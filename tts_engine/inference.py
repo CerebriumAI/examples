@@ -428,7 +428,7 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
     # Use a larger queue for high-end systems
-    queue_size = 100 if HIGH_END_GPU else 50
+    queue_size = 200 if HIGH_END_GPU else 50
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     
@@ -517,7 +517,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     # Optimized I/O approach for all systems
     # This approach is simpler and more reliable than separate code paths
     write_buffer = bytearray()
-    buffer_max_size = 8 * 1024 * 1024  # 4MB for faster I/O
+    buffer_max_size = 8 * 1024 * 1024  # 8MB for faster I/O
     
     # Keep track of the last time we checked for completion
     last_check_time = time.time()

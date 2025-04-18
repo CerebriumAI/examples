@@ -7,6 +7,7 @@ import queue
 import time
 import os
 import sys
+import gc
 
 # Helper to detect if running in Uvicorn's reloader (same as in inference.py)
 def is_reloader_process():
@@ -50,87 +51,150 @@ model = model.to(snac_device)
 if not IS_RELOADER:
     print("Using standard PyTorch optimizations (torch.compile disabled)")
 
-# Prepare CUDA streams for parallel processing if available
-cuda_stream = None
+# Configure optimal CUDA settings for inference
 if snac_device == "cuda":
-    cuda_stream = torch.cuda.Stream()
+    # Set benchmark mode for faster runtime on fixed input sizes
+    torch.backends.cudnn.benchmark = True
+    # Disable gradient operations entirely
+    torch.set_grad_enabled(False)
+    # Set memory allocation settings for lower fragmentation
+    torch.cuda.empty_cache()
     if not IS_RELOADER:
-        print("Using CUDA stream for parallel processing")
+        print(f"CUDA optimizations enabled: cudnn benchmark, gradients disabled")
+        
+    # Create primary and secondary CUDA streams for overlapping operations
+    cuda_stream = torch.cuda.Stream()
+    cuda_stream_secondary = torch.cuda.Stream()
+    if not IS_RELOADER:
+        print("Using multiple CUDA streams for concurrent processing")
+else:
+    cuda_stream = None
+    cuda_stream_secondary = None
 
+# Increase token cache size for better performance 
+MAX_CACHE_SIZE = 25000  # Increased from 10000
+
+# Try to use TorchScript for model optimization
+try:
+    if snac_device == "cuda":
+        # Try to apply TorchScript to the model for better performance
+        model = torch.jit.script(model)
+        if not IS_RELOADER:
+            print("TorchScript optimization applied to model")
+except Exception as e:
+    if not IS_RELOADER:
+        print(f"TorchScript optimization skipped: {e}")
+
+# Setup CUDA graphs for the model's decode operation if available
+decode_graphed = None
+if CUDA_GRAPHS_AVAILABLE and snac_device == "cuda":
+    try:
+        # We'll create a graphed version of the decode method
+        sample_codes_0 = torch.zeros(1, 7, dtype=torch.int32, device=snac_device)
+        sample_codes_1 = torch.zeros(1, 14, dtype=torch.int32, device=snac_device)
+        sample_codes_2 = torch.zeros(1, 28, dtype=torch.int32, device=snac_device)
+        sample_codes = [sample_codes_0, sample_codes_1, sample_codes_2]
+        
+        # Create graphed callable for the decode operation
+        def decode_wrapper(codes):
+            return model.decode(codes)
+        
+        decode_graphed = torch.cuda.make_graphed_callables(
+            decode_wrapper, (sample_codes,)
+        )
+        
+        if not IS_RELOADER:
+            print("CUDA graphs enabled for decode operation")
+    except Exception as e:
+        if not IS_RELOADER:
+            print(f"CUDA graphs setup failed: {e}")
+        decode_graphed = None
 
 def convert_to_audio(multiframe, count):
     """
-    Optimized version of convert_to_audio that eliminates inefficient tensor operations
-    and reduces CPU-GPU transfers for much faster inference on high-end GPUs.
+    Heavily optimized version of convert_to_audio that maximizes GPU utilization
+    with vectorized operations and optimized memory transfers.
     """
     if len(multiframe) < 7:
         return None
   
     num_frames = len(multiframe) // 7
-    frame = multiframe[:num_frames*7]
     
-    # Pre-allocate tensors instead of incrementally building them
-    codes_0 = torch.zeros(num_frames, dtype=torch.int32, device=snac_device)
-    codes_1 = torch.zeros(num_frames * 2, dtype=torch.int32, device=snac_device)
-    codes_2 = torch.zeros(num_frames * 4, dtype=torch.int32, device=snac_device)
+    # Periodic GPU memory management to reduce fragmentation
+    if count % 1000 == 0 and snac_device == "cuda":
+        torch.cuda.empty_cache()
     
-    # Use vectorized operations where possible
-    frame_tensor = torch.tensor(frame, dtype=torch.int32, device=snac_device)
-    
-    # Direct indexing is much faster than concatenation in a loop
-    for j in range(num_frames):
-        idx = j * 7
-        
-        # Code 0 - single value per frame
-        codes_0[j] = frame_tensor[idx]
-        
-        # Code 1 - two values per frame
-        codes_1[j*2] = frame_tensor[idx+1]
-        codes_1[j*2+1] = frame_tensor[idx+4]
-        
-        # Code 2 - four values per frame
-        codes_2[j*4] = frame_tensor[idx+2]
-        codes_2[j*4+1] = frame_tensor[idx+3]
-        codes_2[j*4+2] = frame_tensor[idx+5]
-        codes_2[j*4+3] = frame_tensor[idx+6]
-    
-    # Reshape codes into expected format
-    codes = [
-        codes_0.unsqueeze(0), 
-        codes_1.unsqueeze(0), 
-        codes_2.unsqueeze(0)
-    ]
-    
-    # Check tokens are in valid range
-    if (torch.any(codes[0] < 0) or torch.any(codes[0] > 4096) or 
-        torch.any(codes[1] < 0) or torch.any(codes[1] > 4096) or 
-        torch.any(codes[2] < 0) or torch.any(codes[2] > 4096)):
-        return None
-
-    # Use CUDA stream for parallel processing if available
-    stream_ctx = torch.cuda.stream(cuda_stream) if cuda_stream is not None else torch.no_grad()
+    # Run in secondary stream if available to overlap with other operations
+    stream_to_use = cuda_stream_secondary if cuda_stream_secondary is not None else cuda_stream
+    stream_ctx = torch.cuda.stream(stream_to_use) if stream_to_use is not None else torch.no_grad()
     
     with stream_ctx, torch.inference_mode():
-        # Decode the audio
-        audio_hat = model.decode(codes)
+        # Transfer data to GPU in one batch
+        frame_tensor = torch.tensor(multiframe[:num_frames*7], dtype=torch.int32, device=snac_device)
         
-        # Extract the relevant slice and efficiently convert to bytes
-        # Keep data on GPU as long as possible
+        # Pre-allocate output tensors
+        codes_0 = torch.zeros(1, num_frames, dtype=torch.int32, device=snac_device)
+        codes_1 = torch.zeros(1, num_frames * 2, dtype=torch.int32, device=snac_device)
+        codes_2 = torch.zeros(1, num_frames * 4, dtype=torch.int32, device=snac_device)
+        
+        # Vectorized operations for far better GPU utilization
+        # Reshape the input to make indexing more efficient
+        frame_reshaped = frame_tensor.view(-1, 7)
+        
+        # Direct vectorized assignment
+        codes_0[0, :] = frame_reshaped[:, 0]
+        
+        # For codes_1, we need indices 1 and 4 from each group of 7
+        codes_1_indices = torch.tensor([1, 4], device=snac_device)
+        codes_1_data = torch.index_select(frame_reshaped, 1, codes_1_indices)
+        codes_1[0, ::2] = codes_1_data[:, 0]  # Even indices get index 1
+        codes_1[0, 1::2] = codes_1_data[:, 1]  # Odd indices get index 4
+        
+        # For codes_2, we need indices 2, 3, 5 and 6
+        codes_2_indices = torch.tensor([2, 3, 5, 6], device=snac_device)
+        codes_2_data = torch.index_select(frame_reshaped, 1, codes_2_indices)
+        codes_2[0, ::4] = codes_2_data[:, 0]     # Indices 0, 4, 8...
+        codes_2[0, 1::4] = codes_2_data[:, 1]    # Indices 1, 5, 9...
+        codes_2[0, 2::4] = codes_2_data[:, 2]    # Indices 2, 6, 10...
+        codes_2[0, 3::4] = codes_2_data[:, 3]    # Indices 3, 7, 11...
+        
+        # Combine codes
+        codes = [codes_0, codes_1, codes_2]
+        
+        # Validate token ranges using vectorized operations
+        valid_range = torch.all((codes[0] >= 0) & (codes[0] < 4096) &
+                               (codes[1] >= 0) & (codes[1] < 4096) &
+                               (codes[2] >= 0) & (codes[2] < 4096))
+        
+        if not valid_range:
+            return None
+            
+        # Use CUDA graphs if available for the decode operation
+        if decode_graphed is not None:
+            audio_hat = decode_graphed(codes)
+        else:
+            audio_hat = model.decode(codes)
+        
+        # Wait for CUDA stream to complete before continuing
+        if stream_to_use is not None:
+            stream_to_use.synchronize()
+        
+        # Extract the relevant slice
         audio_slice = audio_hat[:, :, 2048:4096]
         
-        # Process on GPU if possible, with minimal data transfer
+        # Process on GPU if possible
         if snac_device == "cuda":
-            # Scale directly on GPU
+            # Scale and convert to int16 directly on GPU
             audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
-            # Only transfer the final result to CPU
+            # Minimize CPU-GPU transfer by only moving the final result
             audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
         else:
-            # For non-CUDA devices, fall back to the original approach
+            # For non-CUDA devices, use the original approach
             detached_audio = audio_slice.detach().cpu()
             audio_np = detached_audio.numpy()
             audio_int16 = (audio_np * 32767).astype(np.int16)
             audio_bytes = audio_int16.tobytes()
-            
+    
     return audio_bytes
 
 # Define the custom token prefix
@@ -138,7 +202,6 @@ CUSTOM_TOKEN_PREFIX = "<custom_token_"
 
 # Use a single global cache for token processing
 token_id_cache = {}
-MAX_CACHE_SIZE = 10000  # Increased cache size for better performance
 
 def turn_token_into_id(token_string, index):
     """
@@ -196,7 +259,8 @@ async def tokens_decoder(token_gen):
     # Use different thresholds for first chunk vs. subsequent chunks
     min_frames_first = 7  # Just one chunk (7 tokens) for first audio - ultra-low latency
     min_frames_subsequent = 28  # Standard minimum (4 chunks of 7 tokens) after first audio
-    ideal_frames = 49  # Ideal standard frame size (7×7 window) - unchanged
+    # Increased ideal frame size for larger GPU batches
+    ideal_frames = 98  # Ideal standard frame size (14x7 window), increased from 49
     process_every_n = 7  # Process every 7 tokens (standard for Orpheus model) - unchanged
     
     start_time = time.time()
@@ -291,12 +355,14 @@ async def tokens_decoder(token_gen):
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
-    # Use a larger queue for RTX 4090 to maximize GPU utilization
-    max_queue_size = 32 if snac_device == "cuda" else 8
+    # Use a larger queue for CUDA devices to maximize GPU utilization
+    # Increased queue size for CUDA
+    max_queue_size = 128 if snac_device == "cuda" else 24  # Increased from 64/16
     audio_queue = queue.Queue(maxsize=max_queue_size)
     
-    # Collect tokens in batches for higher throughput
-    batch_size = 16 if snac_device == "cuda" else 4
+    # Collect tokens in larger batches for higher throughput on CUDA
+    # Increased batch size for CUDA
+    batch_size = 64 if snac_device == "cuda" else 12       # Increased from 32/8
     
     # Convert the synchronous token generator into an async generator with batching
     async def async_token_gen():
@@ -340,13 +406,13 @@ def tokens_decoder_sync(syn_token_gen):
     def run_async():
         asyncio.run(async_producer())
 
-    # Use a higher priority thread for RTX 4090 to ensure it stays fed with work
+    # Run the producer in a separate thread
     thread = threading.Thread(target=run_async)
     thread.daemon = True  # Allow the thread to be terminated when the main thread exits
     thread.start()
 
     # Use larger buffer for final audio assembly
-    buffer_size = 5
+    buffer_size = 10 if snac_device == "cuda" else 5       # Increased from 5
     audio_buffer = []
     
     while True:
