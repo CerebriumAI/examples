@@ -352,7 +352,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                 print("Max retries reached. Token generation failed.")
                 return
 
-# The turn_token_into_id function is now imported from speechpipe.py
+# The turn_token_into_id function is now imported from speechpipe
 # This eliminates duplicate code and ensures consistent behavior
 
 def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
@@ -601,73 +601,25 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     
     return audio_segments
 
-def stream_audio(audio_buffer):
-    """Stream audio buffer to output device with error handling."""
-    if audio_buffer is None or len(audio_buffer) == 0:
-        return
-    
-    try:
-        # Convert bytes to NumPy array (16-bit PCM)
-        audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
-        
-        # Normalize to float in range [-1, 1] for playback
-        audio_float = audio_data.astype(np.float32) / 32767.0
-        
-        # Play the audio with proper device selection and error handling
-        sd.play(audio_float, SAMPLE_RATE)
-        sd.wait()
-    except Exception as e:
-        print(f"Audio playback error: {e}")
-
-import re
-import numpy as np
-from io import BytesIO
-import wave
-
-def split_text_into_sentences(text):
-    """Split text into sentences with a more reliable approach."""
-    # We'll use a simple approach that doesn't rely on variable-width lookbehinds
-    # which aren't supported in Python's regex engine
-    
-    # First, split on common sentence ending punctuation
-    # This isn't perfect but works for most cases and avoids the regex error
-    parts = []
-    current_sentence = ""
-    
-    for char in text:
-        current_sentence += char
-        
-        # If we hit a sentence ending followed by a space, consider this a potential sentence end
-        if char in (' ', '\n', '\t') and len(current_sentence) > 1:
-            prev_char = current_sentence[-2]
-            if prev_char in ('.', '!', '?'):
-                # Check if this is likely a real sentence end and not an abbreviation
-                # (Simple heuristic: if there's a space before the period, it's likely a real sentence end)
-                if len(current_sentence) > 3 and current_sentence[-3] not in ('.', ' '):
-                    parts.append(current_sentence.strip())
-                    current_sentence = ""
-    
-    # Add any remaining text
-    if current_sentence.strip():
-        parts.append(current_sentence.strip())
-    
-    # Combine very short segments to avoid tiny audio files
-    min_chars = 20  # Minimum reasonable sentence length
-    combined_sentences = []
-    i = 0
-    
-    while i < len(parts):
-        current = parts[i]
-        
-        # If this is a short sentence and not the last one, combine with next
-        while i < len(parts) - 1 and len(current) < min_chars:
-            i += 1
-            current += " " + parts[i]
-            
-        combined_sentences.append(current)
-        i += 1
-    
-    return combined_sentences
+async def stream_speech_from_api(
+    prompt: str,
+    voice: str = DEFAULT_VOICE,
+    temperature: float = TEMPERATURE,
+    top_p: float = TOP_P,
+    max_tokens: int = MAX_TOKENS,
+    repetition_penalty: float = REPETITION_PENALTY
+):
+    """Async generator to stream speech audio chunks from Orpheus TTS model."""
+    token_gen = generate_tokens_from_api(
+        prompt=prompt,
+        voice=voice,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        repetition_penalty=repetition_penalty
+    )
+    async for chunk in tokens_decoder(token_gen):
+        yield chunk
 
 def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE, 
                      top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=None, 
@@ -789,6 +741,74 @@ def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temp
     print(f"Total speech generation completed in {total_time:.2f} seconds")
     
     return all_audio_segments
+
+def split_text_into_sentences(text):
+    """Split text into sentences with a more reliable approach."""
+    # We'll use a simple approach that doesn't rely on variable-width lookbehinds
+    # which aren't supported in Python's regex engine
+    
+    # First, split on common sentence ending punctuation
+    # This isn't perfect but works for most cases and avoids the regex error
+    parts = []
+    current_sentence = ""
+    
+    for char in text:
+        current_sentence += char
+        
+        # If we hit a sentence ending followed by a space, consider this a potential sentence end
+        if char in (' ', '\n', '\t') and len(current_sentence) > 1:
+            prev_char = current_sentence[-2]
+            if prev_char in ('.', '!', '?'):
+                # Check if this is likely a real sentence end and not an abbreviation
+                # (Simple heuristic: if there's a space before the period, it's likely a real sentence end)
+                if len(current_sentence) > 3 and current_sentence[-3] not in ('.', ' '):
+                    parts.append(current_sentence.strip())
+                    current_sentence = ""
+    
+    # Add any remaining text
+    if current_sentence.strip():
+        parts.append(current_sentence.strip())
+    
+    # Combine very short segments to avoid tiny audio files
+    min_chars = 20  # Minimum reasonable sentence length
+    combined_sentences = []
+    i = 0
+    
+    while i < len(parts):
+        current = parts[i]
+        
+        # If this is a short sentence and not the last one, combine with next
+        while i < len(parts) - 1 and len(current) < min_chars:
+            i += 1
+            current += " " + parts[i]
+            
+        combined_sentences.append(current)
+        i += 1
+    
+    return combined_sentences
+
+def stream_audio(audio_buffer):
+    """Stream audio buffer to output device with error handling."""
+    if audio_buffer is None or len(audio_buffer) == 0:
+        return
+    
+    try:
+        # Convert bytes to NumPy array (16-bit PCM)
+        audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
+        
+        # Normalize to float in range [-1, 1] for playback
+        audio_float = audio_data.astype(np.float32) / 32767.0
+        
+        # Play the audio with proper device selection and error handling
+        sd.play(audio_float, SAMPLE_RATE)
+        sd.wait()
+    except Exception as e:
+        print(f"Audio playback error: {e}")
+
+import re
+import numpy as np
+from io import BytesIO
+import wave
 
 def stitch_wav_files(input_files, output_file, crossfade_ms=50):
     """Stitch multiple WAV files together with crossfading for smooth transitions."""
