@@ -175,7 +175,11 @@ async def stream_speech_api(request: StreamingSpeechRequest):
             prompt=request.input,
             voice=request.voice
         ):
-            yield audio_chunk
+            # Ensure the audio chunk is bytes
+            if isinstance(audio_chunk, bytearray):
+                yield bytes(audio_chunk)
+            else:
+                yield audio_chunk
     
     return StreamingResponse(
         audio_stream_generator(),
@@ -216,7 +220,8 @@ def generate_wav_header(sample_rate):
     header.extend(b'data')  # Subchunk2ID
     header.extend(struct.pack('<I', data_size))  # Subchunk2Size (data size)
     
-    return header
+    # Convert bytearray to bytes before returning
+    return bytes(header)
 
 @app.get("/v1/audio/voices")
 async def list_voices():
