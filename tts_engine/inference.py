@@ -11,7 +11,7 @@ import threading
 import queue
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Optional, Generator, Union, Tuple
+from typing import List, Dict, Any, Optional, Generator, Union, Tuple, AsyncGenerator
 from dotenv import load_dotenv
 
 # Helper to detect if running in Uvicorn's reloader
@@ -668,6 +668,56 @@ def split_text_into_sentences(text):
         i += 1
     
     return combined_sentences
+
+async def stream_speech_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperature: float = TEMPERATURE,
+                                 top_p: float = TOP_P, max_tokens: int = MAX_TOKENS,
+                                 repetition_penalty: float = REPETITION_PENALTY) -> AsyncGenerator[bytes, None]:
+    """
+    Generate speech from text using Orpheus model and stream audio chunks.
+    This version yields raw audio bytes suitable for StreamingResponse.
+    """
+    print(f"Starting streaming speech generation for '{prompt[:50]}{'...' if len(prompt) > 50 else ''}'")
+    print(f"Using voice: {voice}, GPU acceleration: {'Yes (High-end)' if HIGH_END_GPU else 'Yes' if torch.cuda.is_available() else 'No'}")
+
+    # Reset performance monitor
+    global perf_monitor
+    perf_monitor = PerformanceMonitor()
+    start_time = time.time()
+
+    # Generate tokens from the API (synchronous generator)
+    token_generator = generate_tokens_from_api(
+        prompt=prompt,
+        voice=voice,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        repetition_penalty=repetition_penalty # Use provided or default penalty
+    )
+
+    # Convert synchronous generator to async generator
+    async def async_token_generator():
+        for token in token_generator:
+            yield token
+            # Allow minimal cooperative multitasking
+            await asyncio.sleep(0)
+
+    try:
+        # Decode tokens into audio chunks asynchronously using the async generator
+        async for audio_chunk in tokens_decoder(async_token_generator()):
+            if audio_chunk:
+                yield audio_chunk
+            # Allow other tasks to run
+            await asyncio.sleep(0.001)
+    except Exception as e:
+        print(f"Error during streaming: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Report final performance metrics
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"Total streaming speech generation completed in {total_time:.2f} seconds")
+    perf_monitor.report() # Ensure final report is printed
 
 def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE, 
                      top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=None, 
