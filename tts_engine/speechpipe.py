@@ -190,10 +190,12 @@ def convert_to_audio(multiframe, count):
         # Combine codes
         codes = [codes_0, codes_1, codes_2]
         
-        # Validate token ranges using vectorized operations
-        valid_range = torch.all((codes[0] >= 0) & (codes[0] < 4096) &
-                               (codes[1] >= 0) & (codes[1] < 4096) &
-                               (codes[2] >= 0) & (codes[2] < 4096))
+        # Fix: Validate each tensor separately to avoid shape mismatch errors
+        valid_range = (
+            torch.all(codes[0] >= 0) and torch.all(codes[0] < 4096) and
+            torch.all(codes[1] >= 0) and torch.all(codes[1] < 4096) and
+            torch.all(codes[2] >= 0) and torch.all(codes[2] < 4096)
+        )
         
         if not valid_range:
             return None
