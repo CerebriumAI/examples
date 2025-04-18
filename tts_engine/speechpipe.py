@@ -8,6 +8,9 @@ import time
 import os
 import sys
 import gc
+# Place this at the very top of your script, before any torch imports
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128,garbage_collection_threshold:0.6"
 
 # Helper to detect if running in Uvicorn's reloader (same as in inference.py)
 def is_reloader_process():
@@ -45,6 +48,11 @@ snac_device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.m
 if not IS_RELOADER:
     print(f"Using device: {snac_device}")
 model = model.to(snac_device)
+
+if torch.cuda.is_available():
+    # Allow using the full memory of the selected device
+    torch.cuda.set_per_process_memory_fraction(1.0, device=snac_device)
+    print("Set per-process memory fraction to 100% of GPU memory")
 
 # Disable torch.compile as it requires Triton which isn't installed
 # We'll use regular PyTorch optimization techniques instead
