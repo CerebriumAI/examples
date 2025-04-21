@@ -272,7 +272,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                     # Yield full chunks
                     while len(buffer) >= chunk_bytes:
                         chunk = buffer[:chunk_bytes]
-                        yield chunk
+                        yield bytes(chunk)
                         total_bytes += chunk_bytes
                         del buffer[:chunk_bytes]
                         await asyncio.sleep(chunk_duration_ms / 1000)
