@@ -136,7 +136,7 @@ def generate_wav_header(sample_rate: int = 24000, bits_per_sample: int = 16, cha
     header = bytearray()
     # RIFF header
     header.extend(b'RIFF')
-    header.extend(struct.pack('<I', 0))  # Placeholder for file size (filled at end)
+    header.extend(struct.pack('<I', 0xFFFFFFFF))  # Placeholder for file size (unknown streaming length)
     header.extend(b'WAVE')
     # Format chunk
     header.extend(b'fmt ')
@@ -149,7 +149,7 @@ def generate_wav_header(sample_rate: int = 24000, bits_per_sample: int = 16, cha
     header.extend(struct.pack('<H', bits_per_sample))
     # Data chunk
     header.extend(b'data')
-    header.extend(struct.pack('<I', 0))  # Placeholder for data size (filled at end)
+    header.extend(struct.pack('<I', 0xFFFFFFFF))  # Placeholder for data size (unknown streaming length)
     
     # Store in cache for future use
     WAV_HEADER_CACHE[cache_key] = bytes(header)
