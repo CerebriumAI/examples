@@ -195,10 +195,9 @@ async def tokens_decoder(token_gen):
     
     # Use different thresholds for first chunk vs. subsequent chunks
     min_frames_first = 7  # First chunk: 7 tokens for ultra-low latency
-    min_frames_subsequent = 21  # Minimum for subsequent chunks
-    ideal_frames = 35  # Ideal frame size (5 chunks of 7)
-    process_every_n = 14  # Process every 14 tokens after first chunk for higher throughput
- # Process every 14 tokens after first chunk for higher throughput
+    min_frames_subsequent = 56  # Minimum for subsequent chunks to leverage more GPU
+    ideal_frames = 112  # Ideal frame size (16 chunks) for high VRAM utilization
+    process_every_n = 56  # Process every 56 tokens for larger batches
     
     start_time = time.time()
     token_count = 0
@@ -238,7 +237,7 @@ async def tokens_decoder(token_gen):
                         first_chunk_processed = True  # Mark first chunk as processed
                         yield audio_samples
             else:
-                # For subsequent chunks, process every 14 tokens for higher throughput
+                # For subsequent chunks, process every 56 tokens for larger batches
                 if count % process_every_n == 0:
                     if len(buffer) >= ideal_frames:
                         buffer_to_proc = buffer[-ideal_frames:]
@@ -278,11 +277,11 @@ async def tokens_decoder(token_gen):
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
     # Use a larger queue for RTX 4090 to maximize GPU utilization
-    max_queue_size = 32 if snac_device == "cuda" else 8
+    max_queue_size = 128 if snac_device == "cuda" else 8
     audio_queue = queue.Queue(maxsize=max_queue_size)
     
     # Collect tokens in batches for higher throughput
-    batch_size = 16 if snac_device == "cuda" else 4
+    batch_size = 64 if snac_device == "cuda" else 4
     
     # Convert the synchronous token generator into an async generator with batching
     async def async_token_gen():
