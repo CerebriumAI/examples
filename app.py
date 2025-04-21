@@ -227,7 +227,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     max_batch_size = max(2, min(8, input_length // 100))
     
     # Add minimal silence padding for client startup
-    SILENCE_DURATION_MS = 10  # 10ms of silence for lower latency
+    SILENCE_DURATION_MS = 100  # 100ms of silence for improved buffering
     SAMPLE_RATE_BYTES_PER_MS = SAMPLE_RATE * 2 // 1000  # 2 bytes per sample
     silence_bytes = bytearray(SILENCE_DURATION_MS * SAMPLE_RATE_BYTES_PER_MS)
     
@@ -259,7 +259,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
             batches = [request.input]
 
         # Fixed chunk parameters
-        chunk_duration_ms = 20
+        chunk_duration_ms = 50  # 50ms chunks for smoother playback
         chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * chunk_duration_ms
         buffer = bytearray()
 
@@ -553,7 +553,7 @@ async def stream_speech(
     
     # Add short silence at the beginning to give client some buffering time
     # Reduced for lower latency
-    SILENCE_DURATION_MS = 10  # 10ms of silence
+    SILENCE_DURATION_MS = 100  # 100ms of silence for improved buffering
     SAMPLE_RATE_BYTES_PER_MS = SAMPLE_RATE * 2 // 1000  # 2 bytes per sample
     silence_bytes = bytearray(SILENCE_DURATION_MS * SAMPLE_RATE_BYTES_PER_MS)
     
@@ -595,7 +595,7 @@ async def stream_speech(
                 
                 # Yield fixed-size chunks
                 while True:
-                    chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 20
+                    chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 50
                     if buffer_position >= chunk_bytes:
                         yield bytes(audio_buffer[:chunk_bytes])
                         total_bytes += chunk_bytes
@@ -607,7 +607,7 @@ async def stream_speech(
                         break
             # Send any remaining audio in buffer, padded
             if buffer_position > 0:
-                chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 20
+                chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 50
                 pad_len = chunk_bytes - buffer_position
                 yield bytes(audio_buffer[:buffer_position]) + b"\x00" * pad_len
                 total_bytes += chunk_bytes
