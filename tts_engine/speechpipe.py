@@ -7,6 +7,7 @@ import queue
 import time
 import os
 import sys
+import contextlib
 
 # Helper to detect if running in Uvicorn's reloader (same as in inference.py)
 def is_reloader_process():
@@ -57,6 +58,13 @@ if snac_device == "cuda":
     if not IS_RELOADER:
         print("Using CUDA stream for parallel processing")
 
+if TORCH_COMPILE_AVAILABLE and snac_device == "cuda":
+    try:
+        model = torch.compile(model)
+        if not IS_RELOADER:
+            print(" SNAC model compiled for optimized GPU inference")
+    except Exception as e:
+        print(f" torch.compile failed: {e}")
 
 def convert_to_audio(multiframe, count):
     """
@@ -69,30 +77,14 @@ def convert_to_audio(multiframe, count):
     num_frames = len(multiframe) // 7
     frame = multiframe[:num_frames*7]
     
-    # Pre-allocate tensors instead of incrementally building them
-    codes_0 = torch.zeros(num_frames, dtype=torch.int32, device=snac_device)
-    codes_1 = torch.zeros(num_frames * 2, dtype=torch.int32, device=snac_device)
-    codes_2 = torch.zeros(num_frames * 4, dtype=torch.int32, device=snac_device)
-    
-    # Use vectorized operations where possible
+    # Vectorize frame slicing: reshape and slice
     frame_tensor = torch.tensor(frame, dtype=torch.int32, device=snac_device)
-    
-    # Direct indexing is much faster than concatenation in a loop
-    for j in range(num_frames):
-        idx = j * 7
-        
-        # Code 0 - single value per frame
-        codes_0[j] = frame_tensor[idx]
-        
-        # Code 1 - two values per frame
-        codes_1[j*2] = frame_tensor[idx+1]
-        codes_1[j*2+1] = frame_tensor[idx+4]
-        
-        # Code 2 - four values per frame
-        codes_2[j*4] = frame_tensor[idx+2]
-        codes_2[j*4+1] = frame_tensor[idx+3]
-        codes_2[j*4+2] = frame_tensor[idx+5]
-        codes_2[j*4+3] = frame_tensor[idx+6]
+    frame_mat = frame_tensor.view(num_frames, 7)
+    codes_0 = frame_mat[:, 0]
+    # Two values per frame: columns 1 and 4
+    codes_1 = frame_mat[:, [1, 4]].reshape(-1)
+    # Four values per frame: columns 2,3,5,6
+    codes_2 = frame_mat[:, [2, 3, 5, 6]].reshape(-1)
     
     # Reshape codes into expected format
     codes = [
@@ -109,8 +101,9 @@ def convert_to_audio(multiframe, count):
 
     # Use CUDA stream for parallel processing if available
     stream_ctx = torch.cuda.stream(cuda_stream) if cuda_stream is not None else torch.no_grad()
+    autocast_ctx = torch.cuda.amp.autocast() if snac_device == "cuda" else contextlib.nullcontext()
     
-    with stream_ctx, torch.inference_mode():
+    with stream_ctx, torch.inference_mode(), autocast_ctx:
         # Decode the audio
         audio_hat = model.decode(codes)
         
