@@ -222,14 +222,12 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     chunk_count = 0
     total_bytes = 0
     
-    # Optimize buffer size based on input text length
-    # Larger buffers for longer texts improve network efficiency
-    initial_batch_size = max(2, min(4, input_length // 200))
-    max_batch_size = max(8, min(32, input_length // 100))
+    # Optimize buffer size based on input text length (smaller batches for lower latency)
+    initial_batch_size = max(1, min(2, input_length // 200))
+    max_batch_size = max(2, min(8, input_length // 100))
     
-    # Add short silence at the beginning to give client more buffering time
-    # This helps prevent buffer underruns during playback startup
-    SILENCE_DURATION_MS = 50  # 50ms of silence
+    # Add minimal silence padding for client startup
+    SILENCE_DURATION_MS = 10  # 10ms of silence for lower latency
     SAMPLE_RATE_BYTES_PER_MS = SAMPLE_RATE * 2 // 1000  # 2 bytes per sample
     silence_bytes = bytearray(SILENCE_DURATION_MS * SAMPLE_RATE_BYTES_PER_MS)
     
@@ -245,16 +243,16 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         yield bytes(silence_bytes)
         total_bytes += len(silence_bytes)
         
-        # Pre-allocate audio buffer for better memory efficiency
-        buffer_size = 16384  # Increased from 8192 to 16384 (16KB)
+        # Pre-allocate smaller audio buffer for quicker turnovers
+        buffer_size = 4096  # 4KB buffer
         audio_buffer = bytearray(buffer_size)
         buffer_position = 0
         
         # Track timing for consistent delivery
         last_yield_time = time.time()
-        target_chunk_duration_ms = 50  # Target ~50ms per chunk for lower latency
+        target_chunk_duration_ms = 20  # Target ~20ms per chunk for lower latency
         
-        # Dynamic batching parameters with better consistency
+        # Dynamic batching parameters
         current_batch_size = initial_batch_size
         chunks_since_yield = 0
         
@@ -309,7 +307,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                                 audio_buffer[buffer_position:buffer_position + len(chunk)] = chunk
                                 buffer_position += len(chunk)
                             
-                            # Yield the combined initial chunks
+                            # Yield the combined initial chunks immediately
                             yield bytes(audio_buffer[:buffer_position])
                             total_bytes += buffer_position
                             buffer_position = 0
@@ -328,36 +326,39 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                     buffer_position += chunk_size
                     chunks_since_yield += 1
                     
-                    # Yield buffer based on improved adaptive strategy
+                    # Yield buffer based on improved adaptive strategy, faster timing
                     should_yield = False
                     current_time = time.time()
                     elapsed_since_last_yield = (current_time - last_yield_time) * 1000  # in ms
                     
-                    # Yield based on consistent timing (~50ms chunks) for smooth playback
+                    # If enough time has passed, yield a chunk
                     if elapsed_since_last_yield >= target_chunk_duration_ms:
-                        should_yield = True
-                    # Also yield if buffer gets very large
-                    elif buffer_position >= buffer_size:
-                        should_yield = True
-                    # Yield based on number of chunks collected with adaptive batch size
-                    elif chunks_since_yield >= current_batch_size:
-                        should_yield = True
-                    
-                    if should_yield and buffer_position > 0:
-                        yield bytes(audio_buffer[:buffer_position])
-                        total_bytes += buffer_position
-                        buffer_position = 0
+                        # Ensure at least one full chunk
+                        if buffer_position >= initial_batch_size:
+                            yield bytes(audio_buffer[:initial_batch_size])
+                            total_bytes += initial_batch_size
+                            # Shift leftover
+                            remaining = buffer_position - initial_batch_size
+                            audio_buffer[:remaining] = audio_buffer[initial_batch_size:buffer_position]
+                            buffer_position = remaining
+                            last_yield_time = time.time()
+                        # Reset chunk count
                         chunks_since_yield = 0
-                        last_yield_time = current_time
-                        
-                        # Adaptively adjust batch size based on timing
-                        # For smooth playback, we want consistent chunk sizes
-                        if elapsed_since_last_yield < target_chunk_duration_ms * 0.8:
-                            # Yielding too quickly, increase batch size
-                            current_batch_size = min(current_batch_size + 1, max_batch_size)
-                        elif elapsed_since_last_yield > target_chunk_duration_ms * 1.2:
-                            # Yielding too slowly, decrease batch size
-                            current_batch_size = max(initial_batch_size, current_batch_size - 1)
+                    # If number of chunks exceeds batch size, yield
+                    elif chunks_since_yield >= current_batch_size:
+                        # Yield available full chunks
+                        while buffer_position >= target_chunk_duration_ms * SAMPLE_RATE_BYTES_PER_MS:
+                            yield bytes(audio_buffer[:target_chunk_duration_ms * SAMPLE_RATE_BYTES_PER_MS])
+                            total_bytes += target_chunk_duration_ms * SAMPLE_RATE_BYTES_PER_MS
+                            remaining = buffer_position - (target_chunk_duration_ms * SAMPLE_RATE_BYTES_PER_MS)
+                            audio_buffer[:remaining] = audio_buffer[target_chunk_duration_ms * SAMPLE_RATE_BYTES_PER_MS:buffer_position]
+                            buffer_position = remaining
+                        chunks_since_yield = 0
+                    # Adjust batch size adaptively
+                    elif elapsed_since_last_yield < target_chunk_duration_ms * 0.8:
+                        current_batch_size = max(1, current_batch_size - 1)
+                    elif elapsed_since_last_yield > target_chunk_duration_ms * 1.2:
+                        current_batch_size = min(max_batch_size, current_batch_size + 1)
             
             # Send any remaining audio in buffer
             if buffer_position > 0:
@@ -535,9 +536,9 @@ def get_current_config():
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    default_config[key] = value
-    
+                    key = line.split("=")[0].strip()
+                    default_config[key] = line.split("=", 1)[1].strip()
+
     # Current config from .env
     current_config = {}
     if os.path.exists(".env"):
@@ -545,9 +546,9 @@ def get_current_config():
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    current_config[key] = value
-    
+                    key = line.split("=")[0].strip()
+                    current_config[key] = line.split("=", 1)[1].strip()
+
     # Merge configs, with current taking precedence
     config = {**default_config, **current_config}
     
@@ -633,11 +634,12 @@ async def stream_speech(
     total_bytes = 0
     
     # Optimize buffer size for smoother playback
-    initial_batch_size = max(2, min(4, input_length // 200))
-    max_batch_size = max(8, min(32, input_length // 100))
+    initial_batch_size = max(1, min(2, input_length // 200))
+    max_batch_size = max(2, min(8, input_length // 100))
     
-    # Add short silence at the beginning to give client more buffering time
-    SILENCE_DURATION_MS = 50  # 50ms of silence
+    # Add short silence at the beginning to give client some buffering time
+    # Reduced for lower latency
+    SILENCE_DURATION_MS = 10  # 10ms of silence
     SAMPLE_RATE_BYTES_PER_MS = SAMPLE_RATE * 2 // 1000  # 2 bytes per sample
     silence_bytes = bytearray(SILENCE_DURATION_MS * SAMPLE_RATE_BYTES_PER_MS)
     
@@ -654,13 +656,13 @@ async def stream_speech(
         total_bytes += len(silence_bytes)
         
         # Pre-allocate buffers for better performance
-        buffer_size = 16384  # Increased from 8192 to 16KB
+        buffer_size = 4096  # Lower for quicker buffer turnovers (4KB)
         audio_buffer = bytearray(buffer_size)
         buffer_position = 0
         
         # Track timing for consistent delivery
         last_yield_time = time.time()
-        target_chunk_duration_ms = 50  # Target ~50ms per chunk
+        target_chunk_duration_ms = 20  # Target ~20ms per chunk for lower latency
         
         # Dynamic batching parameters
         current_batch_size = initial_batch_size
@@ -696,7 +698,7 @@ async def stream_speech(
                             audio_buffer[buffer_position:buffer_position + len(c)] = c
                             buffer_position += len(c)
                         
-                        # Yield the combined initial chunks
+                        # Yield the combined initial chunks immediately
                         yield bytes(audio_buffer[:buffer_position])
                         total_bytes += buffer_position
                         buffer_position = 0
@@ -720,7 +722,7 @@ async def stream_speech(
                 current_time = time.time()
                 elapsed_since_last_yield = (current_time - last_yield_time) * 1000  # in ms
                 
-                # Yield based on consistent timing (~50ms chunks) for smooth playback
+                # Yield based on consistent timing (~20ms chunks) for smooth playback
                 if elapsed_since_last_yield >= target_chunk_duration_ms:
                     should_yield = True
                 # Also yield if buffer gets very large
