@@ -195,9 +195,10 @@ async def tokens_decoder(token_gen):
     
     # Use different thresholds for first chunk vs. subsequent chunks
     min_frames_first = 7  # First chunk: 7 tokens for ultra-low latency
-    min_frames_subsequent = 28  # Minimum for subsequent chunks
-    ideal_frames = 49  # Ideal frame size
-    process_every_n = 40  # Process every 14 tokens after first chunk for higher throughput
+    min_frames_subsequent = 21  # Minimum for subsequent chunks
+    ideal_frames = 35  # Ideal frame size (5 chunks of 7)
+    process_every_n = 14  # Process every 14 tokens after first chunk for higher throughput
+ # Process every 14 tokens after first chunk for higher throughput
     
     start_time = time.time()
     token_count = 0
