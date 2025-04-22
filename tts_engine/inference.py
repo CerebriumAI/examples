@@ -31,6 +31,11 @@ load_dotenv()
 # Detect hardware capabilities and display information
 import torch
 import psutil
+# Enable TF32 and cuDNN benchmarking for faster GPU inference
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
 
 # Detect if we're on a high-end system based on hardware capabilities
 HIGH_END_GPU = False
@@ -392,11 +397,12 @@ def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     buffer = []
     count = 0
     
-    # Use different thresholds for first chunk vs. subsequent chunks
+    # Use larger batch sizes for higher GPU throughput
     first_chunk_processed = False
-    min_frames_first = 7  # Process after just 7 tokens for first chunk (ultra-low latency)
-    min_frames_subsequent = 28  # Default for reliability after first chunk (4 chunks of 7)
-    process_every = 7  # Process every 7 tokens (standard for Orpheus model)
+    min_frames_first = 16   # Larger initial chunk for better GPU utilization
+    min_frames_subsequent = 64  # Larger subsequent chunks for batch processing
+    process_every = 32  # Process every 32 tokens for larger batches
+
     
     start_time = time.time()
     last_log_time = start_time
@@ -447,8 +453,8 @@ def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
-    # Use a larger queue for high-end systems
-    queue_size = 100 if HIGH_END_GPU else 50
+    # Use a much larger queue for high-end systems and batch processing
+    queue_size = 400 if HIGH_END_GPU else 200
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     

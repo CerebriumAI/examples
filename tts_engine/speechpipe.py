@@ -1,6 +1,11 @@
 from snac import SNAC
 import numpy as np
 import torch
+# Enable TF32 and cuDNN benchmarking for faster GPU inference
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
 import asyncio
 import threading
 import queue
@@ -45,6 +50,11 @@ snac_device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.m
 if not IS_RELOADER:
     print(f"Using device: {snac_device}")
 model = model.to(snac_device)
+# Cast model to half precision if using CUDA for faster inference
+if snac_device == "cuda":
+    model = model.half()
+    if not IS_RELOADER:
+        print("SNAC model cast to FP16 for faster GPU inference")
 
 # Disable torch.compile as it requires Triton which isn't installed
 # We'll use regular PyTorch optimization techniques instead
@@ -186,11 +196,11 @@ async def tokens_decoder(token_gen):
     # Track if first chunk has been processed
     first_chunk_processed = False
     
-    # Use different thresholds for first chunk vs. subsequent chunks
-    min_frames_first = 7  # First chunk: 7 tokens for ultra-low latency
-    min_frames_subsequent = 56  # Minimum for subsequent chunks to leverage more GPU
-    ideal_frames = 112  # Ideal frame size (16 chunks) for high VRAM utilization
-    process_every_n = 56  # Process every 56 tokens for larger batches
+    # Use larger batch sizes for higher GPU throughput
+    min_frames_first = 16   # First chunk: larger for better GPU utilization
+    min_frames_subsequent = 64  # Subsequent chunks: larger for batch processing
+    ideal_frames = 128  # Ideal frame size for high-throughput streaming
+    process_every_n = 32  # Process every 32 tokens
     
     start_time = time.time()
     token_count = 0
