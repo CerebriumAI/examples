@@ -40,11 +40,23 @@ except:
 
 model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").eval()
 
+# Enable TF32 and cuDNN benchmarking for faster GPU inference
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
+
 # Check if CUDA is available and set device accordingly
 snac_device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 if not IS_RELOADER:
     print(f"Using device: {snac_device}")
 model = model.to(snac_device)
+
+# Cast model to half precision if using CUDA for faster inference
+if snac_device == "cuda":
+    model = model.half()
+    if not IS_RELOADER:
+        print("SNAC model cast to FP16 for faster GPU inference")
 
 # Disable torch.compile as it requires Triton which isn't installed
 # We'll use regular PyTorch optimization techniques instead
@@ -186,11 +198,11 @@ async def tokens_decoder(token_gen):
     # Track if first chunk has been processed
     first_chunk_processed = False
     
-    # Use different thresholds for first chunk vs. subsequent chunks
-    min_frames_first = 7  # First chunk: 7 tokens for ultra-low latency
-    min_frames_subsequent = 56  # Minimum for subsequent chunks to leverage more GPU
-    ideal_frames = 112  # Ideal frame size (16 chunks) for high VRAM utilization
-    process_every_n = 56  # Process every 56 tokens for larger batches
+    # Use adjusted thresholds for lower latency
+    min_frames_first = 4   # First chunk: lower threshold for ultra-low latency
+    min_frames_subsequent = 28  # Subsequent chunks: reduced for faster processing
+    ideal_frames = 56  # Ideal frame size adapted for lower latency
+    process_every_n = 28  # Process every 28 tokens for more frequent updates
     
     start_time = time.time()
     token_count = 0
@@ -230,7 +242,7 @@ async def tokens_decoder(token_gen):
                         first_chunk_processed = True  # Mark first chunk as processed
                         yield audio_samples
             else:
-                # For subsequent chunks, process every 56 tokens for larger batches
+                # For subsequent chunks, process every 28 tokens for more frequent updates
                 if count % process_every_n == 0:
                     if len(buffer) >= ideal_frames:
                         buffer_to_proc = buffer[-ideal_frames:]

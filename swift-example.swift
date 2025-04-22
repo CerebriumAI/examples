@@ -3,6 +3,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     // MARK: - Properties
     private let engine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
+    private let converterNode = AVAudioMixerNode()
     private var sourceFormat: AVAudioFormat?
     private var outputFormat: AVAudioFormat?
     private var session: URLSession!
@@ -10,98 +11,65 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     private var headerBuffer = Data()
     private var headerParsed = false
     private var completionHandler: (() -> Void)?
-    
+    private var streamingEnded = false
+    private var pendingData = Data()
+
     // Enhanced buffering system
     private var audioProcessingQueue = DispatchQueue(label: "com.orpheus.audioProcessing", qos: .userInteractive)
     private var audioChunks = [Data]()
     private var audioChunksLock = NSLock()
     private var isSchedulingBuffers = false
     private var bufferSemaphore = DispatchSemaphore(value: 1)
-    
+
     // Buffer settings for smooth playback
-    private let prefillBufferCount = 7      // Increased from 3 to 7 to prevent underruns
-    private let bufferDuration = 0.08       // Reduced from 0.1 to 0.08 for more granular scheduling
-    private let maximumBufferedDuration = 3.0  // Increased from 2.0 to 3.0 seconds
+    private let prefillBufferCount = 6      // Number of buffers to fill before starting playback (increased for underrun protection)
+    private let bufferDuration = 0.1        // Duration of each audio buffer in seconds
+    private let maximumBufferedDuration = 2.0  // Maximum audio to buffer ahead in seconds
+    private var initialBufferThreshold: Int {
+        Int(ceil(maximumBufferedDuration / bufferDuration))
+    }
     private var lastScheduledTime: AVAudioTime?
     private var converter: AVAudioConverter?
     private var needsScheduling = false
     private var isPlaying = false
-    private var framesPerBuffer: AVAudioFrameCount = 3528 // Will be recalculated based on format
-    
-    // Advanced jitter buffer
-    private var jitterBufferEnabled = true
-    private var targetBufferLevel = 5       // Target number of buffers to maintain
-    private var minBufferLevel = 2          // Minimum buffers before slowing down
-    private var maxBufferLevel = 10         // Maximum buffers before speeding up
-    private var bufferingStrategy = BufferingStrategy.adaptive
-    
-    // Stats for debugging and adaptive playback
+    private var framesPerBuffer: AVAudioFrameCount = 4410 // Will be recalculated based on format
+
+    // Stats for debugging
     private var totalScheduledFrames: UInt64 = 0
     private var bufferUnderrunCount = 0
     private var lastDebugPrintTime = Date()
-    private var playbackRate: Float = 1.0
-    private var bufferHealthHistory = [Int]()
-    private var networkJitterMs = 0.0       // Estimated network jitter in milliseconds
-    
-    // MARK: - Enums
-    
-    enum BufferingStrategy {
-        case fixed      // Fixed buffer size
-        case adaptive   // Adapt buffer size based on network conditions
-        case aggressive // More aggressive buffering for difficult networks
-    }
 
     /// Initializes the audio session, engine, and URLSession for streaming.
     override init() {
         super.init()
         setupAudioSession()
         setupAudioEngine()
-        
-        // Create custom URLSession configuration for audio streaming
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
-        config.waitsForConnectivity = true
-        config.httpMaximumConnectionsPerHost = 1
-        session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
-        
-        print("OrpheusStreamingPlayer initialized with prefill count: \(prefillBufferCount)")
+        session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
     }
-    
+
     // MARK: - Setup
-    
+
     private func setupAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playback, mode: .default)
             try audioSession.setActive(true)
-            
-            // Request higher buffer size for more stable playback
-            let preferredIOBufferDuration = 0.015  // 15ms buffer (increased from default)
-            try audioSession.setPreferredIOBufferDuration(preferredIOBufferDuration)
-            
-            print("Audio session configured with \(preferredIOBufferDuration * 1000)ms IO buffer")
         } catch {
             print("AVAudioSession setup error: \(error)")
         }
     }
-    
+
     private func setupAudioEngine() {
         // Output format is fixed to system rate for maximum compatibility
         outputFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)
-        
+
         // Attach and connect nodes with the output format
         engine.attach(playerNode)
-        
-        // Set larger buffer size on the main mixer for more stability
-        engine.mainMixerNode.volume = 1.0
-        
+        engine.attach(converterNode)
+
         // Connect with output format (will be properly configured later)
         engine.connect(playerNode, to: engine.mainMixerNode, format: outputFormat)
-        
-        // Enable manual rendering mode to prevent audio dropouts
-        engine.prepare()
-        
+
         // Set up buffer observer to detect buffer underruns
         NotificationCenter.default.addObserver(
             self,
@@ -109,87 +77,30 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
             name: .AVAudioEngineConfigurationChange,
             object: engine
         )
-        
-        // Also monitor for audio interruptions
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleAudioInterruption),
-            name: AVAudioSession.interruptionNotification,
-            object: nil
-        )
     }
-    
+
     @objc private func handleEngineConfigurationChange(_ notification: Notification) {
         print("Audio engine configuration changed")
-        
+
         // Restart the engine if needed
         if !engine.isRunning {
             startEngine()
         }
     }
-    
-    @objc private func handleAudioInterruption(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
-            return
-        }
-        
-        if type == .began {
-            // Interruption began, audio stopped
-            print("Audio interrupted - playback paused")
-        } else if type == .ended {
-            // Interruption ended, resume if needed
-            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
-                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                if options.contains(.shouldResume) {
-                    print("Audio interruption ended - resuming playback")
-                    startEngine()
-                    
-                    if !playerNode.isPlaying && isPlaying {
-                        playerNode.play()
-                    }
-                }
-            }
-        }
-    }
-    
+
     private func startEngine() {
         if engine.isRunning { return }
-        
+
         do {
             try engine.start()
             print("Audio engine started")
         } catch {
             print("Failed to start audio engine: \(error)")
-            
-            // Try to recover
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.recoverFromEngineFailure()
-            }
-        }
-    }
-    
-    // Recovery method for engine failures
-    private func recoverFromEngineFailure() {
-        print("Attempting to recover from engine failure...")
-        
-        do {
-            // Reset audio session
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setActive(false)
-            try audioSession.setActive(true)
-            
-            // Restart engine
-            try engine.start()
-            print("Engine recovered successfully")
-        } catch {
-            print("Recovery failed: \(error)")
         }
     }
 
     // MARK: - Public API
-    
+
     /// Streams TTS audio from the server and plays it.
     /// - Parameters:
     ///   - text: The text to synthesize.
@@ -199,7 +110,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
                      voice: String = "tara",
                      completion: (() -> Void)? = nil) {
         completionHandler = completion
-        guard let url = URL(string: "http://35.205.197.251:5005/v1/audio/speech/stream") else {
+        guard let url = URL(string: "http://34.125.197.177:5005/v1/audio/speech/stream") else {
             print("Invalid server URL")
             return
         }
@@ -219,36 +130,15 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
-        
+
         // Reset state
         reset()
-        
-        // Prepare buffering strategy based on text length
-        if text.count > 500 {
-            // For longer texts, use more aggressive buffering
-            bufferingStrategy = .aggressive
-            targetBufferLevel = 8
-            prefillBufferCount = 10
-            print("Using aggressive buffering for long text (\(text.count) chars)")
-        } else if text.count > 200 {
-            // Medium length texts
-            bufferingStrategy = .adaptive
-            targetBufferLevel = 6
-            prefillBufferCount = 7
-            print("Using adaptive buffering for medium text (\(text.count) chars)")
-        } else {
-            // Short texts, prioritize latency
-            bufferingStrategy = .fixed
-            targetBufferLevel = 4
-            prefillBufferCount = 5
-            print("Using fixed buffering for short text (\(text.count) chars)")
-        }
-        
+
         // Begin streaming
         dataTask = session.dataTask(with: request)
         dataTask?.resume()
     }
-    
+
     func stop() {
         isPlaying = false
         playerNode.stop()
@@ -256,12 +146,12 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
         dataTask?.cancel()
         reset()
     }
-    
+
     private func reset() {
         audioChunksLock.lock()
         audioChunks.removeAll()
         audioChunksLock.unlock()
-        
+
         headerBuffer.removeAll()
         headerParsed = false
         isSchedulingBuffers = false
@@ -270,170 +160,106 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
         bufferUnderrunCount = 0
         isPlaying = false
         lastDebugPrintTime = Date()
-        playbackRate = 1.0
-        bufferHealthHistory.removeAll()
-        networkJitterMs = 0.0
+        streamingEnded = false
+        pendingData.removeAll()
     }
-    
+
     // MARK: - Audio Processing
-    
+
     /// Starts the scheduling process if not already running
     private func ensureSchedulingActive() {
         let wasScheduling = isSchedulingBuffers
-        if !wasScheduling && isPlaying {
+        audioChunksLock.lock()
+        let pendingChunks = audioChunks.count
+        audioChunksLock.unlock()
+        // Only start scheduling if we have enough prefill buffers
+        if !wasScheduling && isPlaying && pendingChunks >= prefillBufferCount {
             isSchedulingBuffers = true
             audioProcessingQueue.async { [weak self] in
                 self?.processAudioChunks()
             }
         }
     }
-    
+
     /// Main audio processing loop - runs on audioProcessingQueue
     private func processAudioChunks() {
-        guard isSchedulingBuffers else { return }
-        
-        // Get current buffer health
+        // If stream ended and no pending chunks, finish playback
         audioChunksLock.lock()
-        let pendingChunksCount = audioChunks.count
-        let hasData = !audioChunks.isEmpty
+        let pending = audioChunks.count
         audioChunksLock.unlock()
-        
-        // Update buffer health history
-        bufferHealthHistory.append(pendingChunksCount)
-        if bufferHealthHistory.count > 20 {
-            bufferHealthHistory.removeFirst()
+        if streamingEnded && pending == 0 {
+            isSchedulingBuffers = false
+            DispatchQueue.main.async { [weak self] in
+                self?.completionHandler?()
+            }
+            return
         }
-        
-        // Adaptive rate adjustment based on buffer health
-        if bufferingStrategy == .adaptive || bufferingStrategy == .aggressive {
-            updatePlaybackRate(bufferCount: pendingChunksCount)
+
+        guard isSchedulingBuffers else { return }
+
+        // Get next chunk if available
+        var chunk: Data?
+        audioChunksLock.lock()
+        if !audioChunks.isEmpty {
+            chunk = audioChunks.removeFirst()
         }
-        
+        let pendingChunksCount = audioChunks.count
+        audioChunksLock.unlock()
+
         // Process chunk if we have one
-        if hasData {
-            audioChunksLock.lock()
-            let chunk = audioChunks.removeFirst()
-            audioChunksLock.unlock()
-            
-            if let sourceFormat = sourceFormat, let converter = converter {
-                processAndScheduleAudioChunk(chunk, sourceFormat: sourceFormat, converter: converter)
-                
-                // Debug output every few seconds
-                let now = Date()
-                if now.timeIntervalSince(lastDebugPrintTime) > 5.0 {
-                    // Calculate network jitter
-                    if bufferHealthHistory.count >= 10 {
-                        let bufferVariance = calculateBufferVariance()
-                        networkJitterMs = bufferVariance * bufferDuration * 1000 // convert to ms
-                    }
-                    
-                    print("Buffer health: \(pendingChunksCount)/\(targetBufferLevel) chunks (\(bufferUnderrunCount) underruns, jitter: \(networkJitterMs)ms)")
-                    lastDebugPrintTime = now
-                }
+        if let chunk = chunk, let sourceFormat = sourceFormat, let converter = converter {
+            processAndScheduleAudioChunk(chunk, sourceFormat: sourceFormat, converter: converter)
+
+            // Debug output every few seconds
+            let now = Date()
+            if now.timeIntervalSince(lastDebugPrintTime) > 5.0 {
+                print("Audio stats: \(pendingChunksCount) chunks buffered, \(bufferUnderrunCount) underruns")
+                lastDebugPrintTime = now
             }
         } else {
-            // No chunk available, check if we need more buffers scheduled
-            if playerNode.isPlaying && needsScheduling {
-                bufferUnderrunCount += 1
-                print("⚠️ Buffer underrun detected! (\(bufferUnderrunCount) total)")
-                needsScheduling = false
-                
-                // If we keep getting underruns, adjust our buffer target
-                if bufferUnderrunCount > 3 && bufferingStrategy != .fixed {
-                    // Increase target buffer level to compensate for network issues
-                    targetBufferLevel = min(targetBufferLevel + 1, 12)
-                    print("Adjusted target buffer level to \(targetBufferLevel)")
+            // No chunk available, wait briefly and check player status
+            if playerNode.isPlaying {
+                // Player is still going - check if we need more buffers scheduled
+                if needsScheduling {
+                    bufferUnderrunCount += 1
+                    print("⚠️ Buffer underrun detected!")
+                    needsScheduling = false
                 }
             }
         }
-        
+
         // Continue processing if we're still scheduling
         if isSchedulingBuffers {
             // Use short delay to prevent tight loop while allowing frequent scheduling
-            let delayTime: TimeInterval
-            if pendingChunksCount > targetBufferLevel {
-                delayTime = 0.01 // Process quickly if we have lots of data
-            } else if pendingChunksCount > 0 {
-                delayTime = 0.02 // Normal processing
-            } else {
-                delayTime = 0.05 // Wait longer if no data to process
-            }
-            
-            DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delayTime) { [weak self] in
+            DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.01) { [weak self] in
                 self?.audioProcessingQueue.async {
                     self?.processAudioChunks()
                 }
             }
         }
     }
-    
-    /// Calculate variance in buffer level (used to estimate jitter)
-    private func calculateBufferVariance() -> Double {
-        guard bufferHealthHistory.count > 1 else { return 0 }
-        
-        let average = Double(bufferHealthHistory.reduce(0, +)) / Double(bufferHealthHistory.count)
-        let sumOfSquaredDifferences = bufferHealthHistory.reduce(0.0) { result, value in
-            let difference = Double(value) - average
-            return result + (difference * difference)
-        }
-        
-        return sqrt(sumOfSquaredDifferences / Double(bufferHealthHistory.count))
-    }
-    
-    /// Update playback rate based on buffer health
-    private func updatePlaybackRate(bufferCount: Int) {
-        if bufferCount < minBufferLevel {
-            // Buffer getting too low - slow down playback slightly to let buffer refill
-            let newRate = max(0.95, playbackRate - 0.01)
-            if newRate != playbackRate {
-                playbackRate = newRate
-                // Apply rate change if significant
-                if abs(playbackRate - 1.0) > 0.03 {
-                    print("Adjusting playback rate to \(playbackRate) (buffer low: \(bufferCount))")
-                }
-            }
-        } else if bufferCount > maxBufferLevel && bufferCount > targetBufferLevel * 2 {
-            // Buffer growing too large - speed up playback slightly to catch up
-            let newRate = min(1.05, playbackRate + 0.01)
-            if newRate != playbackRate {
-                playbackRate = newRate
-                // Apply rate change if significant
-                if abs(playbackRate - 1.0) > 0.03 {
-                    print("Adjusting playback rate to \(playbackRate) (buffer high: \(bufferCount))")
-                }
-            }
-        } else if bufferCount >= targetBufferLevel && bufferCount <= targetBufferLevel + 2 {
-            // Buffer at healthy level - gradually return to normal rate
-            if playbackRate != 1.0 {
-                playbackRate = playbackRate + (1.0 - playbackRate) * 0.2
-                if abs(playbackRate - 1.0) < 0.01 {
-                    playbackRate = 1.0
-                }
-            }
-        }
-    }
-    
+
     /// Processes and schedules a chunk of audio data
     private func processAndScheduleAudioChunk(_ chunk: Data, sourceFormat: AVAudioFormat, converter: AVAudioConverter) {
         bufferSemaphore.wait()
         defer { bufferSemaphore.signal() }
-        
+
         let bytesPerFrame = Int(sourceFormat.streamDescription.pointee.mBytesPerFrame)
         let frameCount = AVAudioFrameCount(chunk.count / bytesPerFrame)
-        
+
         // Skip empty chunks
         if frameCount == 0 {
             return
         }
-        
+
         // Create buffer with the original format
         guard let sourceBuffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: frameCount) else {
             print("Failed to create source buffer")
             return
         }
-        
+
         sourceBuffer.frameLength = frameCount
-        
+
         // Copy chunk data to source buffer
         chunk.withUnsafeBytes { rawBufferPointer in
             let audioBuffer = sourceBuffer.audioBufferList.pointee.mBuffers
@@ -442,97 +268,101 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
                 memcpy(destPtr, srcPtr, Int(audioBuffer.mDataByteSize))
             }
         }
-        
-        // Calculate output frame capacity based on sample rate ratio and playback rate
+
+        // Calculate output frame capacity based on sample rate ratio
         let sampleRateRatio = outputFormat!.sampleRate / sourceFormat.sampleRate
         let outputFrameCount = AVAudioFrameCount(Double(frameCount) * sampleRateRatio)
-        
+
         // Create output buffer
         guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat!, frameCapacity: outputFrameCount) else {
             print("Failed to create output buffer")
             return
         }
-        
+
         // Perform the conversion
         var error: NSError?
         let conversionResult = converter.convert(to: outputBuffer, error: &error) { packetCount, status in
             status.pointee = .haveData
             return sourceBuffer
         }
-        
+
         if let error = error {
             print("Conversion error: \(error)")
             return
         }
-        
+
         if conversionResult == .error || outputBuffer.frameLength == 0 {
             print("Conversion failed or produced no output")
             return
         }
-        
+
         // Schedule the buffer at the appropriate time
         scheduleBuffer(outputBuffer)
     }
-    
+
     /// Schedules a buffer with proper timing
     private func scheduleBuffer(_ buffer: AVAudioPCMBuffer) {
         // Calculate the time when this buffer should start
         var schedulingTime: AVAudioTime?
-        
+
         if let lastTime = lastScheduledTime {
             // Calculate next buffer start time from previous end time
             let sampleTime = lastTime.sampleTime + AVAudioFramePosition(totalScheduledFrames)
             schedulingTime = AVAudioTime(sampleTime: sampleTime, atRate: outputFormat!.sampleRate)
         } else {
-            // First buffer; schedule with a slight delay to allow for buffering
-            let hostTime = mach_absolute_time() + UInt64(200_000_000) // 200ms initial delay
+            // First buffer; schedule immediately (in 100ms to allow for more buffering)
+            let hostTime = mach_absolute_time() + UInt64(100_000_000) // 100ms
             schedulingTime = AVAudioTime(hostTime: hostTime)
         }
-        
+
         // If player isn't playing, start it
         if !playerNode.isPlaying {
             playerNode.play(at: schedulingTime)
             isPlaying = true
         }
-        
+
         // Schedule buffer with completion handler to track when it finishes
         playerNode.scheduleBuffer(buffer, at: schedulingTime) { [weak self] in
             DispatchQueue.main.async {
                 self?.needsScheduling = true
             }
         }
-        
+
         // Update tracking variables
         lastScheduledTime = schedulingTime
         totalScheduledFrames = UInt64(buffer.frameLength)
     }
 
     // MARK: - URLSessionDataDelegate
-    
+
     func urlSession(_ session: URLSession,
                     dataTask: URLSessionDataTask,
                     didReceive data: Data) {
         if !headerParsed {
-            // Collect header bytes
             headerBuffer.append(data)
-            
             if headerBuffer.count >= 44 {
-                // We have enough bytes for the WAV header
                 parseWAVHeader(headerBuffer)
                 headerParsed = true
-                
-                // Start processing any remaining audio data after the header
                 if headerBuffer.count > 44 {
                     let audioData = headerBuffer.suffix(from: 44)
-                    enqueueAudioData(Data(audioData))
+                    pendingData.append(audioData)
+                    headerBuffer.removeAll()
                 }
             }
         } else {
-            // Process incoming audio data
-            enqueueAudioData(data)
+            pendingData.append(data)
+        }
+        // Slice pendingData into fixed-size buffers
+        guard headerParsed, let sourceFormat = sourceFormat else { return }
+        let bytesPerFrame = Int(sourceFormat.streamDescription.pointee.mBytesPerFrame)
+        let bytesPerBuffer = bytesPerFrame * Int(framesPerBuffer)
+        while pendingData.count >= bytesPerBuffer {
+            let chunk = pendingData.prefix(bytesPerBuffer)
+            pendingData.removeFirst(bytesPerBuffer)
+            enqueueAudioData(chunk)
         }
     }
-    
+
     func urlSession(_ session: URLSession,
                     task: URLSessionTask,
                     didCompleteWithError error: Error?) {
@@ -541,28 +371,39 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
         } else {
             print("Streaming completed successfully")
         }
-        
-        // Allow any remaining audio to play
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.isSchedulingBuffers = false
-            self?.completionHandler?()
+        // Flush leftover pendingData
+        if headerParsed && pendingData.count > 0 {
+            enqueueAudioData(pendingData)
+            pendingData.removeAll()
         }
+        // Start playback if buffered
+        audioChunksLock.lock()
+        let pendingChunks = audioChunks.count
+        audioChunksLock.unlock()
+        if pendingChunks > 0 {
+            if !isPlaying {
+                isPlaying = true
+                startEngine()
+            }
+            ensureSchedulingActive()
+        }
+        streamingEnded = true
     }
-    
+
     // MARK: - Helpers
-    
+
     /// Enqueues audio data for processing
     private func enqueueAudioData(_ data: Data) {
         // Skip empty data
         if data.isEmpty { return }
-        
+
         // Add to queue
         audioChunksLock.lock()
         audioChunks.append(data)
         let pendingChunks = audioChunks.count
         audioChunksLock.unlock()
-        
-        // Start scheduling if we have enough initial data
+
+        // Only start playback once we have enough buffers
         if !isPlaying && pendingChunks >= prefillBufferCount {
             isPlaying = true
             startEngine()
@@ -571,11 +412,11 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
             ensureSchedulingActive()
         }
     }
-    
+
     /// Parses the WAV header to extract format info and configure the audio pipeline
     private func parseWAVHeader(_ header: Data) {
         guard header.count >= 44 else { return }
-        
+
         let bytes = [UInt8](header)
         let channels = UInt16(bytes[22]) | (UInt16(bytes[23]) << 8)
         let rate = UInt32(bytes[24]) |
@@ -583,51 +424,51 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
         (UInt32(bytes[26]) << 16) |
         (UInt32(bytes[27]) << 24)
         let bits = UInt16(bytes[34]) | (UInt16(bytes[35]) << 8)
-        
+
         print("WAV format: \(rate)Hz, \(channels) channels, \(bits) bits")
-        
+
         // Create the input format
         sourceFormat = AVAudioFormat(
             commonFormat: .pcmFormatInt16,
             sampleRate: Double(rate),
             channels: AVAudioChannelCount(channels),
             interleaved: true)
-        
+
         // Create/update the output format
         outputFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 44100, // Fixed rate for consistency
             channels: AVAudioChannelCount(channels),
             interleaved: false)
-        
+
         // Calculate frames per buffer based on desired buffer duration
         framesPerBuffer = AVAudioFrameCount(outputFormat!.sampleRate * bufferDuration)
-        
+
         // Create the converter
         converter = AVAudioConverter(from: sourceFormat!, to: outputFormat!)
         if converter == nil {
             print("Failed to create audio converter")
             return
         }
-        
+
         // Reset audio engine, ensure connections are correct
         resetAudioEngine()
     }
-    
+
     /// Reconfigures the audio engine with the current formats
     private func resetAudioEngine() {
         // Stop everything
         if engine.isRunning {
             engine.stop()
         }
-        
+
         // Reset connections
         engine.disconnectNodeInput(playerNode)
         engine.disconnectNodeInput(engine.mainMixerNode)
-        
+
         // Reconnect with proper format
         engine.connect(playerNode, to: engine.mainMixerNode, format: outputFormat)
-        
+
         // Don't start yet - we'll start when we have enough buffered data
     }
 }

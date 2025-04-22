@@ -32,6 +32,12 @@ load_dotenv()
 import torch
 import psutil
 
+# Enable TF32 and cuDNN benchmarking for faster GPU inference
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
+
 # Detect if we're on a high-end system based on hardware capabilities
 HIGH_END_GPU = False
 if torch.cuda.is_available():
@@ -394,9 +400,9 @@ def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     
     # Use different thresholds for first chunk vs. subsequent chunks
     first_chunk_processed = False
-    min_frames_first = 7  # Process after just 7 tokens for first chunk (ultra-low latency)
-    min_frames_subsequent = 28  # Default for reliability after first chunk (4 chunks of 7)
-    process_every = 7  # Process every 7 tokens (standard for Orpheus model)
+    min_frames_first = 4   # Lower threshold for initial chunk (ultra-low latency)
+    min_frames_subsequent = 16  # Reduced subsequent threshold for faster processing
+    process_every = 4  # More frequent processing of buffer for lower latency
     
     start_time = time.time()
     last_log_time = start_time
