@@ -12,6 +12,7 @@ import wave
 import io
 import struct
 import json
+import numpy as np
 
 # Function to ensure .env file exists
 def ensure_env_file_exists():
@@ -245,11 +246,9 @@ async def stream_speech_api(request: StreamingSpeechRequest):
             batches = [request.input]
 
         chunk_duration_ms = 50  # 50ms chunks for smoother playback
-        if response_format == "pcm_f32le":
-            bytes_per_sample = 4
-            chunk_bytes = int(24000 * bytes_per_sample * (chunk_duration_ms / 1000))
-        else:
-            chunk_bytes = SAMPLE_RATE * 2 * chunk_duration_ms // 1000
+        # Compute int16 chunk size per 50ms
+        samples_per_chunk = int(24000 * (chunk_duration_ms / 1000))
+        int16_chunk_bytes = samples_per_chunk * 2
         buffer = bytearray()
 
         try:
@@ -259,17 +258,29 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                         continue
                     buffer.extend(audio_chunk)
                     # Yield full chunks
-                    while len(buffer) >= chunk_bytes:
-                        chunk = buffer[:chunk_bytes]
-                        yield bytes(chunk)
-                        total_bytes += chunk_bytes
-                        del buffer[:chunk_bytes]
+                    while len(buffer) >= int16_chunk_bytes:
+                        int16_chunk = bytes(buffer[:int16_chunk_bytes])
+                        if response_format == "pcm_f32le":
+                            # Convert int16 PCM to PCM float32 in [-1,1]
+                            arr = np.frombuffer(int16_chunk, dtype=np.int16).astype(np.float32) / 32767.0
+                            chunk = arr.tobytes()
+                        else:
+                            chunk = int16_chunk
+                        total_bytes += len(chunk)
+                        yield chunk
+                        del buffer[:int16_chunk_bytes]
                         await asyncio.sleep(chunk_duration_ms / 1000)
             # Flush remaining buffer padded to full chunk
             if buffer:
-                pad_len = chunk_bytes - len(buffer)
-                yield bytes(buffer) + b"\x00" * pad_len
-                total_bytes += chunk_bytes
+                pad_len = int16_chunk_bytes - len(buffer)
+                int16_chunk = bytes(buffer) + b"\x00" * pad_len
+                if response_format == "pcm_f32le":
+                    arr = np.frombuffer(int16_chunk, dtype=np.int16).astype(np.float32) / 32767.0
+                    chunk = arr.tobytes()
+                else:
+                    chunk = int16_chunk
+                total_bytes += len(chunk)
+                yield chunk
         except Exception as e:
             print(f"Error in streaming audio: {e}")
         finally:
