@@ -378,7 +378,8 @@ async def stream_speech_from_api(
     temperature: float = TEMPERATURE,
     top_p: float = TOP_P,
     max_tokens: int = MAX_TOKENS,
-    repetition_penalty: float = REPETITION_PENALTY
+    repetition_penalty: float = REPETITION_PENALTY,
+    output_format: str = "int16"
 ):
     """Async generator to stream speech audio chunks from Orpheus TTS model."""
     token_gen = generate_tokens_from_api(
@@ -389,7 +390,7 @@ async def stream_speech_from_api(
         max_tokens=max_tokens,
         repetition_penalty=repetition_penalty
     )
-    for chunk in tokens_decoder(token_gen):
+    for chunk in tokens_decoder(token_gen, output_format=output_format):
         yield chunk
 
 def tokens_decoder(token_gen, output_format="int16") -> Generator[bytes, None, None]:
@@ -633,7 +634,8 @@ async def stream_speech_from_api(
     temperature: float = TEMPERATURE,
     top_p: float = TOP_P,
     max_tokens: int = MAX_TOKENS,
-    repetition_penalty: float = REPETITION_PENALTY
+    repetition_penalty: float = REPETITION_PENALTY,
+    output_format: str = "int16"
 ):
     """Async generator to stream speech audio chunks from Orpheus TTS model."""
     token_gen = generate_tokens_from_api(
@@ -644,7 +646,7 @@ async def stream_speech_from_api(
         max_tokens=max_tokens,
         repetition_penalty=repetition_penalty
     )
-    for chunk in tokens_decoder(token_gen):
+    for chunk in tokens_decoder(token_gen, output_format=output_format):
         yield chunk
 
 def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE, 
