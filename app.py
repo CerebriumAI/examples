@@ -209,7 +209,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     3. Unlimited length - no practical limit on input text length
     4. High throughput - efficient batching for maximum performance
     
-    Returns a streaming response with WAV audio data.
+    Returns a streaming response with WAV audio data or raw PCM Float32 LE.
     """
     if not request.input:
         raise HTTPException(status_code=400, detail="Missing input text")
@@ -222,27 +222,13 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     chunk_count = 0
     total_bytes = 0
     
-    # Optimize buffer size based on input text length (smaller batches for lower latency)
-    initial_batch_size = max(1, min(2, input_length // 200))
-    max_batch_size = max(2, min(8, input_length // 100))
-    
-    # Add minimal silence padding for client startup
-    SILENCE_DURATION_MS = 100  # 100ms of silence for improved buffering
-    SAMPLE_RATE_BYTES_PER_MS = SAMPLE_RATE * 2 // 1000  # 2 bytes per sample
-    silence_bytes = bytearray(SILENCE_DURATION_MS * SAMPLE_RATE_BYTES_PER_MS)
+    response_format = getattr(request, 'response_format', 'wav')
+    print(f"[stream_speech_api] response_format: {response_format}")
     
     async def audio_stream_generator():
         nonlocal chunk_count, total_bytes
         
-        # Yield WAV header and initial silence
-        wav_header = generate_wav_header(SAMPLE_RATE)
-        yield wav_header
-        total_bytes += len(wav_header)
-
-        yield bytes(silence_bytes)
-        total_bytes += len(silence_bytes)
-
-        # Prepare text batches
+        # Streaming raw pcm_f32le, no WAV header or silence if requested
         if len(request.input) > 1000:
             from tts_engine.inference import split_text_into_sentences
             sentences = split_text_into_sentences(request.input)
@@ -258,9 +244,12 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         else:
             batches = [request.input]
 
-        # Fixed chunk parameters
         chunk_duration_ms = 50  # 50ms chunks for smoother playback
-        chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * chunk_duration_ms
+        if response_format == "pcm_f32le":
+            bytes_per_sample = 4
+            chunk_bytes = int(24000 * bytes_per_sample * (chunk_duration_ms / 1000))
+        else:
+            chunk_bytes = SAMPLE_RATE * 2 * chunk_duration_ms // 1000
         buffer = bytearray()
 
         try:
@@ -297,7 +286,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     # Use optimized headers for streaming response
     return StreamingResponse(
         audio_stream_generator(),
-        media_type="audio/wav",
+        media_type="application/octet-stream" if response_format == "pcm_f32le" else "audio/wav",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "X-Content-Type-Options": "nosniff",
@@ -561,13 +550,13 @@ async def stream_speech(
         nonlocal chunk_count, total_bytes
         
         # Use cached WAV header for maximum performance
-        wav_header = generate_wav_header(SAMPLE_RATE)
-        yield wav_header
-        total_bytes += len(wav_header)
+        # wav_header = generate_wav_header(SAMPLE_RATE)
+        # yield wav_header
+        # total_bytes += len(wav_header)
         
         # Add silence padding at the beginning to help client buffering
-        yield bytes(silence_bytes)
-        total_bytes += len(silence_bytes)
+        # yield bytes(silence_bytes)
+        # total_bytes += len(silence_bytes)
         
         # Pre-allocate buffers for better performance
         buffer_size = 4096  # Lower for quicker buffer turnovers (4KB)
@@ -630,7 +619,7 @@ async def stream_speech(
     # Return StreamingResponse with optimized headers
     return StreamingResponse(
         stream_audio(),
-        media_type="audio/wav",
+        media_type="application/octet-stream",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "X-Content-Type-Options": "nosniff",
