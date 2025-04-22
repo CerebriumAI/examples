@@ -252,33 +252,25 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         buffer = bytearray()
 
         try:
+            output_format = "float32" if response_format == "pcm_f32le" else "int16"
             for batch in batches:
-                async for audio_chunk in stream_speech_from_api(prompt=batch, voice=request.voice):
+                async for audio_chunk in stream_speech_from_api(prompt=batch, voice=request.voice, output_format=output_format):
                     if not audio_chunk:
                         continue
                     buffer.extend(audio_chunk)
                     # Yield full chunks
-                    while len(buffer) >= int16_chunk_bytes:
-                        int16_chunk = bytes(buffer[:int16_chunk_bytes])
-                        if response_format == "pcm_f32le":
-                            # Convert int16 PCM to PCM float32 in [-1,1]
-                            arr = np.frombuffer(int16_chunk, dtype=np.int16).astype(np.float32) / 32767.0
-                            chunk = arr.tobytes()
-                        else:
-                            chunk = int16_chunk
+                    chunk_bytes = samples_per_chunk * (4 if output_format == "float32" else 2)
+                    while len(buffer) >= chunk_bytes:
+                        chunk = bytes(buffer[:chunk_bytes])
                         total_bytes += len(chunk)
                         yield chunk
-                        del buffer[:int16_chunk_bytes]
+                        del buffer[:chunk_bytes]
                         await asyncio.sleep(chunk_duration_ms / 1000)
             # Flush remaining buffer padded to full chunk
             if buffer:
-                pad_len = int16_chunk_bytes - len(buffer)
-                int16_chunk = bytes(buffer) + b"\x00" * pad_len
-                if response_format == "pcm_f32le":
-                    arr = np.frombuffer(int16_chunk, dtype=np.int16).astype(np.float32) / 32767.0
-                    chunk = arr.tobytes()
-                else:
-                    chunk = int16_chunk
+                chunk_bytes = samples_per_chunk * (4 if output_format == "float32" else 2)
+                pad_len = chunk_bytes - len(buffer)
+                chunk = bytes(buffer) + b"\x00" * pad_len
                 total_bytes += len(chunk)
                 yield chunk
         except Exception as e:

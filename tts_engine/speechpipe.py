@@ -76,7 +76,7 @@ if TORCH_COMPILE_AVAILABLE and snac_device == "cuda":
     except Exception as e:
         print(f" torch.compile failed: {e}")
 
-def convert_to_audio(multiframe, count):
+def convert_to_audio(multiframe, count, output_format="int16"):
     """
     Optimized version of convert_to_audio that eliminates inefficient tensor operations
     and reduces CPU-GPU transfers for much faster inference on high-end GPUs.
@@ -116,24 +116,24 @@ def convert_to_audio(multiframe, count):
     with stream_ctx, torch.inference_mode(), autocast_ctx:
         # Decode the audio
         audio_hat = model.decode(codes)
-        
-        # Extract the relevant slice and efficiently convert to bytes
-        # Keep data on GPU as long as possible
         audio_slice = audio_hat[:, :, 2048:4096]
-        
-        # Process on GPU if possible, with minimal data transfer
-        if snac_device == "cuda":
-            # Scale directly on GPU
-            audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
-            # Only transfer the final result to CPU
-            audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
+
+        if output_format == "float32":
+            # Return float32 PCM in native range
+            if snac_device == "cuda":
+                audio_bytes = audio_slice.contiguous().cpu().numpy().astype(np.float32).tobytes()
+            else:
+                audio_bytes = audio_slice.detach().cpu().numpy().astype(np.float32).tobytes()
         else:
-            # For non-CUDA devices, fall back to the original approach
-            detached_audio = audio_slice.detach().cpu()
-            audio_np = detached_audio.numpy()
-            audio_int16 = (audio_np * 32767).astype(np.int16)
-            audio_bytes = audio_int16.tobytes()
-            
+            # Default: int16 PCM
+            if snac_device == "cuda":
+                audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
+                audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
+            else:
+                detached_audio = audio_slice.detach().cpu()
+                audio_np = detached_audio.numpy()
+                audio_int16 = (audio_np * 32767).astype(np.int16)
+                audio_bytes = audio_int16.tobytes()
     return audio_bytes
 
 # Define the custom token prefix

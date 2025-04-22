@@ -360,12 +360,12 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
 # The turn_token_into_id function is now imported from speechpipe
 # This eliminates duplicate code and ensures consistent behavior
 
-def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
+def convert_to_audio(multiframe: List[int], count: int, output_format="int16") -> Optional[bytes]:
     """Convert token frames to audio with performance monitoring."""
     # Import here to avoid circular imports
     from .speechpipe import convert_to_audio as orpheus_convert_to_audio
     start_time = time.time()
-    result = orpheus_convert_to_audio(multiframe, count)
+    result = orpheus_convert_to_audio(multiframe, count, output_format=output_format)
     
     if result is not None:
         perf_monitor.add_audio_chunk()
@@ -392,7 +392,7 @@ async def stream_speech_from_api(
     for chunk in tokens_decoder(token_gen):
         yield chunk
 
-def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
+def tokens_decoder(token_gen, output_format="int16") -> Generator[bytes, None, None]:
     """Simplified token decoder with early first-chunk processing for lower latency."""
     buffer = []
     count = 0
@@ -432,7 +432,7 @@ def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
                     
                     # Process the first chunk for immediate audio feedback
                     print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
+                    audio_samples = convert_to_audio(buffer_to_proc, count, output_format=output_format)
                     if audio_samples is not None:
                         first_chunk_processed = True  # Mark first chunk as processed
                         yield audio_samples
@@ -447,7 +447,7 @@ def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
                         print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
                     
                     # Process the tokens
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
+                    audio_samples = convert_to_audio(buffer_to_proc, count, output_format=output_format)
                     if audio_samples is not None:
                         yield audio_samples
 
