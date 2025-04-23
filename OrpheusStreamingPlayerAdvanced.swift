@@ -10,6 +10,12 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
     private var dataTask: URLSessionDataTask?
     private var completionHandler: (() -> Void)?
     // No header processing for raw PCM
+    // Moved from extension:
+    private var wavDataBuffer = Data()
+    private var wavHeaderParsed = false
+    private var playbackStarted = false
+    private var scheduledBufferCount = 0
+    private let minBuffersBeforePlayback = 4
 
     public override init() {
         super.init()
@@ -37,20 +43,19 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playback, mode: .default)
-            try audioSession.setPreferredSampleRate(24000)
+            // Removed setPreferredSampleRate(24000) to avoid forcing unsupported sample rate
             try audioSession.setActive(true)
             print("[Orpheus] Audio session configured")
         } catch {
             print("[Orpheus] Warning: Failed to configure audio session: \(error)")
         }
         
-        // Set up engine with the known format - float32 PCM at 24kHz mono
+        // Set up engine and player node
         engine = AVAudioEngine()
         playerNode = AVAudioPlayerNode()
-        expectedFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: true)
         
-        guard let engine = engine, let playerNode = playerNode, let inputFormat = expectedFormat else {
-            print("[Orpheus] Failed to create audio engine, player node, or format")
+        guard let engine = engine, let playerNode = playerNode else {
+            print("[Orpheus] Failed to create audio engine or player node")
             return
         }
         
@@ -58,11 +63,16 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         let hardwareFormat = engine.outputNode.inputFormat(forBus: 0)
         print("[Orpheus] Hardware output format: sampleRate=\(hardwareFormat.sampleRate), channels=\(hardwareFormat.channelCount)")
         
-        // Connect and start the engine - use the expected format (float32 PCM) directly
-        // This ensures no format conversion happens which could introduce artifacts
+        // Use hardware format for expectedFormat to avoid format mismatch
+        expectedFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: hardwareFormat.sampleRate, channels: hardwareFormat.channelCount, interleaved: false)
+        guard let inputFormat = expectedFormat else {
+            print("[Orpheus] Failed to create expected AVAudioFormat")
+            return
+        }
+        
+        // Attach player and connect through main mixer for automatic format conversion
         engine.attach(playerNode)
-        // Directly connect to hardware output to bypass mixer and avoid resampling
-        engine.connect(playerNode, to: engine.outputNode, format: inputFormat)
+        engine.connect(playerNode, to: engine.mainMixerNode, format: inputFormat)
         
         do {
             try engine.start()
@@ -115,62 +125,67 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
         completionHandler?()
     }
 
-    // Buffer for incomplete WAV header/data
-    private var wavDataBuffer = Data()
-    private var wavHeaderParsed = false
-    private var wavDataStartIndex: Int = 0
-
-    // Handles streaming WAV data, parses header, and schedules int16 PCM buffers
+    // Buffer for incoming streamed WAV data
+    private let chunkFrameCount = 2048  // frames per buffer
     private func bufferWavAndSchedule(with data: Data) {
         wavDataBuffer.append(data)
 
         // Parse WAV header if not yet done
         if !wavHeaderParsed {
-            if wavDataBuffer.count >= 44 {
-                // Standard WAV header is 44 bytes
-                wavHeaderParsed = true
-                wavDataStartIndex = 44
-                print("[Orpheus] WAV header parsed. Data starts at byte 44.")
-            } else {
-                // Wait for more data
-                return
+            guard wavDataBuffer.count >= 44 else { return }
+            // Parse WAV header for format info
+            let header = wavDataBuffer.prefix(44)
+            let sampleRate = header.withUnsafeBytes { ptr -> UInt32 in
+                ptr.load(fromByteOffset: 24, as: UInt32.self).littleEndian
             }
+            let channels = header.withUnsafeBytes { ptr -> UInt16 in
+                ptr.load(fromByteOffset: 22, as: UInt16.self).littleEndian
+            }
+            print("[Orpheus] WAV header parsed. sampleRate=\(sampleRate), channels=\(channels)")
+            wavHeaderParsed = true
+            // Update expectedFormat to match WAV header
+            expectedFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                           sampleRate: Double(sampleRate),
+                                           channels: AVAudioChannelCount(channels),
+                                           interleaved: false)
+            // Remove header bytes
+            wavDataBuffer.removeFirst(44)
         }
 
-        guard let format = expectedFormat, let playerNode = playerNode, let engine = engine else {
-            print("[Orpheus] bufferWavAndSchedule: Missing format or playerNode or engine")
+        guard let format = expectedFormat, let playerNode = playerNode else {
+            print("[Orpheus] Missing format or playerNode")
             return
         }
 
-        // Schedule all available PCM frames (after header)
-        let pcmData = wavDataBuffer.subdata(in: wavDataStartIndex..<wavDataBuffer.count)
-        let bytesPerSample = 2 // int16
-        let frameCapacity = UInt32(pcmData.count) / UInt32(bytesPerSample)
-        guard frameCapacity > 0 else { return }
+        let bytesPerFrame = Int(format.streamDescription.pointee.mBytesPerFrame)
+        let chunkByteSize = chunkFrameCount * bytesPerFrame
 
-        guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
-            print("[Orpheus] Failed to create AVAudioPCMBuffer with frameCapacity=\(frameCapacity)")
-            return
-        }
-        inputBuffer.frameLength = frameCapacity
-
-        // Fill buffer with int16 PCM data
-        pcmData.withUnsafeBytes { rawBuffer in
-            if let sourcePtr = rawBuffer.baseAddress?.assumingMemoryBound(to: Int16.self) {
-                guard let int16ChannelData = inputBuffer.int16ChannelData else {
-                    print("[Orpheus] Error: Could not get int16 channel data")
-                    return
-                }
-                let destPtr = int16ChannelData[0]
-                for i in 0..<Int(frameCapacity) {
-                    destPtr[i] = sourcePtr[i]
+        // Schedule in fixed-size chunks
+        while wavDataBuffer.count >= chunkByteSize {
+            guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: format,
+                                                  frameCapacity: AVAudioFrameCount(chunkFrameCount)) else { break }
+            pcmBuffer.frameLength = AVAudioFrameCount(chunkFrameCount)
+            
+            wavDataBuffer.withUnsafeBytes { raw in
+                let intPtr = raw.baseAddress!.assumingMemoryBound(to: Int16.self)
+                let floatPtr = pcmBuffer.floatChannelData![0]
+                for i in 0..<chunkFrameCount {
+                    floatPtr[i] = Float(intPtr[i]) / 32768.0
                 }
             }
-        }
-        playerNode.scheduleBuffer(inputBuffer, at: nil, options: [], completionHandler: nil)
-        print("[Orpheus] Scheduled buffer: frameLength=\(inputBuffer.frameLength)")
+            
+            playerNode.scheduleBuffer(pcmBuffer, at: nil, options: [], completionHandler: nil)
+            scheduledBufferCount += 1
+            print("[Orpheus] Scheduled chunk buffer \(scheduledBufferCount)")
 
-        // Move buffer start index forward
-        wavDataStartIndex = wavDataBuffer.count
+            if !playbackStarted && scheduledBufferCount >= minBuffersBeforePlayback {
+                playerNode.play()
+                playbackStarted = true
+                print("[Orpheus] Playback started after \(minBuffersBeforePlayback) buffers")
+            }
+
+            // Remove data for scheduled chunk
+            wavDataBuffer.removeFirst(chunkByteSize)
+        }
     }
 }
