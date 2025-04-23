@@ -64,7 +64,7 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         print("[Orpheus] Hardware output format: sampleRate=\(hardwareFormat.sampleRate), channels=\(hardwareFormat.channelCount)")
         
         // Use hardware format for expectedFormat to avoid format mismatch
-        expectedFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: hardwareFormat.sampleRate, channels: hardwareFormat.channelCount, interleaved: false)
+        expectedFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: hardwareFormat.sampleRate, channels: hardwareFormat.channelCount, interleaved: false)
         guard let inputFormat = expectedFormat else {
             print("[Orpheus] Failed to create expected AVAudioFormat")
             return
@@ -124,7 +124,7 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
             let header = headerData.prefix(44)
             let sampleRate = header.withUnsafeBytes { $0.load(fromByteOffset: 24, as: UInt32.self).littleEndian }
             let channels = header.withUnsafeBytes { $0.load(fromByteOffset: 22, as: UInt16.self).littleEndian }
-            expectedFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+            expectedFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
                                            sampleRate: Double(sampleRate),
                                            channels: AVAudioChannelCount(channels),
                                            interleaved: false)
@@ -145,9 +145,10 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
         buffer.frameLength = frameCount
         pcmData.withUnsafeBytes { raw in
             let ptr = raw.baseAddress!.assumingMemoryBound(to: Int16.self)
-            for frame in 0..<Int(frameCount) {
-                for ch in 0..<Int(fmt.channelCount) {
-                    buffer.floatChannelData![ch][frame] = Float(ptr[frame * Int(fmt.channelCount) + ch]) / 32768.0
+            for ch in 0..<Int(fmt.channelCount) {
+                let channelData = buffer.int16ChannelData![ch]
+                for frame in 0..<Int(frameCount) {
+                    channelData[frame] = ptr[frame * Int(fmt.channelCount) + ch]
                 }
             }
         }
