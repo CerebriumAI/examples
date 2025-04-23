@@ -517,7 +517,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     # Optimized I/O approach for all systems
     # This approach is simpler and more reliable than separate code paths
     write_buffer = bytearray()
-    buffer_max_size = 1024 * 1024  # 1MB max buffer size (adjustable)
+    buffer_max_size = 1024 * 1024 * 4   # 4MB max buffer size (adjustable)
     
     # Keep track of the last time we checked for completion
     last_check_time = time.time()

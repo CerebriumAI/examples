@@ -11,8 +11,8 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
     private var completionHandler: (() -> Void)?
     // No header processing for raw PCM
     // Moved from extension:
-    private var wavDataBuffer = Data()
-    private var wavHeaderParsed = false
+    private var headerData = Data()
+    private var headerParsed = false
     private var playbackStarted = false
     private var scheduledBufferCount = 0
     private let minBuffersBeforePlayback = 4
@@ -76,7 +76,6 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         
         do {
             try engine.start()
-            playerNode.play()
             print("[Orpheus] Audio engine started")
         } catch {
             print("[Orpheus] Error starting audio engine: \(error)")
@@ -103,13 +102,6 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
 
 extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        print("[Orpheus] Received data chunk of size: \(data.count)")
-        guard let expectedFormat = expectedFormat, let playerNode = playerNode else {
-            print("[Orpheus] Missing format or playerNode")
-            return
-        }
-        
-        // Buffer WAV data and decode into int16 PCM chunks
         bufferWavAndSchedule(with: data)
     }
 
@@ -117,75 +109,53 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
         if let error = error {
             print("[Orpheus] Streaming error: \(error)")
         } else {
-            print("[Orpheus] Streaming completed successfully.")
+            print("[Orpheus] Streaming completed.")
         }
-        playerNode?.stop()
-        engine?.stop()
-        print("[Orpheus] Audio engine and player node stopped.")
         completionHandler?()
     }
 
-    // Buffer for incoming streamed WAV data
-    private let chunkFrameCount = 2048  // frames per buffer
+    // Parse WAV header once, then schedule each chunk as its own PCM buffer
     private func bufferWavAndSchedule(with data: Data) {
-        wavDataBuffer.append(data)
-
-        // Parse WAV header if not yet done
-        if !wavHeaderParsed {
-            guard wavDataBuffer.count >= 44 else { return }
-            // Parse WAV header for format info
-            let header = wavDataBuffer.prefix(44)
-            let sampleRate = header.withUnsafeBytes { ptr -> UInt32 in
-                ptr.load(fromByteOffset: 24, as: UInt32.self).littleEndian
-            }
-            let channels = header.withUnsafeBytes { ptr -> UInt16 in
-                ptr.load(fromByteOffset: 22, as: UInt16.self).littleEndian
-            }
-            print("[Orpheus] WAV header parsed. sampleRate=\(sampleRate), channels=\(channels)")
-            wavHeaderParsed = true
-            // Update expectedFormat to match WAV header
+        var pcmData = data
+        // On first chunk, accumulate header bytes
+        if !headerParsed {
+            headerData.append(data)
+            guard headerData.count >= 44 else { return }
+            let header = headerData.prefix(44)
+            let sampleRate = header.withUnsafeBytes { $0.load(fromByteOffset: 24, as: UInt32.self).littleEndian }
+            let channels = header.withUnsafeBytes { $0.load(fromByteOffset: 22, as: UInt16.self).littleEndian }
             expectedFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
                                            sampleRate: Double(sampleRate),
                                            channels: AVAudioChannelCount(channels),
                                            interleaved: false)
-            // Remove header bytes
-            wavDataBuffer.removeFirst(44)
+            if let engine = engine, let node = playerNode, let fmt = expectedFormat {
+                engine.disconnectNodeInput(node)
+                engine.connect(node, to: engine.mainMixerNode, format: fmt)
+            }
+            headerParsed = true
+            // Extract PCM data after header
+            pcmData = headerData.dropFirst(44)
+            headerData.removeAll()
         }
-
-        guard let format = expectedFormat, let playerNode = playerNode else {
-            print("[Orpheus] Missing format or playerNode")
-            return
-        }
-
-        let bytesPerFrame = Int(format.streamDescription.pointee.mBytesPerFrame)
-        let chunkByteSize = chunkFrameCount * bytesPerFrame
-
-        // Schedule in fixed-size chunks
-        while wavDataBuffer.count >= chunkByteSize {
-            guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: format,
-                                                  frameCapacity: AVAudioFrameCount(chunkFrameCount)) else { break }
-            pcmBuffer.frameLength = AVAudioFrameCount(chunkFrameCount)
-            
-            wavDataBuffer.withUnsafeBytes { raw in
-                let intPtr = raw.baseAddress!.assumingMemoryBound(to: Int16.self)
-                let floatPtr = pcmBuffer.floatChannelData![0]
-                for i in 0..<chunkFrameCount {
-                    floatPtr[i] = Float(intPtr[i]) / 32768.0
+        // Schedule this PCM data chunk
+        guard let fmt = expectedFormat, let node = playerNode else { return }
+        let bytesPerFrame = Int(fmt.streamDescription.pointee.mBytesPerFrame)
+        let frameCount = UInt32(pcmData.count) / UInt32(bytesPerFrame)
+        guard frameCount > 0, let buffer = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frameCount) else { return }
+        buffer.frameLength = frameCount
+        pcmData.withUnsafeBytes { raw in
+            let ptr = raw.baseAddress!.assumingMemoryBound(to: Int16.self)
+            for frame in 0..<Int(frameCount) {
+                for ch in 0..<Int(fmt.channelCount) {
+                    buffer.floatChannelData![ch][frame] = Float(ptr[frame * Int(fmt.channelCount) + ch]) / 32768.0
                 }
             }
-            
-            playerNode.scheduleBuffer(pcmBuffer, at: nil, options: [], completionHandler: nil)
-            scheduledBufferCount += 1
-            print("[Orpheus] Scheduled chunk buffer \(scheduledBufferCount)")
-
-            if !playbackStarted && scheduledBufferCount >= minBuffersBeforePlayback {
-                playerNode.play()
-                playbackStarted = true
-                print("[Orpheus] Playback started after \(minBuffersBeforePlayback) buffers")
-            }
-
-            // Remove data for scheduled chunk
-            wavDataBuffer.removeFirst(chunkByteSize)
+        }
+        node.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
+        scheduledBufferCount += 1
+        if !playbackStarted && scheduledBufferCount >= minBuffersBeforePlayback {
+            node.play()
+            playbackStarted = true
         }
     }
 }
