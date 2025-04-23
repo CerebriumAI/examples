@@ -25,7 +25,7 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
             "input": text,
             "voice": voice,
             "model": "orpheus",
-            "response_format": "pcm_f32le",
+            "response_format": "wav",
             "speed": 1.0
         ]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: body, options: []) else {
@@ -37,6 +37,7 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playback, mode: .default)
+            try audioSession.setPreferredSampleRate(24000)
             try audioSession.setActive(true)
             print("[Orpheus] Audio session configured")
         } catch {
@@ -46,7 +47,7 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         // Set up engine with the known format - float32 PCM at 24kHz mono
         engine = AVAudioEngine()
         playerNode = AVAudioPlayerNode()
-        expectedFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 24000, channels: 1, interleaved: true)
+        expectedFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: true)
         
         guard let engine = engine, let playerNode = playerNode, let inputFormat = expectedFormat else {
             print("[Orpheus] Failed to create audio engine, player node, or format")
@@ -57,10 +58,11 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         let hardwareFormat = engine.outputNode.inputFormat(forBus: 0)
         print("[Orpheus] Hardware output format: sampleRate=\(hardwareFormat.sampleRate), channels=\(hardwareFormat.channelCount)")
         
-        // Connect and start the engine – use the hardware format so that scheduled buffers
-        // must match this format (we will convert from inputFormat -> hardwareFormat later).
+        // Connect and start the engine - use the expected format (float32 PCM) directly
+        // This ensures no format conversion happens which could introduce artifacts
         engine.attach(playerNode)
-        engine.connect(playerNode, to: engine.mainMixerNode, format: inputFormat)
+        // Directly connect to hardware output to bypass mixer and avoid resampling
+        engine.connect(playerNode, to: engine.outputNode, format: inputFormat)
         
         do {
             try engine.start()
@@ -97,8 +99,8 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
             return
         }
         
-        // Directly schedule the buffer - we're receiving raw pcm_f32le data
-        scheduleBuffer(with: data)
+        // Buffer WAV data and decode into int16 PCM chunks
+        bufferWavAndSchedule(with: data)
     }
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
@@ -113,60 +115,62 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
         completionHandler?()
     }
 
-    private func scheduleBuffer(with data: Data) {
+    // Buffer for incomplete WAV header/data
+    private var wavDataBuffer = Data()
+    private var wavHeaderParsed = false
+    private var wavDataStartIndex: Int = 0
+
+    // Handles streaming WAV data, parses header, and schedules int16 PCM buffers
+    private func bufferWavAndSchedule(with data: Data) {
+        wavDataBuffer.append(data)
+
+        // Parse WAV header if not yet done
+        if !wavHeaderParsed {
+            if wavDataBuffer.count >= 44 {
+                // Standard WAV header is 44 bytes
+                wavHeaderParsed = true
+                wavDataStartIndex = 44
+                print("[Orpheus] WAV header parsed. Data starts at byte 44.")
+            } else {
+                // Wait for more data
+                return
+            }
+        }
+
         guard let format = expectedFormat, let playerNode = playerNode, let engine = engine else {
-            print("[Orpheus] scheduleBuffer: Missing format or playerNode or engine")
+            print("[Orpheus] bufferWavAndSchedule: Missing format or playerNode or engine")
             return
         }
-        
-        // For pcm_f32le, each sample is 4 bytes
-        let bytesPerSample = 4
-        let frameCapacity = UInt32(data.count) / UInt32(bytesPerSample)
-        
-        guard frameCapacity > 0 else {
-            print("[Orpheus] Not enough data to create audio buffer")
-            return
-        }
-        
+
+        // Schedule all available PCM frames (after header)
+        let pcmData = wavDataBuffer.subdata(in: wavDataStartIndex..<wavDataBuffer.count)
+        let bytesPerSample = 2 // int16
+        let frameCapacity = UInt32(pcmData.count) / UInt32(bytesPerSample)
+        guard frameCapacity > 0 else { return }
+
         guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
             print("[Orpheus] Failed to create AVAudioPCMBuffer with frameCapacity=\(frameCapacity)")
             return
         }
         inputBuffer.frameLength = frameCapacity
-        
-        // Fill the buffer with float32 PCM data
-        data.withUnsafeBytes { rawBuffer in
-            if let sourcePtr = rawBuffer.baseAddress?.bindMemory(to: Float32.self, capacity: Int(frameCapacity)) {
-                guard let floatChannelData = inputBuffer.floatChannelData else {
-                    print("[Orpheus] Error: Could not get float channel data")
+
+        // Fill buffer with int16 PCM data
+        pcmData.withUnsafeBytes { rawBuffer in
+            if let sourcePtr = rawBuffer.baseAddress?.assumingMemoryBound(to: Int16.self) {
+                guard let int16ChannelData = inputBuffer.int16ChannelData else {
+                    print("[Orpheus] Error: Could not get int16 channel data")
                     return
                 }
-                let destPtr = floatChannelData[0]
+                let destPtr = int16ChannelData[0]
                 for i in 0..<Int(frameCapacity) {
-                    var sample = sourcePtr[i]
-                    var rawValue: UInt32 = 0
-                    memcpy(&rawValue, &sample, 4)
-                    if abs(sample) > 10 {
-                        rawValue = CFSwapInt32LittleToHost(rawValue)
-                        memcpy(&sample, &rawValue, 4)
-                    }
-                    // Clamp extreme values to valid audio range
-                    if sample > 1.0 { sample = 1.0 }
-                    if sample < -1.0 { sample = -1.0 }
-                    
-                    // Store in buffer
-                    destPtr[i] = sample
+                    destPtr[i] = sourcePtr[i]
                 }
-                
-                print("[Orpheus] Processed \(frameCapacity) float32 frames with conversion")
-            } else {
-                print("[Orpheus] Failed to bind memory to Float32")
-                return
             }
         }
-        
-        // Schedule buffer directly and let AVAudioEngine handle conversion
         playerNode.scheduleBuffer(inputBuffer, at: nil, options: [], completionHandler: nil)
         print("[Orpheus] Scheduled buffer: frameLength=\(inputBuffer.frameLength)")
+
+        // Move buffer start index forward
+        wavDataStartIndex = wavDataBuffer.count
     }
 }

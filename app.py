@@ -229,7 +229,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
     async def audio_stream_generator():
         nonlocal chunk_count, total_bytes
         
-        # Streaming raw pcm_f32le, no WAV header or silence if requested
+        # Always stream WAV data (int16 PCM with header)
         if len(request.input) > 1000:
             from tts_engine.inference import split_text_into_sentences
             sentences = split_text_into_sentences(request.input)
@@ -246,20 +246,24 @@ async def stream_speech_api(request: StreamingSpeechRequest):
             batches = [request.input]
 
         chunk_duration_ms = 50  # 50ms chunks for smoother playback
-        # Compute int16 chunk size per 50ms
         samples_per_chunk = int(24000 * (chunk_duration_ms / 1000))
         int16_chunk_bytes = samples_per_chunk * 2
         buffer = bytearray()
 
+        # Yield a standard WAV header
+        wav_header = generate_wav_header(sample_rate=24000, bits_per_sample=16, channels=1)
+        yield wav_header
+        total_bytes += len(wav_header)
+
         try:
-            output_format = "float32" if response_format == "pcm_f32le" else "int16"
+            # Always use int16 PCM for WAV
             for batch in batches:
-                async for audio_chunk in stream_speech_from_api(prompt=batch, voice=request.voice, output_format=output_format):
+                async for audio_chunk in stream_speech_from_api(prompt=batch, voice=request.voice, output_format="int16"):
                     if not audio_chunk:
                         continue
                     buffer.extend(audio_chunk)
                     # Yield full chunks
-                    chunk_bytes = samples_per_chunk * (4 if output_format == "float32" else 2)
+                    chunk_bytes = samples_per_chunk * 2
                     while len(buffer) >= chunk_bytes:
                         chunk = bytes(buffer[:chunk_bytes])
                         total_bytes += len(chunk)
@@ -268,7 +272,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                         await asyncio.sleep(chunk_duration_ms / 1000)
             # Flush remaining buffer padded to full chunk
             if buffer:
-                chunk_bytes = samples_per_chunk * (4 if output_format == "float32" else 2)
+                chunk_bytes = samples_per_chunk * 2
                 pad_len = chunk_bytes - len(buffer)
                 chunk = bytes(buffer) + b"\x00" * pad_len
                 total_bytes += len(chunk)
@@ -282,14 +286,13 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                 chars_per_sec = input_length / elapsed
                 chunks_per_sec = chunk_count / elapsed
                 kb_per_sec = total_bytes / elapsed / 1024
-                
                 print(f"Stream completed: {input_length} chars → {chunk_count} chunks, {total_bytes/1024:.1f}KB")
                 print(f"Performance: {chars_per_sec:.1f} chars/sec, {chunks_per_sec:.1f} chunks/sec, {kb_per_sec:.1f}KB/sec")
     
-    # Use optimized headers for streaming response
+    # Always return WAV data
     return StreamingResponse(
         audio_stream_generator(),
-        media_type="application/octet-stream" if response_format == "pcm_f32le" else "audio/wav",
+        media_type="audio/wav",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "X-Content-Type-Options": "nosniff",
