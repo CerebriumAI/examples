@@ -624,6 +624,27 @@ import numpy as np
 from io import BytesIO
 import wave
 
+async def stream_speech_from_api(
+    prompt: str,
+    voice: str = DEFAULT_VOICE,
+    temperature: float = TEMPERATURE,
+    top_p: float = TOP_P,
+    max_tokens: int = MAX_TOKENS,
+    repetition_penalty: float = REPETITION_PENALTY,
+    output_format: str = "int16"
+):
+    """Async generator to stream speech audio chunks from Orpheus TTS model."""
+    token_gen = generate_tokens_from_api(
+        prompt=prompt,
+        voice=voice,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        repetition_penalty=repetition_penalty
+    )
+    async for chunk in tokens_decoder(token_gen):
+        yield chunk
+
 def split_text_into_sentences(text):
     """Split text into sentences with a more reliable approach."""
     # We'll use a simple approach that doesn't rely on variable-width lookbehinds
