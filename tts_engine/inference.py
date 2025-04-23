@@ -624,6 +624,10 @@ import numpy as np
 from io import BytesIO
 import wave
 
+async def sync_to_async_gen(sync_gen):
+    for item in sync_gen:
+        yield item
+
 async def stream_speech_from_api(
     prompt: str,
     voice: str = DEFAULT_VOICE,
@@ -634,7 +638,7 @@ async def stream_speech_from_api(
     output_format: str = "int16"
 ):
     """Async generator to stream speech audio chunks from Orpheus TTS model."""
-    token_gen = generate_tokens_from_api(
+    sync_gen = generate_tokens_from_api(
         prompt=prompt,
         voice=voice,
         temperature=temperature,
@@ -642,6 +646,7 @@ async def stream_speech_from_api(
         max_tokens=max_tokens,
         repetition_penalty=repetition_penalty
     )
+    token_gen = sync_to_async_gen(sync_gen)
     async for chunk in tokens_decoder(token_gen):
         yield chunk
 
