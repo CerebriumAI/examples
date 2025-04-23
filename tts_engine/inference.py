@@ -31,11 +31,6 @@ load_dotenv()
 # Detect hardware capabilities and display information
 import torch
 import psutil
-# Enable TF32 and cuDNN benchmarking for faster GPU inference
-if torch.cuda.is_available():
-    torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
-    torch.backends.cudnn.benchmark = True
 
 # Detect if we're on a high-end system based on hardware capabilities
 HIGH_END_GPU = False
@@ -357,59 +352,37 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                 print("Max retries reached. Token generation failed.")
                 return
 
-# The turn_token_into_id function is now imported from speechpipe
+# The turn_token_into_id function is now imported from speechpipe.py
 # This eliminates duplicate code and ensures consistent behavior
 
-def convert_to_audio(multiframe: List[int], count: int, output_format="int16") -> Optional[bytes]:
+def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
     """Convert token frames to audio with performance monitoring."""
     # Import here to avoid circular imports
     from .speechpipe import convert_to_audio as orpheus_convert_to_audio
     start_time = time.time()
-    result = orpheus_convert_to_audio(multiframe, count, output_format=output_format)
+    result = orpheus_convert_to_audio(multiframe, count)
     
     if result is not None:
         perf_monitor.add_audio_chunk()
         
     return result
 
-async def stream_speech_from_api(
-    prompt: str,
-    voice: str = DEFAULT_VOICE,
-    temperature: float = TEMPERATURE,
-    top_p: float = TOP_P,
-    max_tokens: int = MAX_TOKENS,
-    repetition_penalty: float = REPETITION_PENALTY,
-    output_format: str = "int16"
-):
-    """Async generator to stream speech audio chunks from Orpheus TTS model."""
-    token_gen = generate_tokens_from_api(
-        prompt=prompt,
-        voice=voice,
-        temperature=temperature,
-        top_p=top_p,
-        max_tokens=max_tokens,
-        repetition_penalty=repetition_penalty
-    )
-    for chunk in tokens_decoder(token_gen, output_format=output_format):
-        yield chunk
-
-def tokens_decoder(token_gen, output_format="int16") -> Generator[bytes, None, None]:
+async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     """Simplified token decoder with early first-chunk processing for lower latency."""
     buffer = []
     count = 0
     
-    # Use larger batch sizes for higher GPU throughput
+    # Use different thresholds for first chunk vs. subsequent chunks
     first_chunk_processed = False
-    min_frames_first = 16   # Larger initial chunk for better GPU utilization
-    min_frames_subsequent = 64  # Larger subsequent chunks for batch processing
-    process_every = 32  # Process every 32 tokens for larger batches
-
+    min_frames_first = 7  # Process after just 7 tokens for first chunk (ultra-low latency)
+    min_frames_subsequent = 28  # Default for reliability after first chunk (4 chunks of 7)
+    process_every = 7  # Process every 7 tokens (standard for Orpheus model)
     
     start_time = time.time()
     last_log_time = start_time
     token_count = 0
     
-    for token_text in token_gen:
+    async for token_text in token_gen:
         token = turn_token_into_id(token_text, count)
         if token is not None and token > 0:
             # Add to buffer using simple append (reliable method)
@@ -433,7 +406,7 @@ def tokens_decoder(token_gen, output_format="int16") -> Generator[bytes, None, N
                     
                     # Process the first chunk for immediate audio feedback
                     print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
-                    audio_samples = convert_to_audio(buffer_to_proc, count, output_format=output_format)
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
                     if audio_samples is not None:
                         first_chunk_processed = True  # Mark first chunk as processed
                         yield audio_samples
@@ -448,14 +421,14 @@ def tokens_decoder(token_gen, output_format="int16") -> Generator[bytes, None, N
                         print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
                     
                     # Process the tokens
-                    audio_samples = convert_to_audio(buffer_to_proc, count, output_format=output_format)
+                    audio_samples = convert_to_audio(buffer_to_proc, count)
                     if audio_samples is not None:
                         yield audio_samples
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
-    # Use a much larger queue for high-end systems and batch processing
-    queue_size = 400 if HIGH_END_GPU else 200
+    # Use a larger queue for high-end systems
+    queue_size = 100 if HIGH_END_GPU else 50
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     
@@ -628,26 +601,73 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     
     return audio_segments
 
-async def stream_speech_from_api(
-    prompt: str,
-    voice: str = DEFAULT_VOICE,
-    temperature: float = TEMPERATURE,
-    top_p: float = TOP_P,
-    max_tokens: int = MAX_TOKENS,
-    repetition_penalty: float = REPETITION_PENALTY,
-    output_format: str = "int16"
-):
-    """Async generator to stream speech audio chunks from Orpheus TTS model."""
-    token_gen = generate_tokens_from_api(
-        prompt=prompt,
-        voice=voice,
-        temperature=temperature,
-        top_p=top_p,
-        max_tokens=max_tokens,
-        repetition_penalty=repetition_penalty
-    )
-    for chunk in tokens_decoder(token_gen, output_format=output_format):
-        yield chunk
+def stream_audio(audio_buffer):
+    """Stream audio buffer to output device with error handling."""
+    if audio_buffer is None or len(audio_buffer) == 0:
+        return
+    
+    try:
+        # Convert bytes to NumPy array (16-bit PCM)
+        audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
+        
+        # Normalize to float in range [-1, 1] for playback
+        audio_float = audio_data.astype(np.float32) / 32767.0
+        
+        # Play the audio with proper device selection and error handling
+        sd.play(audio_float, SAMPLE_RATE)
+        sd.wait()
+    except Exception as e:
+        print(f"Audio playback error: {e}")
+
+import re
+import numpy as np
+from io import BytesIO
+import wave
+
+def split_text_into_sentences(text):
+    """Split text into sentences with a more reliable approach."""
+    # We'll use a simple approach that doesn't rely on variable-width lookbehinds
+    # which aren't supported in Python's regex engine
+    
+    # First, split on common sentence ending punctuation
+    # This isn't perfect but works for most cases and avoids the regex error
+    parts = []
+    current_sentence = ""
+    
+    for char in text:
+        current_sentence += char
+        
+        # If we hit a sentence ending followed by a space, consider this a potential sentence end
+        if char in (' ', '\n', '\t') and len(current_sentence) > 1:
+            prev_char = current_sentence[-2]
+            if prev_char in ('.', '!', '?'):
+                # Check if this is likely a real sentence end and not an abbreviation
+                # (Simple heuristic: if there's a space before the period, it's likely a real sentence end)
+                if len(current_sentence) > 3 and current_sentence[-3] not in ('.', ' '):
+                    parts.append(current_sentence.strip())
+                    current_sentence = ""
+    
+    # Add any remaining text
+    if current_sentence.strip():
+        parts.append(current_sentence.strip())
+    
+    # Combine very short segments to avoid tiny audio files
+    min_chars = 20  # Minimum reasonable sentence length
+    combined_sentences = []
+    i = 0
+    
+    while i < len(parts):
+        current = parts[i]
+        
+        # If this is a short sentence and not the last one, combine with next
+        while i < len(parts) - 1 and len(current) < min_chars:
+            i += 1
+            current += " " + parts[i]
+            
+        combined_sentences.append(current)
+        i += 1
+    
+    return combined_sentences
 
 def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temperature=TEMPERATURE, 
                      top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=None, 
@@ -769,74 +789,6 @@ def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temp
     print(f"Total speech generation completed in {total_time:.2f} seconds")
     
     return all_audio_segments
-
-def split_text_into_sentences(text):
-    """Split text into sentences with a more reliable approach."""
-    # We'll use a simple approach that doesn't rely on variable-width lookbehinds
-    # which aren't supported in Python's regex engine
-    
-    # First, split on common sentence ending punctuation
-    # This isn't perfect but works for most cases and avoids the regex error
-    parts = []
-    current_sentence = ""
-    
-    for char in text:
-        current_sentence += char
-        
-        # If we hit a sentence ending followed by a space, consider this a potential sentence end
-        if char in (' ', '\n', '\t') and len(current_sentence) > 1:
-            prev_char = current_sentence[-2]
-            if prev_char in ('.', '!', '?'):
-                # Check if this is likely a real sentence end and not an abbreviation
-                # (Simple heuristic: if there's a space before the period, it's likely a real sentence end)
-                if len(current_sentence) > 3 and current_sentence[-3] not in ('.', ' '):
-                    parts.append(current_sentence.strip())
-                    current_sentence = ""
-    
-    # Add any remaining text
-    if current_sentence.strip():
-        parts.append(current_sentence.strip())
-    
-    # Combine very short segments to avoid tiny audio files
-    min_chars = 20  # Minimum reasonable sentence length
-    combined_sentences = []
-    i = 0
-    
-    while i < len(parts):
-        current = parts[i]
-        
-        # If this is a short sentence and not the last one, combine with next
-        while i < len(parts) - 1 and len(current) < min_chars:
-            i += 1
-            current += " " + parts[i]
-            
-        combined_sentences.append(current)
-        i += 1
-    
-    return combined_sentences
-
-def stream_audio(audio_buffer):
-    """Stream audio buffer to output device with error handling."""
-    if audio_buffer is None or len(audio_buffer) == 0:
-        return
-    
-    try:
-        # Convert bytes to NumPy array (16-bit PCM)
-        audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
-        
-        # Normalize to float in range [-1, 1] for playback
-        audio_float = audio_data.astype(np.float32) / 32767.0
-        
-        # Play the audio with proper device selection and error handling
-        sd.play(audio_float, SAMPLE_RATE)
-        sd.wait()
-    except Exception as e:
-        print(f"Audio playback error: {e}")
-
-import re
-import numpy as np
-from io import BytesIO
-import wave
 
 def stitch_wav_files(input_files, output_file, crossfade_ms=50):
     """Stitch multiple WAV files together with crossfading for smooth transitions."""
