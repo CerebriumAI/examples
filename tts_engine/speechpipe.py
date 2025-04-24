@@ -292,7 +292,7 @@ async def tokens_decoder(token_gen):
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
     # Use a larger queue for RTX 4090 to maximize GPU utilization
-    max_queue_size = 32 if snac_device == "cuda" else 8
+    max_queue_size = 64 if snac_device == "cuda" else 8
     audio_queue = queue.Queue(maxsize=max_queue_size)
     
     # Collect tokens in batches for higher throughput
