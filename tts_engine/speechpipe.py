@@ -314,7 +314,7 @@ def tokens_decoder_sync(syn_token_gen):
     thread.start()
 
     # Use larger buffer for throughput
-    buffer_size = 10
+    buffer_size = 20
     audio_buffer = []
     
     while True:
