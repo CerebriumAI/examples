@@ -45,9 +45,16 @@ if not IS_RELOADER:
     print(f"Using device: {snac_device}")
 model = model.to(snac_device)
 
-# Disable torch.compile as it requires Triton which isn't installed
-# We'll use regular PyTorch optimization techniques instead
-if not IS_RELOADER:
+# Attempt to compile the model if supported for faster inference
+if TORCH_COMPILE_AVAILABLE:
+    try:
+        model = torch.compile(model)
+        if not IS_RELOADER:
+            print("Model compiled with torch.compile for faster inference")
+    except Exception as e:
+        if not IS_RELOADER:
+            print(f"torch.compile failed, continuing without compile: {e}")
+elif not IS_RELOADER:
     print("Using standard PyTorch optimizations (torch.compile disabled)")
 
 # Prepare CUDA streams for parallel processing if available
@@ -69,37 +76,16 @@ def convert_to_audio(multiframe, count):
     num_frames = len(multiframe) // 7
     frame = multiframe[:num_frames*7]
     
-    # Pre-allocate tensors instead of incrementally building them
-    codes_0 = torch.zeros(num_frames, dtype=torch.int32, device=snac_device)
-    codes_1 = torch.zeros(num_frames * 2, dtype=torch.int32, device=snac_device)
-    codes_2 = torch.zeros(num_frames * 4, dtype=torch.int32, device=snac_device)
-    
-    # Use vectorized operations where possible
+    # Vectorized extraction of per-frame codes
     frame_tensor = torch.tensor(frame, dtype=torch.int32, device=snac_device)
-    
-    # Direct indexing is much faster than concatenation in a loop
-    for j in range(num_frames):
-        idx = j * 7
-        
-        # Code 0 - single value per frame
-        codes_0[j] = frame_tensor[idx]
-        
-        # Code 1 - two values per frame
-        codes_1[j*2] = frame_tensor[idx+1]
-        codes_1[j*2+1] = frame_tensor[idx+4]
-        
-        # Code 2 - four values per frame
-        codes_2[j*4] = frame_tensor[idx+2]
-        codes_2[j*4+1] = frame_tensor[idx+3]
-        codes_2[j*4+2] = frame_tensor[idx+5]
-        codes_2[j*4+3] = frame_tensor[idx+6]
-    
-    # Reshape codes into expected format
-    codes = [
-        codes_0.unsqueeze(0), 
-        codes_1.unsqueeze(0), 
-        codes_2.unsqueeze(0)
-    ]
+    codes_matrix = frame_tensor.view(num_frames, 7)
+    # Code 0: first value of each frame
+    codes_0 = codes_matrix[:, 0]
+    # Code 1: second and fifth values
+    codes_1 = codes_matrix[:, [1, 4]].reshape(-1)
+    # Code 2: third, fourth, sixth, and seventh values
+    codes_2 = codes_matrix[:, [2, 3, 5, 6]].reshape(-1)
+    codes = [codes_0.unsqueeze(0), codes_1.unsqueeze(0), codes_2.unsqueeze(0)]
     
     # Check tokens are in valid range
     if (torch.any(codes[0] < 0) or torch.any(codes[0] > 4096) or 
@@ -280,10 +266,9 @@ async def tokens_decoder(token_gen):
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
-    # Use a larger queue for RTX 4090 to maximize GPU utilization
-    max_queue_size = 1048 if snac_device == "cuda" else 8
-    audio_queue = queue.Queue(maxsize=max_queue_size)
-    
+    # Use unbounded SimpleQueue for lower overhead
+    audio_queue = queue.SimpleQueue()
+
     # Collect tokens in batches for higher throughput
     batch_size = 1048 if snac_device == "cuda" else 4
     
@@ -312,18 +297,12 @@ def tokens_decoder_sync(syn_token_gen):
                 if audio_chunk:  # Validate audio chunk before adding to queue
                     audio_queue.put(audio_chunk)
                     chunk_count += 1
-                    
-                    # Log performance stats periodically
-                    if chunk_count % 10 == 0:
-                        elapsed = time.time() - start_time
-                        print(f"Generated {chunk_count} chunks in {elapsed:.2f}s ({chunk_count/elapsed:.2f} chunks/sec)")
         except Exception as e:
             print(f"Error in audio producer: {e}")
             import traceback
             traceback.print_exc()
         finally:    
             # Signal completion
-            print("Audio producer completed - finalizing all chunks")
             audio_queue.put(None)  # Sentinel
 
     def run_async():
@@ -334,8 +313,8 @@ def tokens_decoder_sync(syn_token_gen):
     thread.daemon = True  # Allow the thread to be terminated when the main thread exits
     thread.start()
 
-    # Use larger buffer for final audio assembly
-    buffer_size = 5
+    # Use larger buffer for throughput
+    buffer_size = 10
     audio_buffer = []
     
     while True:
@@ -353,5 +332,3 @@ def tokens_decoder_sync(syn_token_gen):
     # Yield any remaining audio in the buffer
     for chunk in audio_buffer:
         yield chunk
-
-    thread.join()
