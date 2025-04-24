@@ -65,16 +65,9 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         let hardwareFormat = engine.outputNode.inputFormat(forBus: 0)
         print("[Orpheus] Hardware output format: sampleRate=\(hardwareFormat.sampleRate), channels=\(hardwareFormat.channelCount)")
         
-        // Use hardware format for expectedFormat to avoid format mismatch
-        expectedFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: hardwareFormat.sampleRate, channels: hardwareFormat.channelCount, interleaved: false)
-        guard let inputFormat = expectedFormat else {
-            print("[Orpheus] Failed to create expected AVAudioFormat")
-            return
-        }
-        
-        // Attach player and connect through main mixer for automatic format conversion
+        // Attach player and allow format conversion automatically
         engine.attach(playerNode)
-        engine.connect(playerNode, to: engine.mainMixerNode, format: inputFormat)
+        engine.connect(playerNode, to: engine.mainMixerNode, format: nil)
         
         do {
             try engine.start()
@@ -130,10 +123,6 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
                                            sampleRate: Double(sampleRate),
                                            channels: AVAudioChannelCount(channels),
                                            interleaved: false)
-            if let engine = engine, let node = playerNode, let fmt = expectedFormat {
-                engine.disconnectNodeInput(node)
-                engine.connect(node, to: engine.mainMixerNode, format: fmt)
-            }
             headerParsed = true
             // Extract PCM data after header
             pcmData = headerData.dropFirst(44)
