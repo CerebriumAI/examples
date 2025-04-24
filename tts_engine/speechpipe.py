@@ -168,8 +168,8 @@ async def tokens_decoder(token_gen):
     # Track if first chunk has been processed
     first_chunk_processed = False
     
-    # Use different thresholds for first chunk vs. subsequent chunks
-    min_frames_first = 7  # Just one chunk (7 tokens) for first audio - ultra-low latency
+    # Reduce time to first token: yield audio as soon as a single token is available
+    min_frames_first = 1   # Process after just 1 token for lowest latency
     min_frames_subsequent = 28  # Standard minimum (4 chunks of 7 tokens) after first audio
     ideal_frames = 49  # Ideal standard frame size (7×7 window) - unchanged
     process_every_n = 7  # Process every 7 tokens (standard for Orpheus model) - unchanged
@@ -201,12 +201,9 @@ async def tokens_decoder(token_gen):
             
             # Different processing logic based on whether first chunk has been processed
             if not first_chunk_processed:
-                # Process first chunk as soon as possible for minimal latency
+                # Process and yield audio as soon as a single token is available
                 if count >= min_frames_first:
                     buffer_to_proc = buffer[-min_frames_first:]
-                    
-                    # Process the first chunk of audio for immediate feedback
-                    print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens for low latency")
                     audio_samples = convert_to_audio(buffer_to_proc, count)
                     if audio_samples is not None:
                         first_chunk_processed = True  # Mark first chunk as processed
@@ -214,51 +211,22 @@ async def tokens_decoder(token_gen):
             else:
                 # For subsequent chunks, use original processing with proper batching
                 if count % process_every_n == 0:
-                    # Use same prioritization logic as before
                     if len(buffer) >= ideal_frames:
                         buffer_to_proc = buffer[-ideal_frames:]
                     elif len(buffer) >= min_frames_subsequent:
                         buffer_to_proc = buffer[-min_frames_subsequent:]
                     else:
                         continue
-                    
-                    # Debug output to help diagnose issues
-                    if count % 28 == 0:
-                        print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
-                    
-                    # Process the tokens
                     audio_samples = convert_to_audio(buffer_to_proc, count)
                     if audio_samples is not None:
                         yield audio_samples
     
-    # CRITICAL: End-of-generation handling - process all remaining frames
-    # Process remaining complete frames (ideal size)
-    if len(buffer) >= ideal_frames:
-        buffer_to_proc = buffer[-ideal_frames:]
+    # CRITICAL: End-of-generation handling - always flush any remaining tokens as audio
+    if len(buffer) > 0:
+        buffer_to_proc = buffer[:]
         audio_samples = convert_to_audio(buffer_to_proc, count)
         if audio_samples is not None:
             yield audio_samples
-            
-    # Process any additional complete frames (minimum size)
-    elif len(buffer) >= min_frames_subsequent:
-        buffer_to_proc = buffer[-min_frames_subsequent:]
-        audio_samples = convert_to_audio(buffer_to_proc, count)
-        if audio_samples is not None:
-            yield audio_samples
-            
-    # Final special case: even if we don't have minimum frames, try to process
-    # what we have by padding with silence tokens that won't affect the audio
-    elif len(buffer) >= process_every_n:
-        # Pad to minimum frame requirement with copies of the final token
-        # This is more continuous than using unrelated tokens from the beginning
-        last_token = buffer[-1]
-        padding_needed = min_frames_subsequent - len(buffer)
-        
-        # Create a padding array of copies of the last token
-        # This maintains continuity much better than circular buffering
-        padding = [last_token] * padding_needed
-        padded_buffer = buffer + padding
-        
         print(f"Processing final partial frame: {len(buffer)} tokens + {padding_needed} repeated-token padding")
         audio_samples = convert_to_audio(padded_buffer, count)
         if audio_samples is not None:
