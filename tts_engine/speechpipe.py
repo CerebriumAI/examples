@@ -152,38 +152,27 @@ def turn_token_into_id(token_string, index):
     Returns:
         int: Token ID if valid, None otherwise
     """
-    # Check cache first (significant speedup for repeated tokens)
-    cache_key = (token_string, index % 7)
+    prefix = CUSTOM_TOKEN_PREFIX
+    mod = index % 7
+    cache_key = (token_string, mod)
     if cache_key in token_id_cache:
         return token_id_cache[cache_key]
-        
-    # Early rejection for obvious non-matches
-    if CUSTOM_TOKEN_PREFIX not in token_string:
-        return None
-        
-    # Process token
-    token_string = token_string.strip()
-    last_token_start = token_string.rfind(CUSTOM_TOKEN_PREFIX)
-    
-    if last_token_start == -1:
-        return None
-    
-    last_token = token_string[last_token_start:]
-    
-    if not (last_token.startswith(CUSTOM_TOKEN_PREFIX) and last_token.endswith(">")):
-        return None
-        
-    try:
-        number_str = last_token[14:-1]
-        token_id = int(number_str) - 10 - ((index % 7) * 4096)
-        
-        # Cache the result if it's valid
+    # Must start with prefix and end with '>'
+    if not token_string.startswith(prefix) or not token_string.endswith(">"):
         if len(token_id_cache) < MAX_CACHE_SIZE:
-            token_id_cache[cache_key] = token_id
-            
-        return token_id
-    except (ValueError, IndexError):
+            token_id_cache[cache_key] = None
         return None
+    # Extract numeric part
+    num_str = token_string[len(prefix):-1]
+    if not num_str.isdigit():
+        if len(token_id_cache) < MAX_CACHE_SIZE:
+            token_id_cache[cache_key] = None
+        return None
+    num = int(num_str)
+    token_id = num - 10 - (mod * 4096)
+    if len(token_id_cache) < MAX_CACHE_SIZE:
+        token_id_cache[cache_key] = token_id
+    return token_id
 
 async def tokens_decoder(token_gen):
     """Optimized token decoder with early first-chunk processing for lower latency"""
@@ -195,8 +184,8 @@ async def tokens_decoder(token_gen):
     
     # Use different thresholds for first chunk vs. subsequent chunks
     min_frames_first = 7  # Just one chunk (7 tokens) for first audio - ultra-low latency
-    min_frames_subsequent = 70  # Standard minimum (4 chunks of 7 tokens) after first audio
-    ideal_frames = 70  # Ideal standard frame size (7×7 window) - unchanged
+    min_frames_subsequent = 28  # Standard minimum (4 chunks of 7 tokens) after first audio
+    ideal_frames = 49  # Ideal standard frame size (7×7 window) - unchanged
     process_every_n = 7  # Process every 7 tokens (standard for Orpheus model) - unchanged
     
     start_time = time.time()
