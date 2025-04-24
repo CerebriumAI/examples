@@ -16,6 +16,8 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
     private var playbackStarted = false
     private var scheduledBufferCount = 0
     private let minBuffersBeforePlayback = 4
+    // Accumulate initial buffers for smooth playback
+    private var pendingBuffers: [AVAudioPCMBuffer] = []
 
     public override init() {
         super.init()
@@ -152,11 +154,23 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
                 }
             }
         }
-        node.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
-        scheduledBufferCount += 1
-        if !playbackStarted && scheduledBufferCount >= minBuffersBeforePlayback {
-            node.play()
-            playbackStarted = true
+        // Group initial buffers before playback for smooth start
+        if !playbackStarted {
+            pendingBuffers.append(buffer)
+            if pendingBuffers.count >= minBuffersBeforePlayback {
+                // Schedule all pending buffers
+                for buf in pendingBuffers {
+                    node.scheduleBuffer(buf, at: nil, options: [], completionHandler: nil)
+                }
+                scheduledBufferCount = pendingBuffers.count
+                pendingBuffers.removeAll()
+                node.play()
+                playbackStarted = true
+            }
+        } else {
+            // Schedule subsequent buffers as they arrive
+            node.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
+            scheduledBufferCount += 1
         }
     }
 }
