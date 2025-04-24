@@ -270,7 +270,7 @@ def tokens_decoder_sync(syn_token_gen):
     audio_queue = queue.SimpleQueue()
 
     # Collect tokens in batches for higher throughput
-    batch_size = 1048 if snac_device == "cuda" else 4
+    batch_size = 8 if snac_device == "cuda" else 4
     
     # Convert the synchronous token generator into an async generator with batching
     async def async_token_gen():
