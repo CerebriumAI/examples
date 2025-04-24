@@ -195,9 +195,9 @@ async def tokens_decoder(token_gen):
     
     # Use different thresholds for first chunk vs. subsequent chunks
     min_frames_first = 7  # Just one chunk (7 tokens) for first audio - ultra-low latency
-    min_frames_subsequent = 28  # Standard minimum (4 chunks of 7 tokens) after first audio
-    ideal_frames = 49  # Ideal standard frame size (7×7 window) - unchanged
-    process_every_n = 28  # Process every 7 tokens (standard for Orpheus model) - unchanged
+    min_frames_subsequent = 70  # Standard minimum (4 chunks of 7 tokens) after first audio
+    ideal_frames = 70  # Ideal standard frame size (7×7 window) - unchanged
+    process_every_n = 7  # Process every 7 tokens (standard for Orpheus model) - unchanged
     
     start_time = time.time()
     token_count = 0
