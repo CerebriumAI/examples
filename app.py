@@ -560,14 +560,14 @@ async def stream_speech(
         yield wav_header
         total_bytes += len(wav_header)
         
-        # (Optional) 20ms silence padding for jitter tolerance
-        silence = bytearray(SAMPLE_RATE_BYTES_PER_MS * 20)
+        # (Optional) 100ms silence padding for jitter tolerance
+        silence = bytearray(SAMPLE_RATE_BYTES_PER_MS * 100)
         yield silence
         total_bytes += len(silence)
         
         # Pre-allocate buffers for better performance
-        # Buffer set to 2x20ms (~40ms) for reduced latency
-        buffer_size = SAMPLE_RATE_BYTES_PER_MS * 20 * 2
+        # Buffer set to 2x100ms (~200ms) for higher throughput
+        buffer_size = SAMPLE_RATE_BYTES_PER_MS * 100 * 2
         audio_buffer = bytearray(buffer_size)
         buffer_position = 0
         
@@ -590,8 +590,8 @@ async def stream_speech(
                 audio_buffer[buffer_position:buffer_position + chunk_size] = chunk
                 buffer_position += chunk_size
                 
-                # Yield 20ms chunks for lower latency
-                chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 20
+                # Yield 100ms chunks for higher throughput
+                chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 100
                 while True:
                     if buffer_position >= chunk_bytes:
                         yield bytes(audio_buffer[:chunk_bytes])
