@@ -1,16 +1,6 @@
-import asyncio
 import os
-import sys
-from dataclasses import dataclass, field
-from typing import List, Optional, AsyncGenerator
-import numpy as np
-import librosa
-import soundfile as sf
 import time
 from loguru import logger
-import datetime
-import scipy.io.wavfile
-import scipy.signal
 import requests
 from dotenv import load_dotenv
 
@@ -18,17 +8,22 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask, PipelineParams
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADAnalyzer, VADState, VADParams
-from pipecat.services.ultravox.sst import UltravoxSTTService
+from pipecat.audio.vad.vad_analyzer import VADParams
+from pipecat.services.ultravox import UltravoxSTTService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from fastapi import FastAPI
 
 load_dotenv()
 
+# Initialize FastAPI
+app = FastAPI()
+
 ultravox_processor = UltravoxSTTService(
-    model_size="fixie-ai/ultravox-v0_5-llama-3_1-8b",
+    model_name="fixie-ai/ultravox-v0_5-llama-3_1-8b",
     hf_token=os.getenv("HF_TOKEN"),
 )
+
 
 async def main(room_url, token):
     # Get audio devices
@@ -45,7 +40,6 @@ async def main(room_url, token):
         ),
     )
 
-    
     tts = CartesiaTTSService(
         api_key=os.environ.get("CARTESIA_API_KEY"),
         voice_id='97f4b8fb-f2fe-444b-bb9a-c109783a857a',
@@ -55,16 +49,17 @@ async def main(room_url, token):
     # Create pipeline using transport.input() and transport.output()
     pipeline = Pipeline([transport.input(), ultravox_processor, tts, transport.output()])
     task = PipelineTask(
-            pipeline,
-            params=PipelineParams(
-                allow_interruptions=True,
-                enable_metrics=True,
-            ),
-        )
+        pipeline,
+        params=PipelineParams(
+            allow_interruptions=True,
+            enable_metrics=True,
+        ),
+    )
     runner = PipelineRunner()
-    
+
     logger.info("Starting pipeline...")
     await runner.run(task)
+
 
 def create_room():
     url = "https://api.daily.co/v1/rooms/"
@@ -95,7 +90,7 @@ def create_room():
     else:
         data = response.json()
         if data.get("error") == "invalid-request-error" and "rooms reached" in data.get(
-            "info", ""
+                "info", ""
         ):
             print("We are currently at capacity for this demo. Please try again later.")
             return {
@@ -128,13 +123,18 @@ def create_token(room_name: str):
         return None
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+@app.post("/run")
 async def run():
     # Create a room first
     room = create_room()
     if not room or "status_code" in room:
         print("Failed to create room")
         return
-    
+
     # Call main with the room info
-    main(room["url"], room["token"])
+    await main(room["url"], room["token"])
     return {"room_url": room["url"]}

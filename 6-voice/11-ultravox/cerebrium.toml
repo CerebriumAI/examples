@@ -6,20 +6,25 @@ disable_auth = false
 include = ['./*', 'main.py', 'cerebrium.toml']
 exclude = ['.*']
 
+[cerebrium.runtime.custom]
+port = 8765
+entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765"]
+healthcheck_endpoint = "/health"
+
 [cerebrium.hardware]
 cpu = 4
 memory = 16.0
 compute = "AMPERE_A10"
 
 [cerebrium.scaling]
-min_replicas = 0
+min_replicas = 1
 max_replicas = 5
 cooldown = 90
 replica_concurrency = 1
 response_grace_period = 900
 scaling_metric = "concurrency_utilization"
 scaling_target = 80
-scaling_buffer=1
+scaling_buffer= 0
 
 [cerebrium.dependencies.pip]
 transformers = "latest"
@@ -32,6 +37,8 @@ pydantic-settings = "latest"
 textual = "latest"
 loguru = "latest"
 "pipecat-ai[cartesia,daily,silero,ultravox]" = "0.0.62"
+fastapi = "latest"
+uvicorn = "latest"
 
 [cerebrium.dependencies.apt]
 ffmpeg = "latest"
