@@ -555,17 +555,19 @@ async def stream_speech(
     async def stream_audio():
         nonlocal chunk_count, total_bytes
         
-        # Use cached WAV header for maximum performance
-        # wav_header = generate_wav_header(SAMPLE_RATE)
-        # yield wav_header
-        # total_bytes += len(wav_header)
+        # Send WAV header immediately for client parsing
+        wav_header = generate_wav_header(SAMPLE_RATE)
+        yield wav_header
+        total_bytes += len(wav_header)
         
-        # Add silence padding at the beginning to help client buffering
-        # yield bytes(silence_bytes)
-        # total_bytes += len(silence_bytes)
+        # (Optional) 20ms silence padding for jitter tolerance
+        silence = bytearray(SAMPLE_RATE_BYTES_PER_MS * 20)
+        yield silence
+        total_bytes += len(silence)
         
         # Pre-allocate buffers for better performance
-        buffer_size = 8192  # Lower for quicker buffer turnovers (4KB)
+        # Buffer set to 2x20ms (~40ms) for reduced latency
+        buffer_size = SAMPLE_RATE_BYTES_PER_MS * 20 * 2
         audio_buffer = bytearray(buffer_size)
         buffer_position = 0
         
@@ -588,9 +590,9 @@ async def stream_speech(
                 audio_buffer[buffer_position:buffer_position + chunk_size] = chunk
                 buffer_position += chunk_size
                 
-                # Yield fixed-size chunks
+                # Yield 20ms chunks for lower latency
+                chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 20
                 while True:
-                    chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 50
                     if buffer_position >= chunk_bytes:
                         yield bytes(audio_buffer[:chunk_bytes])
                         total_bytes += chunk_bytes
@@ -602,7 +604,7 @@ async def stream_speech(
                         break
             # Send any remaining audio in buffer, padded
             if buffer_position > 0:
-                chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 50
+                chunk_bytes = SAMPLE_RATE_BYTES_PER_MS * 20
                 pad_len = chunk_bytes - buffer_position
                 yield bytes(audio_buffer[:buffer_position]) + b"\x00" * pad_len
                 total_bytes += chunk_bytes
