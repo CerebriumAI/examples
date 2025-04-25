@@ -9,7 +9,7 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask, PipelineParams
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.services.ultravox import UltravoxSTTService
+from pipecat.services.ultravox.sst import UltravoxSTTService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 from fastapi import FastAPI
@@ -25,8 +25,8 @@ ultravox_processor = UltravoxSTTService(
 )
 
 
-async def main(room_url, token):
-    # Get audio devices
+@app.post("/run")
+async def run(room_url: str, token: str):
     transport = DailyTransport(
         room_url,
         token,
@@ -61,6 +61,7 @@ async def main(room_url, token):
     await runner.run(task)
 
 
+@app.post("/create-room")
 def create_room():
     url = "https://api.daily.co/v1/rooms/"
     headers = {
@@ -90,7 +91,7 @@ def create_room():
     else:
         data = response.json()
         if data.get("error") == "invalid-request-error" and "rooms reached" in data.get(
-            "info", ""
+                "info", ""
         ):
             print("We are currently at capacity for this demo. Please try again later.")
             return {
@@ -126,15 +127,3 @@ def create_token(room_name: str):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-@app.post("/run")
-async def run():
-    # Create a room first
-    room = create_room()
-    if not room or "status_code" in room:
-        print("Failed to create room")
-        return
-
-    # Call main with the room info
-    await main(room["url"], room["token"])
-    return {"room_url": room["url"]}
