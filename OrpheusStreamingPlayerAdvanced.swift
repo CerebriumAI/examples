@@ -65,9 +65,12 @@ public class OrpheusStreamingPlayerAdvanced: NSObject {
         let hardwareFormat = engine.outputNode.inputFormat(forBus: 0)
         print("[Orpheus] Hardware output format: sampleRate=\(hardwareFormat.sampleRate), channels=\(hardwareFormat.channelCount)")
         
-        // Attach player and allow format conversion automatically
+        // Attach player and connect with explicit output format to avoid channel mismatch
         engine.attach(playerNode)
-        engine.connect(playerNode, to: engine.mainMixerNode, format: nil)
+        let outputFormat = engine.outputNode.inputFormat(forBus: 0)
+        engine.connect(playerNode, to: engine.mainMixerNode, format: outputFormat)
+        // Save expected output format for buffer conversion
+        self.expectedFormat = outputFormat
         
         do {
             try engine.start()
@@ -136,10 +139,23 @@ extension OrpheusStreamingPlayerAdvanced: URLSessionDataDelegate {
         buffer.frameLength = frameCount
         pcmData.withUnsafeBytes { raw in
             let ptr = raw.baseAddress!.assumingMemoryBound(to: Int16.self)
-            for ch in 0..<Int(fmt.channelCount) {
-                let channelData = buffer.int16ChannelData![ch]
+            let inputChannels = Int(fmt.channelCount)
+            let outputChannels = Int(node.outputFormat(forBus: 0).channelCount)
+            // If output expects stereo but input is mono, duplicate mono to both channels
+            if inputChannels == 1 && outputChannels == 2 {
+                let monoData = buffer.int16ChannelData![0]
+                let left = buffer.int16ChannelData![0]
+                let right = buffer.int16ChannelData![1]
                 for frame in 0..<Int(frameCount) {
-                    channelData[frame] = ptr[frame * Int(fmt.channelCount) + ch]
+                    left[frame] = ptr[frame]
+                    right[frame] = ptr[frame]
+                }
+            } else {
+                for ch in 0..<inputChannels {
+                    let channelData = buffer.int16ChannelData![ch]
+                    for frame in 0..<Int(frameCount) {
+                        channelData[frame] = ptr[frame * inputChannels + ch]
+                    }
                 }
             }
         }
