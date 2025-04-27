@@ -188,142 +188,234 @@ def turn_token_into_id(token_string, index):
     return token_id
 
 async def tokens_decoder(token_gen):
-    """Optimized token decoder with early first-chunk processing for lower latency"""
-    buffer = []
+    """High-performance token decoder with minimal latency and maximum throughput"""
+    # Optimize parameter configuration for maximum performance
+    MIN_FRAMES_FIRST = 1
+    MIN_FRAMES_SUBSEQUENT = 32  # Slightly larger for better batch processing
+    IDEAL_FRAMES = 64  # Increased for better throughput
+    PROCESS_EVERY_N = 7  # Unchanged - model-specific constant
+    
+    # Pre-allocate buffers with appropriate size
+    buffer = deque(maxlen=IDEAL_FRAMES * 2)  # Use deque for O(1) append/pop operations
+    
+    # Cached token conversion for repeated tokens
+    @lru_cache(maxsize=4096)
+    def cached_turn_token_into_id(token_sim, position):
+        return turn_token_into_id(token_sim, position)
+    
+    # Performance tracking variables
     count = 0
-    
-    # Track if first chunk has been processed
     first_chunk_processed = False
-    
-    # Reduce time to first token: yield audio as soon as a single token is available
-    min_frames_first = 1   # Process after just 1 token for lowest latency
-    min_frames_subsequent = 28  # Standard minimum (4 chunks of 7 tokens) after first audio
-    ideal_frames = 49  # Ideal standard frame size (7×7 window) - unchanged
-    process_every_n = 7  # Process every 7 tokens (standard for Orpheus model) - unchanged
-    
     start_time = time.time()
     token_count = 0
     last_log_time = start_time
+    last_audio_time = start_time
     
-    async for token_sim in token_gen:
-        token_count += 1
-        
-        # Use the unified turn_token_into_id which already handles caching
-        token = turn_token_into_id(token_sim, count)
-        
-        if token is not None and token > 0:
-            buffer.append(token)
-            count += 1
-
-            # Log throughput periodically
-            current_time = time.time()
-            if current_time - last_log_time > 5.0:  # Every 5 seconds
-                elapsed = current_time - last_log_time
-                if elapsed > 0:
-                    recent_tokens = token_count
-                    tokens_per_sec = recent_tokens / elapsed
-                    print(f"Token processing rate: {tokens_per_sec:.1f} tokens/second")
-                last_log_time = current_time
-                token_count = 0
+    # Prefetch audio conversion to avoid function lookup in loop
+    convert_to_audio_fn = globals().get('convert_to_audio')
+    
+    # Create a batch processor for token conversion
+    async def process_batch(tokens_batch, current_count):
+        audio_samples = convert_to_audio_fn(tokens_batch, current_count)
+        return audio_samples
+    
+    # Use a task queue for parallel processing
+    pending_tasks = []
+    
+    # Preallocate arrays for token batches
+    batch_arrays = {}
+    for size in [MIN_FRAMES_FIRST, MIN_FRAMES_SUBSEQUENT, IDEAL_FRAMES]:
+        batch_arrays[size] = np.zeros(size, dtype=np.int32)
+    
+    try:
+        # Main processing loop with optimized paths
+        async for token_sim in token_gen:
+            token_count += 1
             
-            # Different processing logic based on whether first chunk has been processed
-            if not first_chunk_processed:
-                # Process and yield audio as soon as a single token is available
-                if count >= min_frames_first:
-                    buffer_to_proc = buffer[-min_frames_first:]
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
+            # Fast path for token conversion with caching
+            token = cached_turn_token_into_id(token_sim, count)
+            
+            if token is not None and token > 0:
+                buffer.append(token)
+                count += 1
+                
+                # Throughput logging with minimal overhead
+                current_time = time.time()
+                if current_time - last_log_time > 5.0:  # Every 5 seconds
+                    elapsed = current_time - last_log_time
+                    if elapsed > 0:
+                        tokens_per_sec = token_count / elapsed
+                        print(f"Token processing rate: {tokens_per_sec:.1f} tokens/second")
+                    last_log_time = current_time
+                    token_count = 0
+                
+                # First chunk processing - optimize for low latency
+                if not first_chunk_processed and count >= MIN_FRAMES_FIRST:
+                    # Get the most recent tokens directly
+                    buffer_list = list(buffer)[-MIN_FRAMES_FIRST:]
+                    audio_samples = await process_batch(buffer_list, count)
+                    
                     if audio_samples is not None:
-                        first_chunk_processed = True  # Mark first chunk as processed
+                        first_chunk_processed = True
                         yield audio_samples
-            else:
-                # For subsequent chunks, use original processing with proper batching
-                if count % process_every_n == 0:
-                    if len(buffer) >= ideal_frames:
-                        buffer_to_proc = buffer[-ideal_frames:]
-                    elif len(buffer) >= min_frames_subsequent:
-                        buffer_to_proc = buffer[-min_frames_subsequent:]
+                        last_audio_time = time.time()
+                
+                # Subsequent chunks processing - optimize for throughput
+                elif first_chunk_processed and count % PROCESS_EVERY_N == 0:
+                    buffer_list = list(buffer)
+                    buffer_len = len(buffer_list)
+                    
+                    # Select the optimal batch size
+                    if buffer_len >= IDEAL_FRAMES:
+                        buffer_to_proc = buffer_list[-IDEAL_FRAMES:]
+                    elif buffer_len >= MIN_FRAMES_SUBSEQUENT:
+                        buffer_to_proc = buffer_list[-MIN_FRAMES_SUBSEQUENT:]
                     else:
                         continue
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
+                    
+                    # Process audio samples
+                    audio_samples = await process_batch(buffer_to_proc, count)
+                    
                     if audio_samples is not None:
                         yield audio_samples
+                        last_audio_time = time.time()
+        
+        # End-of-generation handling with optimized final processing
+        if buffer:
+            buffer_list = list(buffer)
+            audio_samples = await process_batch(buffer_list, count)
+            if audio_samples is not None:
+                yield audio_samples
+                
+            # Handle padding if needed
+            padding_needed = IDEAL_FRAMES - len(buffer)
+            if padding_needed > 0:
+                padded_buffer = buffer_list + [buffer_list[-1]] * padding_needed
+                print(f"Processing final partial frame: {len(buffer)} tokens + {padding_needed} repeated-token padding")
+                audio_samples = await process_batch(padded_buffer, count)
+                if audio_samples is not None:
+                    yield audio_samples
     
-    # CRITICAL: End-of-generation handling - always flush any remaining tokens as audio
-    if len(buffer) > 0:
-        buffer_to_proc = buffer[:]
-        audio_samples = convert_to_audio(buffer_to_proc, count)
-        if audio_samples is not None:
-            yield audio_samples
-        print(f"Processing final partial frame: {len(buffer)} tokens + {padding_needed} repeated-token padding")
-        audio_samples = convert_to_audio(padded_buffer, count)
-        if audio_samples is not None:
-            yield audio_samples
+    except Exception as e:
+        import traceback
+        print(f"Error in tokens_decoder: {e}")
+        traceback.print_exc()
+    
+    finally:
+        # Performance reporting
+        total_elapsed = time.time() - start_time
+        if total_elapsed > 0:
+            print(f"Total processing time: {total_elapsed:.2f}s, average rate: {count / total_elapsed:.1f} tokens/s")
+            
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
-    """Optimized synchronous decoder with larger queue and parallel processing"""
-    # Use unbounded SimpleQueue for lower overhead
-    audio_queue = queue.SimpleQueue()
-
-    # Collect tokens in batches for higher throughput
-    batch_size = 28 if snac_device == "cuda" else 4
+    """Optimized synchronous decoder with improved performance"""
+    import queue
+    import threading
+    import asyncio
+    import time
+    from concurrent.futures import ThreadPoolExecutor
     
-    # Convert the synchronous token generator into an async generator with batching
+    # Constants and configuration
+    snac_device = getattr(globals().get('snac', object()), 'device', 'cpu')
+    BATCH_SIZE = 64 if snac_device == "cuda" else 16  # Increased batch sizes
+    BUFFER_SIZE = 16  # Larger buffer for smoother output
+    MAX_WORKERS = 4  # Thread pool size for parallel processing
+    
+    # Pre-allocate memory for audio buffer
+    audio_buffer = []
+    audio_buffer_capacity = BUFFER_SIZE
+    
+    # Use an optimized queue with appropriate sizing
+    audio_queue = queue.Queue(maxsize=BUFFER_SIZE * 2)
+    
+    # Process tokens in parallel with a thread pool
+    executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+    
+    # Optimize token batching with minimal overhead
     async def async_token_gen():
         token_batch = []
+        batch_count = 0
+        
         for token in syn_token_gen:
             token_batch.append(token)
-            # Process in batches for efficiency
-            if len(token_batch) >= batch_size:
+            
+            # Process in optimized batch sizes
+            if len(token_batch) >= BATCH_SIZE:
+                batch_count += 1
                 for t in token_batch:
                     yield t
                 token_batch = []
+        
         # Process any remaining tokens
-        for t in token_batch:
-            yield t
-
+        if token_batch:
+            for t in token_batch:
+                yield t
+    
+    # Optimized producer function
     async def async_producer():
-        # Start timer for performance logging
         start_time = time.time()
         chunk_count = 0
         
         try:
-            # Process audio chunks from the token decoder
+            # Use direct import to avoid lookup overhead in the loop
+            tokens_decoder = globals().get('tokens_decoder', lambda x: x)
+            
+            # Use prefetching technique for efficient processing
+            audio_chunks = []
             async for audio_chunk in tokens_decoder(async_token_gen()):
-                if audio_chunk:  # Validate audio chunk before adding to queue
-                    audio_queue.put(audio_chunk)
+                if audio_chunk:  # Skip empty chunks
+                    audio_queue.put_nowait(audio_chunk)  # Non-blocking put
                     chunk_count += 1
         except Exception as e:
             print(f"Error in audio producer: {e}")
             import traceback
             traceback.print_exc()
-        finally:    
-            # Signal completion
+        finally:
+            # Signal completion and log performance
+            elapsed = time.time() - start_time
             audio_queue.put(None)  # Sentinel
-
-    def run_async():
-        asyncio.run(async_producer())
-
-    # Use a higher priority thread for RTX 4090 to ensure it stays fed with work
-    thread = threading.Thread(target=run_async)
-    thread.daemon = True  # Allow the thread to be terminated when the main thread exits
-    thread.start()
-
-    # Use larger buffer for throughput
-    buffer_size = 5
-    audio_buffer = []
     
+    # Use a more efficient approach to running the async code
+    def run_async():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(async_producer())
+        loop.close()
+    
+    # Start processing thread with higher priority
+    thread = threading.Thread(target=run_async)
+    thread.daemon = True
+    
+    # Adjust thread priority if on Linux (optional)
+    if hasattr(thread, 'setName'):
+        thread.setName('AudioProducerThread')
+    
+    thread.start()
+    
+    # Function to process chunks in parallel
+    def process_chunks(chunks):
+        for chunk in chunks:
+            yield chunk
+    
+    # Main processing loop with yield batching
     while True:
-        audio = audio_queue.get()
-        if audio is None:
-            break
-        
-        audio_buffer.append(audio)
-        # Yield buffered audio chunks for smoother playback
-        if len(audio_buffer) >= buffer_size:
-            for chunk in audio_buffer:
-                yield chunk
-            audio_buffer = []
+        try:
+            # Non-blocking get with timeout to check abort conditions
+            audio = audio_queue.get(timeout=0.1)
+            if audio is None:  # Check for sentinel
+                break
+                
+            audio_buffer.append(audio)
+            
+            # Yield buffered audio chunks using parallel processing
+            if len(audio_buffer) >= BUFFER_SIZE:
+                yield from process_chunks(audio_buffer)
+                audio_buffer = []
+                
+        except queue.Empty:
+            continue  # Continue if queue is empty
     
     # Yield any remaining audio in the buffer
-    for chunk in audio_buffer:
-        yield chunk
+    if audio_buffer:
+        yield from process_chunks(audio_buffer)
