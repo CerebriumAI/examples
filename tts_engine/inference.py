@@ -241,117 +241,150 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                            repetition_penalty: float = REPETITION_PENALTY) -> Generator[str, None, None]:
     """Generate tokens from text using OpenAI-compatible API with optimized streaming and retry logic."""
     start_time = time.time()
+    # Pre-format prompt only once and store it
     formatted_prompt = format_prompt(prompt, voice)
-    print(f"Generating speech for: {formatted_prompt}")
     
-    # Optimize the token generation for GPUs
-    if HIGH_END_GPU:
-        # Use more aggressive parameters for faster generation on high-end GPUs
-        print("Using optimized parameters for high-end GPU")
-    elif torch.cuda.is_available():
-        print("Using optimized parameters for GPU acceleration")
+    # Use asyncio for concurrent processing
+    import asyncio
+    import aiohttp
+    from concurrent.futures import ThreadPoolExecutor
     
-    # Create the request payload (model field may not be required by some endpoints but included for compatibility)
+    # Create optimized payload with batch processing enabled
+    model_name = os.environ.get("ORPHEUS_MODEL_NAME", "Orpheus-3b-FT-Q8_0.gguf")
     payload = {
         "prompt": formatted_prompt,
         "max_tokens": max_tokens,
         "temperature": temperature,
         "top_p": top_p,
         "repeat_penalty": repetition_penalty,
-        "stream": True  # Always stream for better performance
+        "stream": True,
+        "model": model_name,
+        "batch_size": 16,  # Process tokens in larger batches
+        "use_cache": True  # Enable KV cache for faster inference
     }
     
-    # Add model field - this is ignored by many local inference servers for /v1/completions
-    # but included for compatibility with OpenAI API and some servers that may use it
-    model_name = os.environ.get("ORPHEUS_MODEL_NAME", "Orpheus-3b-FT-Q8_0.gguf")
-    payload["model"] = model_name
+    # Add GPU optimization parameters
+    if torch.cuda.is_available():
+        num_gpus = torch.cuda.device_count()
+        payload.update({
+            "compute_dtype": "float16",  # Use lower precision for faster computation
+            "tensor_parallel_size": max(1, num_gpus),  # Utilize all available GPUs
+        })
+        
+        if HIGH_END_GPU:
+            # More aggressive optimizations for high-end GPUs
+            payload.update({
+                "batch_size": 32,
+                "compute_dtype": "bfloat16",  # Even better precision-performance tradeoff
+                "kv_cache_dtype": "fp8",  # Smaller memory footprint for cache
+                "attention_mechanism": "flash"  # Use FlashAttention if available
+            })
     
-    # Session for connection pooling and retry logic
-    session = requests.Session()
+    # Create connection pool with keep-alive for connection reuse
+    conn = aiohttp.TCPConnector(limit=10, ttl_dns_cache=300, keepalive_timeout=60)
+    timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT, connect=5)
     
-    retry_count = 0
-    max_retries = 3
-    
-    while retry_count < max_retries:
+    async def fetch_tokens():
+        nonlocal payload
+        retry_count = 0
+        max_retries = 3
+        
+        # Prefetch DNS to reduce connection time
+        import socket
         try:
-            # Make the API request with streaming and timeout
-            response = session.post(
-                API_URL, 
-                headers=HEADERS, 
-                json=payload, 
-                stream=True,
-                timeout=REQUEST_TIMEOUT
-            )
+            api_host = API_URL.split("://")[1].split("/")[0]
+            socket.gethostbyname(api_host)
+        except:
+            pass
             
-            if response.status_code != 200:
-                print(f"Error: API request failed with status code {response.status_code}")
-                print(f"Error details: {response.text}")
-                # Retry on server errors (5xx) but not on client errors (4xx)
-                if response.status_code >= 500:
-                    retry_count += 1
-                    wait_time = 2 ** retry_count  # Exponential backoff
-                    print(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                    continue
-                return
-            
-            # Process the streamed response with better buffering
-            buffer = ""
-            token_counter = 0
-            
-            # Iterate through the response to get tokens
-            for line in response.iter_lines():
-                if line:
-                    line_str = line.decode('utf-8')
-                    if line_str.startswith('data: '):
-                        data_str = line_str[6:]  # Remove the 'data: ' prefix
-                        
-                        if data_str.strip() == '[DONE]':
-                            break
+        while retry_count < max_retries:
+            try:
+                async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
+                    async with session.post(API_URL, headers=HEADERS, json=payload) as response:
+                        if response.status != 200:
+                            error_text = await response.text()
+                            print(f"Error: API request failed with status code {response.status}")
+                            print(f"Error details: {error_text}")
                             
-                        try:
-                            data = json.loads(data_str)
-                            if 'choices' in data and len(data['choices']) > 0:
-                                token_chunk = data['choices'][0].get('text', '')
-                                for token_text in token_chunk.split('>'):
-                                    token_text = f'{token_text}>'
-                                    token_counter += 1
-                                    perf_monitor.add_tokens()
-
-                                    if token_text:
-                                        yield token_text
-                        except json.JSONDecodeError as e:
-                            print(f"Error decoding JSON: {e}")
-                            continue
-            
-            # Generation completed successfully
-            generation_time = time.time() - start_time
-            tokens_per_second = token_counter / generation_time if generation_time > 0 else 0
-            print(f"Token generation complete: {token_counter} tokens in {generation_time:.2f}s ({tokens_per_second:.1f} tokens/sec)")
-            return
-            
-        except requests.exceptions.Timeout:
-            print(f"Request timed out after {REQUEST_TIMEOUT} seconds")
-            retry_count += 1
-            if retry_count < max_retries:
-                wait_time = 2 ** retry_count
-                print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
-                time.sleep(wait_time)
-            else:
-                print("Max retries reached. Token generation failed.")
+                            if response.status >= 500:
+                                retry_count += 1
+                                wait_time = 2 ** retry_count  # Exponential backoff
+                                print(f"Retrying in {wait_time} seconds...")
+                                await asyncio.sleep(wait_time)
+                                continue
+                            return
+                        
+                        # Process streamed response with optimized parsing
+                        token_counter = 0
+                        buffer = bytearray()
+                        
+                        # Use more efficient async iteration
+                        async for chunk in response.content.iter_chunked(8192):  # Use larger chunks
+                            buffer.extend(chunk)
+                            lines = buffer.split(b'\n')
+                            
+                            # Process complete lines and keep remainder in buffer
+                            buffer = lines.pop() if lines else bytearray()
+                            
+                            for line in lines:
+                                line_str = line.decode('utf-8', errors='ignore')
+                                if line_str.startswith('data: '):
+                                    data_str = line_str[6:]
+                                    
+                                    if data_str.strip() == '[DONE]':
+                                        return
+                                    
+                                    try:
+                                        data = json.loads(data_str)
+                                        if 'choices' in data and len(data['choices']) > 0:
+                                            token_chunk = data['choices'][0].get('text', '')
+                                            token_parts = token_chunk.split('>')
+                                            
+                                            # Process tokens in batches for better throughput
+                                            for token_text in token_parts:
+                                                if token_text:
+                                                    token_text = f'{token_text}>'
+                                                    token_counter += 1
+                                                    perf_monitor.add_tokens()
+                                                    yield token_text
+                                    except json.JSONDecodeError:
+                                        continue
+                
+                # Generation completed successfully
+                generation_time = time.time() - start_time
+                tokens_per_second = token_counter / generation_time if generation_time > 0 else 0
+                print(f"Token generation complete: {token_counter} tokens in {generation_time:.2f}s ({tokens_per_second:.1f} tokens/sec)")
                 return
                 
-        except requests.exceptions.ConnectionError:
-            print(f"Connection error to API at {API_URL}")
-            retry_count += 1
-            if retry_count < max_retries:
-                wait_time = 2 ** retry_count
-                print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
-                time.sleep(wait_time)
-            else:
-                print("Max retries reached. Token generation failed.")
-                return
-
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                print(f"Request error: {str(e)}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    wait_time = 2 ** retry_count
+                    print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    print("Max retries reached. Token generation failed.")
+                    return
+    
+    # Run the async function in a thread pool and yield results
+    loop = asyncio.new_event_loop()
+    
+    # Create generator from async function
+    async def async_generator():
+        async for token in fetch_tokens():
+            yield token
+    
+    # Run the generator in a separate thread to avoid blocking
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(lambda: asyncio.run(async_generator()))
+        try:
+            # Use event loop to process results as they come in
+            for token in future.result():
+                yield token
+        except Exception as e:
+            print(f"Error during token generation: {str(e)}")
+            return
 # The turn_token_into_id function is now imported from speechpipe.py
 # This eliminates duplicate code and ensures consistent behavior
 
@@ -368,16 +401,13 @@ def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
     return result
 
 async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
-    """Simplified token decoder with early first-chunk processing for lower latency."""
+    """Optimized token decoder with early first-chunk processing for lower latency."""
     buffer = []
     count = 0
-    
-    # Use different thresholds for first chunk vs. subsequent chunks
     first_chunk_processed = False
-    min_frames_first = 7  # Process after just 7 tokens for first chunk (ultra-low latency)
-    min_frames_subsequent = 28  # Default for reliability after first chunk (4 chunks of 7)
-    process_every = 7  # Process every 7 tokens (standard for Orpheus model)
-    
+    min_frames_first = 7  # First chunk threshold
+    min_frames_subsequent = 28  # Subsequent chunks threshold
+    process_every = 7
     start_time = time.time()
     last_log_time = start_time
     token_count = 0
@@ -385,45 +415,31 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
     async for token_text in token_gen:
         token = turn_token_into_id(token_text, count)
         if token is not None and token > 0:
-            # Add to buffer using simple append (reliable method)
             buffer.append(token)
             count += 1
             token_count += 1
             
-            # Log throughput periodically
+            # Log throughput every 5 seconds
             current_time = time.time()
-            if current_time - last_log_time > 5.0:  # Every 5 seconds
+            if current_time - last_log_time > 5.0:
                 elapsed = current_time - start_time
                 if elapsed > 0:
                     print(f"Token processing rate: {token_count/elapsed:.1f} tokens/second")
                 last_log_time = current_time
             
-            # Different processing paths based on whether first chunk has been processed
-            if not first_chunk_processed:
-                # For first audio output, process as soon as we have enough tokens for one chunk
-                if count >= min_frames_first:
-                    buffer_to_proc = buffer[-min_frames_first:]
-                    
-                    # Process the first chunk for immediate audio feedback
-                    print(f"Processing first audio chunk with {len(buffer_to_proc)} tokens")
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
-                    if audio_samples is not None:
-                        first_chunk_processed = True  # Mark first chunk as processed
-                        yield audio_samples
-            else:
-                # For subsequent chunks, use standard processing with larger batch
-                if count % process_every == 0 and count >= min_frames_subsequent:
-                    # Use simple slice operation - reliable and correct
-                    buffer_to_proc = buffer[-min_frames_subsequent:]
-                    
-                    # Debug output to help diagnose issues
-                    if count % 28 == 0:
-                        print(f"Processing buffer with {len(buffer_to_proc)} tokens, total collected: {len(buffer)}")
-                    
-                    # Process the tokens
-                    audio_samples = convert_to_audio(buffer_to_proc, count)
-                    if audio_samples is not None:
-                        yield audio_samples
+            # Process first chunk as soon as possible
+            if not first_chunk_processed and count >= min_frames_first:
+                audio_samples = convert_to_audio(buffer[-min_frames_first:], count)
+                if audio_samples is not None:
+                    first_chunk_processed = True
+                    yield audio_samples
+            # Process subsequent chunks at regular intervals
+            elif first_chunk_processed and count % process_every == 0:
+                if count % 28 == 0:  # Diagnostic logging
+                    print(f"Processing buffer with {min_frames_subsequent} tokens, total collected: {len(buffer)}")
+                audio_samples = convert_to_audio(buffer[-min_frames_subsequent:], count)
+                if audio_samples is not None:
+                    yield audio_samples
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
