@@ -535,7 +535,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     # Optimized I/O approach for all systems
     # This approach is simpler and more reliable than separate code paths
     write_buffer = bytearray()
-    buffer_max_size = 1024 * 1024     # 4MB max buffer size (adjustable)
+    buffer_max_size = 1024 * 1024 * 4     # 4MB max buffer size (adjustable)
     
     # Keep track of the last time we checked for completion
     last_check_time = time.time()
@@ -939,33 +939,60 @@ def create_balanced_batches(sentences, max_batch_chars):
     return batches
 
 def process_batches_in_parallel(batches, voice, temperature, top_p, max_tokens, output_file=None):
-    """Process batches in parallel using multiple processes."""
-    from concurrent.futures import ProcessPoolExecutor
+    """Process batches in parallel using multiple processes with optimized performance."""
+    from concurrent.futures import ProcessPoolExecutor, as_completed
     import os
+    import time
+    import threading
+    import multiprocessing
     
-    # Determine optimal number of workers based on CPU cores
-    num_workers = min(os.cpu_count() or 4, len(batches))
-    print(f"Using {num_workers} parallel workers for batch processing")
+    # Use CPU affinity for better performance
+    def set_worker_affinity(worker_id, num_workers):
+        """Set CPU affinity for worker process to improve cache locality."""
+        try:
+            import psutil
+            process = psutil.Process()
+            cores = process.cpu_affinity()
+            if cores and len(cores) >= num_workers:
+                # Assign specific cores to each worker for better cache utilization
+                process.cpu_affinity([cores[worker_id % len(cores)]])
+        except (ImportError, AttributeError):
+            pass  # Skip if psutil not available or on unsupported platform
     
-    temp_files = []
-    all_segments = []
+    # Determine optimal number of workers based on system resources
+    cpu_count = os.cpu_count() or 4
+    memory_available = get_available_memory_gb() if 'get_available_memory_gb' in globals() else 8
+    # Calculate workers based on both CPU and memory constraints
+    # Assuming each worker needs about 2GB of memory
+    memory_based_workers = max(1, int(memory_available / 2))
+    num_workers = min(cpu_count, memory_based_workers, len(batches))
     
-    # Create temp directory if needed
-    if output_file:
-        os.makedirs("outputs/temp", exist_ok=True)
+    # Use a larger chunk size for fewer, more efficient tasks
+    chunk_size = max(1, len(batches) // (num_workers * 2))
     
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        # Prepare the arguments for each batch
-        futures = []
+    print(f"Using {num_workers} parallel workers with chunk size {chunk_size}")
+    
+    # Pre-allocate result list to avoid thread synchronization on append
+    all_segments = [None] * sum(len(batch) for batch in batches)
+    segment_index = 0
+    
+    # Create shared counter for progress tracking (more efficient than individual print statements)
+    progress_counter = multiprocessing.Value('i', 0)
+    total_items = len(batches)
+    
+    # Process multiple batches in a single worker call to reduce overhead
+    def process_batch_chunk(chunk_batches, worker_id, shared_counter):
+        set_worker_affinity(worker_id, num_workers)
+        chunk_results = []
+        temp_files = []
         
-        for i, batch in enumerate(batches):
+        for i, batch in enumerate(chunk_batches):
             temp_file = None
             if output_file:
-                temp_file = f"outputs/temp/batch_{i}_{int(time.time())}.wav"
+                temp_file = f"outputs/temp/batch_{worker_id}_{i}_{int(time.time())}.wav"
                 temp_files.append(temp_file)
-                
-            futures.append(executor.submit(
-                process_single_batch,
+            
+            segments = process_single_batch(
                 batch=batch,
                 voice=voice,
                 temperature=temperature,
@@ -973,24 +1000,132 @@ def process_batches_in_parallel(batches, voice, temperature, top_p, max_tokens, 
                 max_tokens=max_tokens,
                 output_file=temp_file,
                 batch_index=i,
-                total_batches=len(batches)
-            ))
+                total_batches=len(chunk_batches)
+            )
+            chunk_results.append((segments, temp_file))
+            
+            # Update progress atomically
+            with shared_counter.get_lock():
+                shared_counter.value += 1
+                if shared_counter.value % max(1, total_items // 10) == 0:
+                    print(f"Progress: {shared_counter.value}/{total_items} batches completed")
         
-        # Collect results in the original order
-        for future in futures:
-            segments = future.result()
-            all_segments.extend(segments)
+        return chunk_results, temp_files
     
-    # If output file was requested, stitch together the temporary files
-    if output_file and temp_files:
-        # Use the optimized stitching method
-        stitch_wav_files_optimized(temp_files, output_file)
+    # Create temp directory if needed - do this once before the parallel execution
+    if output_file:
+        os.makedirs("outputs/temp", exist_ok=True)
+    
+    all_temp_files = []
+    
+    # Split batches into chunks for more efficient processing
+    batch_chunks = [batches[i:i+chunk_size] for i in range(0, len(batches), chunk_size)]
+    
+    # Process in parallel with better load balancing using as_completed
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [
+            executor.submit(process_batch_chunk, chunk, i, progress_counter) 
+            for i, chunk in enumerate(batch_chunks)
+        ]
         
-        # Clean up temporary files in a separate thread
-        threading.Thread(target=cleanup_temp_files, args=(temp_files,)).start()
+        # Process results as they complete rather than waiting for all
+        for future in as_completed(futures):
+            chunk_results, temp_files = future.result()
+            all_temp_files.extend(temp_files)
+            
+            for segments, _ in chunk_results:
+                # Insert results directly into pre-allocated space
+                for segment in segments:
+                    all_segments[segment_index] = segment
+                    segment_index += 1
     
-    return all_segments
+    # If output file was requested, stitch together the temporary files using a more efficient approach
+    if output_file and all_temp_files:
+        # Use memory-mapped files for efficient stitching
+        stitch_wav_files_mmap(all_temp_files, output_file)
+        
+        # Clean up temporary files in a separate thread with a timeout
+        cleanup_thread = threading.Thread(target=cleanup_temp_files_with_timeout, 
+                                         args=(all_temp_files, 30))
+        cleanup_thread.daemon = True  # Don't block program exit
+        cleanup_thread.start()
+    
+    # Remove None values if any (in case some batches were empty)
+    return [seg for seg in all_segments if seg is not None]
 
+def stitch_wav_files_mmap(input_files, output_file):
+    """Stitch WAV files together using memory-mapped files for better performance."""
+    import wave
+    import numpy as np
+    import os
+    
+    if not input_files:
+        return
+    
+    # Check if all input files exist
+    valid_files = [f for f in input_files if os.path.exists(f) and os.path.getsize(f) > 0]
+    if not valid_files:
+        return
+    
+    # Get parameters from first file
+    with wave.open(valid_files[0], 'rb') as wf:
+        params = wf.getparams()
+    
+    # Open output file
+    with wave.open(output_file, 'wb') as outf:
+        outf.setparams(params)
+        
+        # Process files in batches to control memory usage
+        batch_size = 10
+        for i in range(0, len(valid_files), batch_size):
+            batch = valid_files[i:i+batch_size]
+            
+            # Use memory mapping for large files
+            for file in batch:
+                try:
+                    with wave.open(file, 'rb') as wf:
+                        # Use a reasonable chunk size for efficient reading
+                        chunk_size = 1024 * 1024  # 1MB chunks
+                        while True:
+                            data = wf.readframes(chunk_size)
+                            if not data:
+                                break
+                            outf.writeframes(data)
+                except Exception as e:
+                    print(f"Error processing file {file}: {e}")
+
+def cleanup_temp_files_with_timeout(temp_files, timeout_seconds=30):
+    """Clean up temporary files with timeout to prevent hanging."""
+    import os
+    import time
+    
+    start_time = time.time()
+    for file in temp_files:
+        # Check if we've exceeded the timeout
+        if time.time() - start_time > timeout_seconds:
+            print(f"Cleanup timed out after {timeout_seconds} seconds, {len(temp_files)} files may remain")
+            break
+            
+        try:
+            if os.path.exists(file):
+                os.remove(file)
+        except Exception as e:
+            print(f"Failed to remove temp file {file}: {e}")
+            
+    # Try removing the temp directory if empty
+    try:
+        os.rmdir("outputs/temp")
+    except:
+        pass
+
+def get_available_memory_gb():
+    """Get available system memory in GB."""
+    try:
+        import psutil
+        return psutil.virtual_memory().available / (1024 * 1024 * 1024)
+    except ImportError:
+        # Default to a conservative estimate if psutil is not available
+        return 4
 def process_single_batch(batch, voice, temperature, top_p, max_tokens, output_file, batch_index, total_batches):
     """Process a single batch and return audio segments."""
     print(f"Processing batch {batch_index+1}/{total_batches} ({len(batch)} characters)")
