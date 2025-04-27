@@ -45,47 +45,16 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
-      --n-gpu-layers 10000
-      --threads-batch 1000
-      --ctx-size ${ORPHEUS_MAX_TOKENS}
-      --n-predict ${ORPHEUS_MAX_TOKENS}
+      --n-gpu-layers 60
+      --threads-batch 4
+      --ctx-size 2048
+      --n-predict 2048
       --rope-scaling linear
-      ${LLAMA_ARG_NO_CONTEXT_SHIFT:+--no-context-shift}
-      ${LLAMA_ARG_SPECIAL:+--special}
-      ${LLAMA_ARG_NO_WARMUP:+--no-warmup}
-      ${LLAMA_ARG_SPM_INFILL:+--spm-infill}
-      --pooling ${LLAMA_ARG_POOLING:-none}
-      ${LLAMA_ARG_CONT_BATCHING:+--cont-batching}
-      ${LLAMA_ARG_NO_CONT_BATCHING:+--no-cont-batching}
-      ${LLAMA_ARG_NO_WEBUI:+--no-webui}
-      ${LLAMA_ARG_EMBEDDINGS:+--embeddings}
-      ${LLAMA_ARG_RERANKING:+--reranking}
-      --timeout ${LLAMA_ARG_TIMEOUT:-600}
-      --threads-http ${LLAMA_ARG_THREADS_HTTP:-1}
-      ${LLAMA_ARG_THREADS:+--threads ${LLAMA_ARG_THREADS}}
-      ${LLAMA_ARG_THREADS_BATCH:+--threads-batch ${LLAMA_ARG_THREADS_BATCH}}
-      ${LLAMA_ARG_CPU_MASK:+--cpu-mask ${LLAMA_ARG_CPU_MASK}}
-      ${LLAMA_ARG_CPU_RANGE:+--cpu-range ${LLAMA_ARG_CPU_RANGE}}
-      ${LLAMA_ARG_CPU_STRICT:+--cpu-strict ${LLAMA_ARG_CPU_STRICT}}
-      ${LLAMA_ARG_PRIO:+--prio ${LLAMA_ARG_PRIO}}
-      ${LLAMA_ARG_POLL:+--poll ${LLAMA_ARG_POLL}}
-      ${LLAMA_ARG_CPU_MASK_BATCH:+--cpu-mask-batch ${LLAMA_ARG_CPU_MASK_BATCH}}
-      ${LLAMA_ARG_CPU_RANGE_BATCH:+--cpu-range-batch ${LLAMA_ARG_CPU_RANGE_BATCH}}
-      ${LLAMA_ARG_CPU_STRICT_BATCH:+--cpu-strict-batch ${LLAMA_ARG_CPU_STRICT_BATCH}}
-      ${LLAMA_ARG_PRIO_BATCH:+--prio-batch ${LLAMA_ARG_PRIO_BATCH}}
-      ${LLAMA_ARG_POLL_BATCH:+--poll-batch ${LLAMA_ARG_POLL_BATCH}}
-      ${LLAMA_ARG_CTX_SIZE:+--ctx-size ${LLAMA_ARG_CTX_SIZE}}
-      ${LLAMA_ARG_N_PREDICT:+--n-predict ${LLAMA_ARG_N_PREDICT}}
-      ${LLAMA_ARG_BATCH:+--batch-size ${LLAMA_ARG_BATCH}}
-      ${LLAMA_ARG_UBATCH:+--ubatch-size ${LLAMA_ARG_UBATCH}}
-      ${LLAMA_ARG_KEEP:+--keep ${LLAMA_ARG_KEEP}}
-      ${LLAMA_ARG_FLASH_ATTN:+--flash-attn}
-      ${LLAMA_ARG_NO_PERF:+--no-perf}
-      ${LLAMA_ARG_ESCAPE:+--escape}
-      ${LLAMA_ARG_NO_ESCAPE:+--no-escape}
-      ${LLAMA_ARG_ROPE_SCALING_TYPE:+--rope-scaling ${LLAMA_ARG_ROPE_SCALING_TYPE}}
-      ${LLAMA_ARG_ROPE_SCALE:+--rope-scale ${LLAMA_ARG_ROPE_SCALE}}
-      --cache-reuse ${LLAMA_ARG_CACHE_REUSE:-0}
+      --flash-attn
+      --batch-size 8
+      --ubatch-size 1
+      --threads-http 2
+      --pooling none
 
   model-init:
     image: curlimages/curl:latest
