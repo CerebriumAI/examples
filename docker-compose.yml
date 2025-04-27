@@ -46,7 +46,8 @@ services:
       --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --n-gpu-layers 999
-      --threads-batch 16
+      --threads -1
+      --threads-batch -1
       --ctx-size 1024
       --prio-batch 3
       --n-predict 1024
