@@ -242,16 +242,12 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                            repetition_penalty: float = REPETITION_PENALTY) -> Generator[str, None, None]:
     """Generate tokens from text using OpenAI-compatible API with optimized streaming and retry logic."""
     start_time = time.time()
-    # Pre-format prompt only once and store it
     formatted_prompt = format_prompt(prompt, voice)
     
-    # Use asyncio for concurrent processing
-    import asyncio
-    import aiohttp
-    from concurrent.futures import ThreadPoolExecutor
-    
-    # Create optimized payload with batch processing enabled
+    # Optimize the token generation for GPUs with better parameters
     model_name = os.environ.get("ORPHEUS_MODEL_NAME", "Orpheus-3b-FT-Q8_0.gguf")
+    
+    # Enhanced payload with performance optimizations
     payload = {
         "prompt": formatted_prompt,
         "max_tokens": max_tokens,
@@ -260,7 +256,6 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
         "repeat_penalty": repetition_penalty,
         "stream": True,
         "model": model_name,
-        "batch_size": 16,  # Process tokens in larger batches
         "use_cache": True  # Enable KV cache for faster inference
     }
     
@@ -268,134 +263,133 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     if torch.cuda.is_available():
         num_gpus = torch.cuda.device_count()
         payload.update({
-            "compute_dtype": "float16",  # Use lower precision for faster computation
-            "tensor_parallel_size": max(1, num_gpus),  # Utilize all available GPUs
+            "compute_dtype": "float16",  # Use half precision for faster computation
+            "tensor_parallel": num_gpus  # Use all available GPUs
         })
         
         if HIGH_END_GPU:
             # More aggressive optimizations for high-end GPUs
             payload.update({
-                "batch_size": 32,
-                "compute_dtype": "bfloat16",  # Even better precision-performance tradeoff
-                "kv_cache_dtype": "fp8",  # Smaller memory footprint for cache
-                "attention_mechanism": "flash"  # Use FlashAttention if available
+                "compute_dtype": "bfloat16",  # Better precision-performance tradeoff
+                "attention_mask_type": "alibi",  # Faster attention mechanism
+                "batch_size": 16  # Process more tokens at once
             })
     
-    # Create connection pool with keep-alive for connection reuse
-    conn = aiohttp.TCPConnector(limit=10, ttl_dns_cache=300, keepalive_timeout=60)
-    timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT, connect=5)
+    # Enhanced connection pooling with requests
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(
+        pool_connections=10,
+        pool_maxsize=10,
+        max_retries=0,  # We'll handle retries manually
+        pool_block=False
+    )
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
     
-    async def fetch_tokens():
-        nonlocal payload
-        retry_count = 0
-        max_retries = 3
-        
-        # Prefetch DNS to reduce connection time
-        import socket
+    # Prefetch DNS to reduce connection time
+    import socket
+    try:
+        api_host = API_URL.split("://")[1].split("/")[0]
+        socket.gethostbyname(api_host)
+    except:
+        pass
+    
+    retry_count = 0
+    max_retries = 3
+    
+    # Use threading for concurrent processing without blocking
+    from threading import Thread
+    from queue import Queue
+    
+    token_queue = Queue(maxsize=100)  # Buffer for tokens
+    stop_event = threading.Event()
+    token_counter = [0]  # Use list to allow modification in thread
+    
+    def stream_processor():
         try:
-            api_host = API_URL.split("://")[1].split("/")[0]
-            socket.gethostbyname(api_host)
-        except:
-            pass
+            response = session.post(
+                API_URL, 
+                headers=HEADERS, 
+                json=payload, 
+                stream=True,
+                timeout=(5, REQUEST_TIMEOUT)  # Connect timeout, read timeout
+            )
             
-        while retry_count < max_retries:
-            try:
-                async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
-                    async with session.post(API_URL, headers=HEADERS, json=payload) as response:
-                        if response.status != 200:
-                            error_text = await response.text()
-                            print(f"Error: API request failed with status code {response.status}")
-                            print(f"Error details: {error_text}")
-                            
-                            if response.status >= 500:
-                                retry_count += 1
-                                wait_time = 2 ** retry_count  # Exponential backoff
-                                print(f"Retrying in {wait_time} seconds...")
-                                await asyncio.sleep(wait_time)
-                                continue
+            if response.status_code != 200:
+                print(f"Error: API request failed with status code {response.status_code}")
+                print(f"Error details: {response.text}")
+                stop_event.set()
+                return
+            
+            # Process the streamed response with improved buffering and parsing
+            buffer = b""
+            
+            # Read in larger chunks for efficiency
+            for chunk in response.raw.read_chunked(8192):
+                buffer += chunk
+                lines = buffer.split(b'\n')
+                buffer = lines.pop() if lines else b""
+                
+                for line in lines:
+                    line_str = line.decode('utf-8', errors='ignore')
+                    if line_str.startswith('data: '):
+                        data_str = line_str[6:]
+                        
+                        if data_str.strip() == '[DONE]':
+                            stop_event.set()
                             return
                         
-                        # Process streamed response with optimized parsing
-                        token_counter = 0
-                        buffer = bytearray()
-                        
-                        # Use more efficient async iteration
-                        async for chunk in response.content.iter_chunked(8192):  # Use larger chunks
-                            buffer.extend(chunk)
-                            lines = buffer.split(b'\n')
+                        try:
+                            data = json.loads(data_str)
+                            if 'choices' in data and len(data['choices']) > 0:
+                                token_chunk = data['choices'][0].get('text', '')
+                                # Process tokens in batches for better throughput
+                                token_parts = token_chunk.split('>')
+                                
+                                for token_text in token_parts:
+                                    if token_text:
+                                        token_text = f'{token_text}>'
+                                        token_counter[0] += 1
+                                        perf_monitor.add_tokens()
+                                        token_queue.put(token_text)
+                        except json.JSONDecodeError:
+                            continue
                             
-                            # Process complete lines and keep remainder in buffer
-                            buffer = lines.pop() if lines else bytearray()
-                            
-                            for line in lines:
-                                line_str = line.decode('utf-8', errors='ignore')
-                                if line_str.startswith('data: '):
-                                    data_str = line_str[6:]
-                                    
-                                    if data_str.strip() == '[DONE]':
-                                        return
-                                    
-                                    try:
-                                        data = json.loads(data_str)
-                                        if 'choices' in data and len(data['choices']) > 0:
-                                            token_chunk = data['choices'][0].get('text', '')
-                                            token_parts = token_chunk.split('>')
-                                            
-                                            # Process tokens in batches for better throughput
-                                            for token_text in token_parts:
-                                                if token_text:
-                                                    token_text = f'{token_text}>'
-                                                    token_counter += 1
-                                                    perf_monitor.add_tokens()
-                                                    yield token_text
-                                    except json.JSONDecodeError:
-                                        continue
-                
-                # Generation completed successfully
-                generation_time = time.time() - start_time
-                tokens_per_second = token_counter / generation_time if generation_time > 0 else 0
-                print(f"Token generation complete: {token_counter} tokens in {generation_time:.2f}s ({tokens_per_second:.1f} tokens/sec)")
-                return
-                
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                print(f"Request error: {str(e)}")
-                retry_count += 1
-                if retry_count < max_retries:
-                    wait_time = 2 ** retry_count
-                    print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
-                    await asyncio.sleep(wait_time)
-                else:
-                    print("Max retries reached. Token generation failed.")
-                    return
-    
-    # Use a background thread to run the async fetch_tokens generator and feed a queue
-    import threading, queue
-
-    token_queue = queue.SimpleQueue()
-
-    def _producer():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        async def _run():
-            async for token in fetch_tokens():
-                token_queue.put(token)
-        try:
-            loop.run_until_complete(_run())
+            stop_event.set()
+            
+        except requests.exceptions.Timeout:
+            print(f"Request timed out after {REQUEST_TIMEOUT} seconds")
+            stop_event.set()
+        except requests.exceptions.ConnectionError:
+            print(f"Connection error to API at {API_URL}")
+            stop_event.set()
         except Exception as e:
-            print(f"Error in token producer: {e}")
-        finally:
-            token_queue.put(None)
-            loop.close()
-
-    producer_thread = threading.Thread(target=_producer, daemon=True)
-    producer_thread.start()
-
-    while True:
-        tok = token_queue.get()
-        if tok is None:
-            break
-        yield tok
-
+            print(f"Unexpected error during streaming: {str(e)}")
+            stop_event.set()
+    
+    # Start processing in a separate thread
+    thread = Thread(target=stream_processor, daemon=True)
+    thread.start()
+    
+    # Yield tokens as they become available
+    while not (stop_event.is_set() and token_queue.empty()):
+        try:
+            # Non-blocking get with timeout for responsiveness
+            token = token_queue.get(timeout=0.1)
+            yield token
+            token_queue.task_done()
+        except queue.Empty:
+            # No tokens available yet, but stream might still be active
+            if stop_event.is_set():
+                break
+    
+    # Wait for thread to complete
+    thread.join(timeout=1.0)
+    
+    # Report performance
+    generation_time = time.time() - start_time
+    tokens_per_second = token_counter[0] / generation_time if generation_time > 0 else 0
+    print(f"Token generation complete: {token_counter[0]} tokens in {generation_time:.2f}s ({tokens_per_second:.1f} tokens/sec)")
 def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
     """Convert token frames to audio with performance monitoring."""
     # Import here to avoid circular imports
