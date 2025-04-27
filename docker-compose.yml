@@ -55,6 +55,7 @@ services:
       --flash-attn
       --batch-size 8112
       --ubatch-size 8112
+      --parallel 8
       --no-escape
       --threads-http 4
       --pooling none
