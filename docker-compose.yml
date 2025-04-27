@@ -53,14 +53,15 @@ services:
       --n-predict 1024
       --rope-scaling linear
       --flash-attn
-      --batch-size 8112
-      --ubatch-size 8112
+      --batch-size 512
+      --ubatch-size 512
       --parallel 8
       --no-escape
       --threads-http 4
       --pooling none
       --cont-batching
       --timeout 600
+      --mlock
 
   model-init:
     image: curlimages/curl:latest
