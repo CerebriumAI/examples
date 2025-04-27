@@ -124,7 +124,7 @@ CUSTOM_TOKEN_PREFIX = "<custom_token_"
 
 # Use a single global cache for token processing
 token_id_cache = {}
-MAX_CACHE_SIZE = 10000  # Increased cache size for better performance
+MAX_CACHE_SIZE = 25000  # Increased cache size for better performance
 
 def turn_token_into_id(token_string, index):
     """
@@ -282,7 +282,7 @@ def tokens_decoder_sync(syn_token_gen):
     thread.start()
 
     # Use larger buffer for throughput
-    buffer_size = 20
+    buffer_size = 5
     audio_buffer = []
     
     while True:
