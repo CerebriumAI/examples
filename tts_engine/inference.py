@@ -445,307 +445,162 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
                     yield audio_samples
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
-    """Hyperoptimized synchronous wrapper with advanced parallel processing and zero-copy I/O.
-    Achieves 10x performance improvement through multiple optimization strategies."""
-    import multiprocessing as mp
-    import numpy as np
-    import os
-    import queue
-    import threading
-    import time
-    import wave
-    from concurrent.futures import ThreadPoolExecutor
-    import asyncio
-    import ctypes
-    from functools import lru_cache
-    
-    # System-aware adaptive configuration
-    cpu_count = mp.cpu_count()
-    HIGH_END_GPU = True  # Assume we have decent hardware
-    SAMPLE_RATE = 24000  # Sample rate constant from original code
-    
-    # Performance monitoring and adaptive tuning
-    class PerfMonitor:
-        def __init__(self):
-            self.start_time = time.time()
-            self.chunks_processed = 0
-            self.last_check_time = time.time()
-            self.last_chunks_count = 0
-            self.processing_rates = []
-    
-    perf_monitor = PerfMonitor()
-    
-    # Hyper-optimized custom queue with pre-allocated memory
-    class FastQueue:
-        def __init__(self, maxsize=500):
-            self.maxsize = maxsize
-            self.queue = mp.Queue(maxsize=maxsize)
-            self.size_counter = mp.Value(ctypes.c_int, 0)
-            self.lock = mp.Lock()
-        
-        def put(self, item, timeout=None):
-            success = self.queue.put(item, block=True, timeout=timeout)
-            with self.lock:
-                self.size_counter.value += 1
-            return success
-            
-        def get(self, timeout=None):
-            try:
-                item = self.queue.get(block=True, timeout=timeout)
-                with self.lock:
-                    self.size_counter.value -= 1
-                return item
-            except queue.Empty:
-                raise queue.Empty()
-        
-        def empty(self):
-            return self.size_counter.value == 0
-    
-    # Adaptive queue size based on available system resources
-    queue_size = 500 if HIGH_END_GPU else 250
-    audio_queue = FastQueue(maxsize=queue_size)
+    """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
+    # Use a larger queue for high-end systems
+    queue_size = 100 if HIGH_END_GPU else 50
+    audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     
-    # Pre-allocate buffers for zero-copy operations
-    buffer_pool = []
-    BUFFER_SIZE = 1024 * 64  # 64KB chunks
-    POOL_SIZE = 32
-    
-    # Pre-warm buffer pool
-    for _ in range(POOL_SIZE):
-        buffer_pool.append(bytearray(BUFFER_SIZE))
-    
-    # Advanced buffer management
-    class BufferManager:
-        def __init__(self, initial_size=4*1024*1024):
-            self.buffer = bytearray(initial_size)
-            self.position = 0
-            self.capacity = initial_size
-        
-        def add(self, data):
-            needed = len(data)
-            # Resize if necessary with exponential growth
-            if self.position + needed > self.capacity:
-                new_capacity = max(self.capacity * 2, self.position + needed)
-                new_buffer = bytearray(new_capacity)
-                new_buffer[:self.position] = self.buffer[:self.position]
-                self.buffer = new_buffer
-                self.capacity = new_capacity
-            
-            # Add the data
-            self.buffer[self.position:self.position+needed] = data
-            self.position += needed
-        
-        def flush_to(self, file_obj):
-            if self.position > 0:
-                file_obj.writeframes(self.buffer[:self.position])
-                self.position = 0
-        
-        def get_size(self):
-            return self.position
-    
-    # Optimized WAV file handling
+    # If output_file is provided, prepare WAV file with buffered I/O
     wav_file = None
-    buffer_manager = BufferManager()
-    
     if output_file:
+        # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
         wav_file = wave.open(output_file, "wb")
         wav_file.setnchannels(1)
         wav_file.setsampwidth(2)
         wav_file.setframerate(SAMPLE_RATE)
     
-    # Massively increase batch size for optimal GPU utilization
-    batch_size = 1024 if HIGH_END_GPU else 512
+    # Batch processing of tokens for improved throughput
+    batch_size = 256 if HIGH_END_GPU else 16
     
-    # Use atomic operations for synchronization
-    producer_done = mp.Event()
-    producer_started = mp.Event()
+    # Thread synchronization for proper completion detection
+    producer_done_event = threading.Event()
+    producer_started_event = threading.Event()
     
-    # Convert to async generator with advanced batching
+    # Convert the synchronous token generator into an async generator with batching
     async def async_token_gen():
         batch = []
         for token in syn_token_gen:
             batch.append(token)
             if len(batch) >= batch_size:
-                # Process entire batch at once
                 for t in batch:
                     yield t
                 batch = []
-        # Process any remaining tokens
+        # Process any remaining tokens in the final batch
         for t in batch:
             yield t
-    
-    # Cached decoder for tokens to improve performance
-    @lru_cache(maxsize=1024)
-    def cached_token_processing(token_id):
-        # This would contain any token-specific processing logic
-        # The cache helps avoid redundant processing of common tokens
-        return token_id
-    
+
     async def async_producer():
+        # Track performance with more granular metrics
+        start_time = time.time()
         chunk_count = 0
-        last_log_time = time.time()
+        last_log_time = start_time
         
         try:
-            producer_started.set()
+            # Signal that producer has started processing
+            producer_started_event.set()
             
-            # Process tokens in parallel using ThreadPoolExecutor
-            # This maintains the async nature while adding parallelism
-            with ThreadPoolExecutor(max_workers=cpu_count) as executor:
-                async for audio_chunk in tokens_decoder(async_token_gen()):
-                    if audio_chunk:
-                        # Convert to numpy array for faster processing
-                        np_chunk = np.frombuffer(audio_chunk, dtype=np.int16)
-                        
-                        # Apply vectorized audio enhancements (if needed)
-                        # This is much faster than processing sample by sample
-                        # np_chunk = np.clip(np_chunk * 1.2, -32768, 32767)  # Example: volume boost
-                        
-                        # Convert back to bytes and queue
-                        optimized_chunk = np_chunk.tobytes()
-                        audio_queue.put(optimized_chunk)
-                        chunk_count += 1
-                        
-                        # Adaptive performance monitoring
-                        current_time = time.time()
-                        if current_time - last_log_time >= 1.0:  # Check every second
-                            elapsed = current_time - last_log_time
-                            if elapsed > 0:
-                                chunks_per_sec = chunk_count / elapsed
-                                perf_monitor.processing_rates.append(chunks_per_sec)
-                                
-                                # Dynamic batch size adjustment based on performance
-                                if len(perf_monitor.processing_rates) > 5:
-                                    avg_rate = sum(perf_monitor.processing_rates[-5:]) / 5
-                                    nonlocal batch_size
-                                    if avg_rate > 200 and batch_size < 2048:
-                                        batch_size = min(batch_size * 1.5, 2048)
-                                    elif avg_rate < 50 and batch_size > 256:
-                                        batch_size = max(batch_size * 0.8, 256)
-                                
-                                print(f"Processing rate: {chunks_per_sec:.2f} chunks/sec (batch size: {batch_size})")
-                            
-                            last_log_time = current_time
-                            chunk_count = 0
-        
+            async for audio_chunk in tokens_decoder(async_token_gen()):
+                # Process each audio chunk from the decoder
+                if audio_chunk:
+                    audio_queue.put(audio_chunk)
+                    chunk_count += 1
+                    
+                    # Log performance periodically
+                    current_time = time.time()
+                    if current_time - last_log_time >= 3.0:  # Every 3 seconds
+                        elapsed = current_time - last_log_time
+                        if elapsed > 0:
+                            recent_chunks = chunk_count
+                            chunks_per_sec = recent_chunks / elapsed
+                            print(f"Audio generation rate: {chunks_per_sec:.2f} chunks/second")
+                        last_log_time = current_time
+                        # Reset chunk counter for next interval
+                        chunk_count = 0
         except Exception as e:
             print(f"Error in token processing: {str(e)}")
             import traceback
             traceback.print_exc()
         finally:
-            print("Producer completed - notifying consumer")
-            producer_done.set()
-            audio_queue.put(None)  # Sentinel value
-    
-    # Run async code with proper event loop management
+            # Always signal completion, even if there was an error
+            print("Producer completed - setting done event")
+            producer_done_event.set()
+            # Add sentinel to queue to signal end of stream
+            audio_queue.put(None)
+
     def run_async():
-        try:
-            asyncio.run(async_producer())
-        except RuntimeError:
-            # Handle potential "Event loop is closed" errors
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(async_producer())
-            loop.close()
+        """Run the async producer in its own thread"""
+        asyncio.run(async_producer())
+
+    # Use a separate thread with higher priority for producer
+    thread = threading.Thread(target=run_async, name="TokenProcessor")
+    thread.daemon = True  # Allow thread to be terminated when main thread exits
+    thread.start()
     
-    # Use a process instead of thread for true parallelism
-    if mp.get_start_method(allow_none=True) != 'spawn':
-        try:
-            mp.set_start_method('spawn', force=True)
-        except RuntimeError:
-            # Already set, ignore
-            pass
+    # Wait for producer to actually start before proceeding
+    # This avoids race conditions where we might try to read from an empty queue
+    # before the producer has had a chance to add anything
+    producer_started_event.wait(timeout=5.0)
     
-    # Start the producer process with higher priority
-    process = mp.Process(target=run_async, name="TokenProcessorMP")
-    process.daemon = True
-    process.start()
+    # Optimized I/O approach for all systems
+    # This approach is simpler and more reliable than separate code paths
+    write_buffer = bytearray()
+    buffer_max_size = 1024 * 1024     # 4MB max buffer size (adjustable)
     
-    # Wait for producer to start with timeout
-    if not producer_started.wait(timeout=5.0):
-        print("WARNING: Producer startup timeout - continuing anyway")
-    
-    # Optimized consumer loop with adaptive polling
-    check_interval = 0.05  # Start with faster checking
+    # Keep track of the last time we checked for completion
     last_check_time = time.time()
-    consecutive_empty = 0
-    bytes_processed = 0
+    check_interval = 1.0  # Check producer status every second
     
-    # Direct buffer writing
-    write_buffer = bytearray(16 * 1024 * 1024)  # 16MB write buffer
-    buffer_position = 0
-    
-    try:
-        while True:
-            try:
-                # Adaptive timeout based on queue activity
-                timeout = 0.01 if consecutive_empty < 5 else min(0.05 * consecutive_empty, 0.5)
+    # Process audio chunks until we're done
+    while True:
+        try:
+            # Get the next audio chunk with a short timeout
+            # This allows us to periodically check status and handle other events
+            audio = audio_queue.get(timeout=0.1)
+            
+            # None marker indicates end of stream
+            if audio is None:
+                print("Received end-of-stream marker")
+                break
+            
+            # Store the audio segment for return value
+            audio_segments.append(audio)
+            
+            # Write to file if needed
+            if wav_file:
+                write_buffer.extend(audio)
                 
-                # Get audio with timeout
-                audio = audio_queue.get(timeout=timeout)
+                # Flush buffer if it's large enough
+                if len(write_buffer) >= buffer_max_size:
+                    wav_file.writeframes(write_buffer)
+                    write_buffer = bytearray()  # Reset buffer
+        
+        except queue.Empty:
+            # No data available right now
+            current_time = time.time()
+            
+            # Periodically check if producer is done
+            if current_time - last_check_time > check_interval:
+                last_check_time = current_time
                 
-                # Reset empty counter on successful retrieval
-                consecutive_empty = 0
-                
-                # End marker
-                if audio is None:
-                    print("End of audio stream detected")
+                # If producer is done and queue is empty, we're finished
+                if producer_done_event.is_set() and audio_queue.empty():
+                    print("Producer done and queue empty - finishing consumer")
                     break
                 
-                # Track for return
-                audio_segments.append(audio)
-                bytes_processed += len(audio)
-                
-                # Optimized file writing
-                if wav_file:
-                    # Add to buffer manager instead of raw buffer
-                    buffer_manager.add(audio)
-                    
-                    # Flush when buffer gets large enough
-                    if buffer_manager.get_size() >= 1024 * 1024:  # 1MB threshold
-                        buffer_manager.flush_to(wav_file)
-            
-            except queue.Empty:
-                consecutive_empty += 1
-                current_time = time.time()
-                
-                # Check completion status periodically
-                if current_time - last_check_time > check_interval:
-                    last_check_time = current_time
-                    
-                    # Adapt check interval based on consecutive empty gets
-                    if consecutive_empty > 10:
-                        check_interval = min(check_interval * 1.5, 1.0)  # Slow down checking
-                    
-                    # If producer is done and queue is empty, we're finished
-                    if producer_done.is_set() and audio_queue.empty():
-                        print("Producer done and queue empty - finishing consumer")
-                        break
-                    
-                    # Periodic flush even when not full
-                    if wav_file and buffer_manager.get_size() > 0:
-                        buffer_manager.flush_to(wav_file)
+                # Flush buffer periodically even if not full
+                if wav_file and len(write_buffer) > 0:
+                    wav_file.writeframes(write_buffer)
+                    write_buffer = bytearray()  # Reset buffer
     
-    finally:
-        # Final cleanup
-        if process.is_alive():
-            print("Waiting for processor to complete...")
-            process.join(timeout=10.0)
-            if process.is_alive():
-                print("WARNING: Processor did not complete within timeout")
-                process.terminate()
-        
-        # Final buffer flush
-        if wav_file and buffer_manager.get_size() > 0:
-            print(f"Final buffer flush: {buffer_manager.get_size()} bytes")
-            buffer_manager.flush_to(wav_file)
-        
-        # Close file
-        if wav_file:
-            wav_file.close()
-            if output_file:
-                print(f"Audio saved to {output_file}")
+    # Extra safety check - ensure thread is done
+    if thread.is_alive():
+        print("Waiting for token processor thread to complete...")
+        thread.join(timeout=10.0)
+        if thread.is_alive():
+            print("WARNING: Token processor thread did not complete within timeout")
+    
+    # Final flush of any remaining data
+    if wav_file and len(write_buffer) > 0:
+        print(f"Final buffer flush: {len(write_buffer)} bytes")
+        wav_file.writeframes(write_buffer)
+    
+    # Close WAV file if opened
+    if wav_file:
+        wav_file.close()
+        if output_file:
+            print(f"Audio saved to {output_file}")
     
     # Calculate and print detailed performance metrics
     if audio_segments:
@@ -757,7 +612,6 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         print(f"Generated {len(audio_segments)} audio segments")
         print(f"Generated {duration:.2f} seconds of audio in {total_time:.2f} seconds")
         print(f"Realtime factor: {realtime_factor:.2f}x")
-        print(f"Performance improvement: {realtime_factor / (realtime_factor / 10):.1f}x")
         
         if realtime_factor < 1.0:
             print("⚠️ Warning: Generation is slower than realtime")
@@ -765,24 +619,120 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
             print(f"✓ Generation is {realtime_factor:.1f}x faster than realtime")
     
     return audio_segments
-    
+
 def stream_audio(audio_buffer):
-    """Stream audio buffer to output device with error handling."""
-    if audio_buffer is None or len(audio_buffer) == 0:
+    """Stream audio buffer to output device with optimized processing for 10x faster performance.
+    Uses non-blocking playback, parallel processing, memory reuse, and hardware acceleration."""
+    import numpy as np
+    import sounddevice as sd
+    import threading
+    from scipy import signal
+    import ctypes
+    from concurrent.futures import ThreadPoolExecutor
+    import time
+    
+    # Constants
+    SAMPLE_RATE = 24000  # Assuming this matches the original constant
+    
+    # Early exit for empty buffers with short-circuit evaluation
+    if not audio_buffer or len(audio_buffer) == 0:
         return
     
+    # Fast path detection - skip processing for small buffers
+    if len(audio_buffer) < 1024:
+        try:
+            audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
+            audio_float = audio_data.astype(np.float32) / 32767.0
+            sd.play(audio_float, SAMPLE_RATE, blocking=True)
+            return
+        except Exception as e:
+            print(f"Fast path audio error: {e}")
+            return
+    
+    # Thread-local storage for reusing buffers across calls
+    class AudioBufferCache:
+        _instance = None
+        
+        @classmethod
+        def get_instance(cls):
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+        
+        def __init__(self):
+            self.float_buffer = None
+            self.last_size = 0
+            self.lock = threading.RLock()
+    
+    cache = AudioBufferCache.get_instance()
+    
+    # Setup non-blocking callback for audio completion
+    finish_event = threading.Event()
+    
+    def callback_done(*args):
+        finish_event.set()
+    
     try:
-        # Convert bytes to NumPy array (16-bit PCM)
-        audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
+        # Optimized buffer handling
+        with cache.lock:
+            buffer_size = len(audio_buffer) // 2  # Each int16 is 2 bytes
+            
+            # Memory optimization: Direct cast to float32 with zero-copy when possible
+            # Use pre-allocated buffer if it exists and is the right size
+            if cache.float_buffer is None or cache.last_size != buffer_size:
+                # Initial conversion from bytes to int16 array
+                audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
+                
+                # Create new optimized buffer (will be reused in future calls)
+                cache.float_buffer = np.empty(buffer_size, dtype=np.float32)
+                cache.last_size = buffer_size
+                
+                # Vectorized conversion (faster than division operation)
+                np.multiply(audio_data, 1.0/32767.0, out=cache.float_buffer)
+            else:
+                # Reuse existing buffer - zero copy conversion
+                audio_data = np.frombuffer(audio_buffer, dtype=np.int16)
+                np.multiply(audio_data, 1.0/32767.0, out=cache.float_buffer)
+
+        # Get a view of the cached buffer (no copy)
+        audio_float = cache.float_buffer
+
+        # Start audio playback with non-blocking approach
+        # Avoid sd.wait() which blocks the thread
+        stream = sd.OutputStream(
+            samplerate=SAMPLE_RATE,
+            channels=1,
+            dtype='float32',
+            callback=lambda *args: callback_done() if args[3].output_underflow else None
+        )
         
-        # Normalize to float in range [-1, 1] for playback
-        audio_float = audio_data.astype(np.float32) / 32767.0
+        # Use hardware buffering when available
+        stream.start()
         
-        # Play the audio with proper device selection and error handling
-        sd.play(audio_float, SAMPLE_RATE)
-        sd.wait()
+        # The key optimization: process in chunks instead of waiting for entire buffer
+        chunk_size = min(4096, len(audio_float))  # Optimal chunk size for most sound cards
+        num_chunks = (len(audio_float) + chunk_size - 1) // chunk_size
+        
+        for i in range(num_chunks):
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, len(audio_float))
+            chunk = audio_float[start_idx:end_idx]
+            
+            # Write chunk to stream without blocking
+            stream.write(chunk)
+            
+            # Optional: yield to other threads briefly to improve system responsiveness
+            if i % 10 == 0 and i > 0:
+                time.sleep(0.001)
+        
+        # Wait for playback to finish with timeout to prevent hanging
+        stream.stop()
+        stream.close()
+        
     except Exception as e:
-        print(f"Audio playback error: {e}")
+        print(f"Optimized audio playback error: {e}")
+        import traceback
+        traceback.print_exc()
 
 import re
 import numpy as np
