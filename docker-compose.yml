@@ -45,7 +45,7 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
-      --n-gpu-layers ${LLAMA_ARG_N_GPU_LAYERS:-120}
+      --n-gpu-layers 10000
       --threads-batch 1000
       --ctx-size ${ORPHEUS_MAX_TOKENS}
       --n-predict ${ORPHEUS_MAX_TOKENS}
