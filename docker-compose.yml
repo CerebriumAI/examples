@@ -51,8 +51,8 @@ services:
       --n-predict 1024
       --rope-scaling linear
       --flash-attn
-      --batch-size 32
-      --ubatch-size 4
+      --batch-size 128
+      --ubatch-size 16
       --threads-http 4
       --pooling none
       --cont-batching
