@@ -368,20 +368,33 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                     print("Max retries reached. Token generation failed.")
                     return
     
-    # Synchronously drive the async generator via its __anext__ method
-    loop = asyncio.new_event_loop()
-    async_gen = fetch_tokens()
-    try:
-        while True:
-            token = loop.run_until_complete(async_gen.__anext__())
-            yield token
-    except StopAsyncIteration:
-        return
-    except Exception as e:
-        print(f"Error during token generation: {str(e)}")
-        return
-    finally:
-        loop.close()
+    # Use a background thread to run the async fetch_tokens generator and feed a queue
+    import threading, queue
+
+    token_queue = queue.SimpleQueue()
+
+    def _producer():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        async def _run():
+            async for token in fetch_tokens():
+                token_queue.put(token)
+        try:
+            loop.run_until_complete(_run())
+        except Exception as e:
+            print(f"Error in token producer: {e}")
+        finally:
+            token_queue.put(None)
+            loop.close()
+
+    producer_thread = threading.Thread(target=_producer, daemon=True)
+    producer_thread.start()
+
+    while True:
+        tok = token_queue.get()
+        if tok is None:
+            break
+        yield tok
 
 def convert_to_audio(multiframe: List[int], count: int) -> Optional[bytes]:
     """Convert token frames to audio with performance monitoring."""
