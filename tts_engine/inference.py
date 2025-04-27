@@ -264,7 +264,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     if torch.cuda.is_available():
         num_gpus = torch.cuda.device_count()
         payload.update({
-            "compute_dtype": "bfloat16",  # Use bfloat16 for improved performance
+            "compute_dtype": "float16",  # Use bfloat16 for improved performance
             "tensor_parallel": num_gpus  # Use all available GPUs
         })
         
@@ -272,7 +272,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
             # More aggressive optimizations for high-end GPUs
             payload.update({
                 "attention_mask_type": "alibi",  # Faster attention mechanism
-                "batch_size": 2048 * 2  # Process more tokens at once
+                "batch_size": 2048  # Process more tokens at once
             })
     
     # Enhanced connection pooling with requests
@@ -301,7 +301,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     from threading import Thread
     from queue import Queue
     
-    token_queue = Queue(maxsize=100)  # Buffer for tokens
+    token_queue = Queue(maxsize=10000)  # Buffer for tokens
     stop_event = threading.Event()
     token_counter = [0]  # Use list to allow modification in thread
     
