@@ -47,8 +47,8 @@ services:
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --n-gpu-layers 999
       --threads-batch 4
-      --ctx-size ${ORPHEUS_MAX_TOKENS}
-      --n-predict ${ORPHEUS_MAX_TOKENS}
+      --ctx-size 1024
+      --n-predict 1024
       --rope-scaling linear
       --flash-attn
       --batch-size 32
