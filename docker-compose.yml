@@ -48,11 +48,12 @@ services:
       --n-gpu-layers 999
       --threads-batch 16
       --ctx-size 1024
+      --prio-batch 3
       --n-predict 1024
       --rope-scaling linear
       --flash-attn
       --batch-size 8112
-      --ubatch-size 2048
+      --ubatch-size 8112
       --no-escape
       --threads-http 4
       --pooling none
