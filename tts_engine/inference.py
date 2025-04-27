@@ -13,6 +13,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional, Generator, Union, Tuple
 from dotenv import load_dotenv
+import aiohttp
 
 # Helper to detect if running in Uvicorn's reloader
 def is_reloader_process():
