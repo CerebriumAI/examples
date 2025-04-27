@@ -43,13 +43,26 @@ services:
     restart: unless-stopped
     command: >
       -m /models/${ORPHEUS_MODEL_NAME}
-      --port 5006 
-      --host 0.0.0.0 
-      --n-gpu-layers 120
-
+      --port ${LLAMA_ARG_PORT:-5006}
+      --host ${LLAMA_ARG_HOST:-0.0.0.0}
+      --n-gpu-layers ${LLAMA_ARG_N_GPU_LAYERS:-120}
+       
       --ctx-size ${ORPHEUS_MAX_TOKENS}
       --n-predict ${ORPHEUS_MAX_TOKENS}
       --rope-scaling linear
+      ${LLAMA_ARG_NO_CONTEXT_SHIFT:+--no-context-shift}
+      ${LLAMA_ARG_SPECIAL:+--special}
+      ${LLAMA_ARG_NO_WARMUP:+--no-warmup}
+      ${LLAMA_ARG_SPM_INFILL:+--spm-infill}
+      --pooling ${LLAMA_ARG_POOLING:-none}
+      ${LLAMA_ARG_CONT_BATCHING:+--cont-batching}
+      ${LLAMA_ARG_NO_CONT_BATCHING:+--no-cont-batching}
+      ${LLAMA_ARG_NO_WEBUI:+--no-webui}
+      ${LLAMA_ARG_EMBEDDINGS:+--embeddings}
+      ${LLAMA_ARG_RERANKING:+--reranking}
+      --timeout ${LLAMA_ARG_TIMEOUT:-600}
+      --threads-http ${LLAMA_ARG_THREADS_HTTP:-1}
+      --cache-reuse ${LLAMA_ARG_CACHE_REUSE:-0}
 
   model-init:
     image: curlimages/curl:latest
@@ -66,4 +79,3 @@ services:
         echo "Model file already exists"
       fi'
     restart: "no"
-    
