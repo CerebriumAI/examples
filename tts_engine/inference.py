@@ -272,7 +272,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
             payload.update({
                 "compute_dtype": "bfloat16",  # Better precision-performance tradeoff
                 "attention_mask_type": "alibi",  # Faster attention mechanism
-                "batch_size": 32  # Process more tokens at once
+                "batch_size": 128  # Process more tokens at once
             })
     
     # Enhanced connection pooling with requests
