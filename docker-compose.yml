@@ -46,13 +46,15 @@ services:
       --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --n-gpu-layers 999
-      --threads-batch 4
+      --threads-batch 16
       --ctx-size 1024
       --n-predict 1024
       --rope-scaling linear
       --flash-attn
       --batch-size 4056
-      --ubatch-size 512
+      --ctk f16
+      --ubatch-size 2048
+      --no-escape
       --threads-http 4
       --pooling none
       --cont-batching
