@@ -1,0 +1,18 @@
+[cerebrium.deployment]
+name = "1-md5-checker"
+python_version = "3.11"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = false
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.hardware]
+cpu = 0.25
+memory = 0.25
+compute = "CPU"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 1
+cooldown = 1
+replica_concurrency = 1
