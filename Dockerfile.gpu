@@ -1,36 +1,72 @@
-# Stage 1: Build llama.cpp server-cuda
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder  # CUDA & cuDNN support :contentReference[oaicite:12]{index=12}
-
-RUN apt-get update && apt-get install -y \
-      cmake \
-      build-essential \
-      git \
-      pkg-config \
-      libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-RUN git clone https://github.com/ggml-org/llama.cpp.git . && \
-    cmake -B build -DGGML_CUDA=ON -DLLAMA_CUBLAS=ON -DCMAKE_CUDA_COMPILER=$(which nvcc) . && \
-    cmake --build build --target server-cuda -j$(nproc)
-
-# Stage 2: Final Orpheus-FastAPI image
 FROM ubuntu:22.04
+
 ENV DEBIAN_FRONTEND=noninteractive
 
-# (Or optionally start again FROM a smaller Python base...)
-RUN apt-get update && apt-get install -y python3.10 python3-pip libsndfile1 ffmpeg portaudio19-dev \
+# 1. Install CMake, compilers, Git, pkg-config, and CUDA headers
+RUN apt-get update && \
+    apt-get install -y \
+      cmake \                         # CMake binary for build configuration :contentReference[oaicite:4]{index=4}
+      build-essential \              # gcc, g++, make, etc. :contentReference[oaicite:5]{index=5}
+      git \                          # to clone llama.cpp :contentReference[oaicite:6]{index=6}
+      pkg-config \                   # for library detection :contentReference[oaicite:7]{index=7}
+      libssl-dev \                   # SSL headers (if needed by llama.cpp) :contentReference[oaicite:8]{index=8}
+      cuda-toolkit-12-4 \            # CUDA headers & tools (if available in apt) 
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only the server binary from builder
-COPY --from=builder /build/build/server-cuda /usr/local/bin/llama-server
+# (Optional) Switch to NVIDIA's CUDA base instead:
+# FROM nvidia/cuda:12.4.1-devel-ubuntu22.04  :contentReference[oaicite:9]{index=9}
 
-# Then set up your Python venv, install torch & Orpheus dependencies…
-COPY requirements.txt .
-RUN python3 -m venv /venv && \
-    /venv/bin/pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 \
-    && /venv/bin/pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
 
-# Expose your FastAPI port and entrypoint
+# Clone and build llama.cpp server
+RUN git clone https://github.com/ggml-org/llama.cpp.git /app/llama.cpp && \
+    cd /app/llama.cpp && \
+    cmake -B build -DGGML_CUDA=ON -DLLAMA_CUBLAS=ON -DCMAKE_CUDA_COMPILER=$(which nvcc) . \  # now succeeds
+    && cmake --build build --target server-cuda -j$(nproc)
+
+# Create non-root user and set up directories
+RUN useradd -m -u 1001 appuser && \
+    mkdir -p /app/outputs /app && \
+    chown -R appuser:appuser /app
+
+USER appuser
+WORKDIR /app
+
+# Copy dependency files
+COPY --chown=appuser:appuser requirements.txt ./requirements.txt
+
+# Create and activate virtual environment
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Install PyTorch with CUDA support and other dependencies
+RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 && \
+    pip3 install --no-cache-dir -r requirements.txt
+
+# Copy project files
+COPY --chown=appuser:appuser . .
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    USE_GPU=true
+
+ENV GGML_CUDA_FORCE_CUBLAS=1
+ENV GGML_CUDA_FORCE_MMQ=0
+    
+
+ARG CUDA_VERSION=12.4.0
+ARG CUDA_DOCKER_ARCH="8.0;8.9;..."
+# add:
+RUN cmake -B build \
+      -DGGML_CUDA=ON \
+      -DLLAMA_CUBLAS=ON \
+      -DCMAKE_CUDA_COMPILER=$(which nvcc) \
+      . && \
+    cmake --build build --target server-cuda -j
+
+# Expose the port
 EXPOSE 5005
-CMD ["/venv/bin/uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5005"]
+
+# Run FastAPI server with uvicorn
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5005", "--workers", "4"]
