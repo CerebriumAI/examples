@@ -187,126 +187,212 @@ def turn_token_into_id(token_string, index):
         token_id_cache[cache_key] = token_id
     return token_id
 
+# --- Configuration ---
+MIN_FRAMES_FIRST = 1
+MIN_FRAMES_SUBSEQUENT = 32
+IDEAL_FRAMES = 64
+PROCESS_EVERY_N = 7 # This seems specific, keeping it. If flexible, could be removed.
+MAX_PENDING_AUDIO_TASKS = 4 # Backpressure: Limit parallel audio conversions
+EXECUTOR_TYPE = 'thread' # 'thread' or 'process'. Use 'thread' if convert_to_audio releases GIL or is I/O bound.
+NUM_EXECUTORS = None # None for default (usually cores * 5 for ThreadPool, cores for ProcessPool)
+
+# Sentinel object to signal the end of processing
+END_OF_STREAM = object()
+
 async def tokens_decoder(token_gen):
-    """High-performance token decoder with minimal latency and maximum throughput"""
-    # Optimize parameter configuration for maximum performance
-    MIN_FRAMES_FIRST = 1
-    MIN_FRAMES_SUBSEQUENT = 32  # Slightly larger for better batch processing
-    IDEAL_FRAMES = 64  # Increased for better throughput
-    PROCESS_EVERY_N = 7  # Unchanged - model-specific constant
-    
-    # Pre-allocate buffers with appropriate size
-    buffer = deque(maxlen=IDEAL_FRAMES * 2)  # Use deque for O(1) append/pop operations
-    
-    # Cached token conversion for repeated tokens
+    """
+    High-performance token decoder optimized for latency and throughput
+    using background audio processing.
+    """
+    global turn_token_into_id, convert_to_audio # Ensure functions are accessible
+
+    buffer = deque(maxlen=IDEAL_FRAMES * 2) # Keep deque for efficient buffering
+    results_queue = asyncio.Queue(maxsize=MAX_PENDING_AUDIO_TASKS + 1) # Queue for yielding results
+    pending_futures = deque() # Track background tasks to ensure order
+
+    # Use LRU Cache for token conversion
     @lru_cache(maxsize=4096)
     def cached_turn_token_into_id(token_sim, position):
+        # Note: If turn_token_into_id itself is slow and CPU-bound,
+        # it might also need to run in an executor. Assumed fast here.
         return turn_token_into_id(token_sim, position)
-    
-    # Performance tracking variables
+
+    # Pre-fetch audio conversion function
+    convert_to_audio_fn = convert_to_audio
+
+    # Choose and create the executor
+    if EXECUTOR_TYPE == 'process':
+        executor = concurrent.futures.ProcessPoolExecutor(max_workers=NUM_EXECUTORS)
+    else:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=NUM_EXECUTORS)
+
+    loop = asyncio.get_running_loop()
+
+    # --- Performance Tracking ---
     count = 0
     first_chunk_processed = False
     start_time = time.time()
-    token_count = 0
+    token_receive_count = 0
     last_log_time = start_time
-    last_audio_time = start_time
-    
-    # Prefetch audio conversion to avoid function lookup in loop
-    convert_to_audio_fn = globals().get('convert_to_audio')
-    
-    # Create a batch processor for token conversion
-    async def process_batch(tokens_batch, current_count):
-        audio_samples = convert_to_audio_fn(tokens_batch, current_count)
-        return audio_samples
-    
-    # Use a task queue for parallel processing
-    pending_tasks = []
-    
-    # Preallocate arrays for token batches
-    batch_arrays = {}
-    for size in [MIN_FRAMES_FIRST, MIN_FRAMES_SUBSEQUENT, IDEAL_FRAMES]:
-        batch_arrays[size] = np.zeros(size, dtype=np.int32)
-    
+    total_tokens_processed_for_audio = 0
+
+    async def _submit_audio_task(tokens_to_process, current_token_count):
+        """Submits a batch of tokens for audio conversion in the executor."""
+        nonlocal total_tokens_processed_for_audio
+        if not tokens_to_process:
+            return
+
+        # Efficiently create numpy array from deque slice
+        # Using np.fromiter on an islice is generally faster than list conversion
+        try:
+            token_array = np.fromiter(tokens_to_process, dtype=np.int32, count=len(tokens_to_process))
+        except TypeError: # Fallback if fromiter needs count=len(...) for deque iterators
+             token_array = np.array(list(tokens_to_process), dtype=np.int32)
+
+
+        # Run convert_to_audio_fn in the background executor
+        future = loop.run_in_executor(
+            executor,
+            partial(convert_to_audio_fn, token_array, current_token_count) # Use partial to pass args
+        )
+        pending_futures.append(future)
+        total_tokens_processed_for_audio += len(tokens_to_process)
+
+        # Apply backpressure: Wait if the results queue is full
+        await results_queue.join() # Wait until a slot is free (task_done called)
+
+    async def _result_producer():
+        """Waits for futures in order and puts results onto the queue."""
+        while True:
+            if not pending_futures:
+                # Wait for a task to be submitted or for the stream to end
+                await asyncio.sleep(0.001) # Small sleep to prevent busy-waiting if queue is empty
+                continue
+
+            future = pending_futures.popleft()
+            try:
+                result = await future # Wait for the background task to complete
+                await results_queue.put(result) # Put result onto the queue for yielding
+            except Exception as e:
+                print(f"Error in background audio conversion: {e}")
+                traceback.print_exc()
+                await results_queue.put(None) # Signal error downstream if needed
+
+            # Check if this was the last future after the main loop finished
+            if result is END_OF_STREAM:
+                 break # Exit producer loop
+
+
+    # Start the background task that processes results
+    producer_task = asyncio.create_task(_result_producer())
+
     try:
-        # Main processing loop with optimized paths
+        # --- Main Token Processing Loop ---
         async for token_sim in token_gen:
-            token_count += 1
-            
-            # Fast path for token conversion with caching
+            token_receive_count += 1
+
             token = cached_turn_token_into_id(token_sim, count)
-            
+
             if token is not None and token > 0:
                 buffer.append(token)
                 count += 1
-                
-                # Throughput logging with minimal overhead
-                current_time = time.time()
-                if current_time - last_log_time > 5.0:  # Every 5 seconds
-                    elapsed = current_time - last_log_time
-                    if elapsed > 0:
-                        tokens_per_sec = token_count / elapsed
-                        print(f"Token processing rate: {tokens_per_sec:.1f} tokens/second")
-                    last_log_time = current_time
-                    token_count = 0
-                
-                # First chunk processing - optimize for low latency
-                if not first_chunk_processed and count >= MIN_FRAMES_FIRST:
-                    # Get the most recent tokens directly
-                    buffer_list = list(buffer)[-MIN_FRAMES_FIRST:]
-                    audio_samples = await process_batch(buffer_list, count)
-                    
-                    if audio_samples is not None:
-                        first_chunk_processed = True
-                        yield audio_samples
-                        last_audio_time = time.time()
-                
-                # Subsequent chunks processing - optimize for throughput
+
+                # --- Batch Submission Logic ---
+                buffer_len = len(buffer) # Check length once
+
+                # First chunk processing - low latency
+                if not first_chunk_processed and buffer_len >= MIN_FRAMES_FIRST:
+                    # Process the most recent MIN_FRAMES_FIRST tokens
+                    tokens_to_process = itertools.islice(buffer, buffer_len - MIN_FRAMES_FIRST, buffer_len)
+                    await _submit_audio_task(list(tokens_to_process), count) # Submit task
+                    first_chunk_processed = True # Mark as processed regardless of audio result status
+
+                # Subsequent chunks processing - throughput (check only when needed)
                 elif first_chunk_processed and count % PROCESS_EVERY_N == 0:
-                    buffer_list = list(buffer)
-                    buffer_len = len(buffer_list)
-                    
-                    # Select the optimal batch size
+                    tokens_to_process = None
+                    # Select the optimal batch size based on available tokens
                     if buffer_len >= IDEAL_FRAMES:
-                        buffer_to_proc = buffer_list[-IDEAL_FRAMES:]
+                         # Slice the most recent IDEAL_FRAMES tokens
+                        tokens_to_process = itertools.islice(buffer, buffer_len - IDEAL_FRAMES, buffer_len)
                     elif buffer_len >= MIN_FRAMES_SUBSEQUENT:
-                        buffer_to_proc = buffer_list[-MIN_FRAMES_SUBSEQUENT:]
-                    else:
-                        continue
-                    
-                    # Process audio samples
-                    audio_samples = await process_batch(buffer_to_proc, count)
-                    
-                    if audio_samples is not None:
-                        yield audio_samples
-                        last_audio_time = time.time()
-        
-        # End-of-generation handling with optimized final processing
+                         # Slice the most recent MIN_FRAMES_SUBSEQUENT tokens
+                        tokens_to_process = itertools.islice(buffer, buffer_len - MIN_FRAMES_SUBSEQUENT, buffer_len)
+
+                    if tokens_to_process:
+                       await _submit_audio_task(list(tokens_to_process), count) # Submit task
+
+            # --- Throughput Logging ---
+            current_time = time.time()
+            if current_time - last_log_time > 5.0:
+                elapsed = current_time - last_log_time
+                if elapsed > 0:
+                    tokens_per_sec = token_receive_count / elapsed
+                    print(f"Token reception rate: {tokens_per_sec:.1f} tokens/second")
+                last_log_time = current_time
+                token_receive_count = 0
+
+        # --- End-of-Generation Handling ---
         if buffer:
-            buffer_list = list(buffer)
-            audio_samples = await process_batch(buffer_list, count)
+            # Process any remaining tokens in the buffer
+            # Decide whether to process the whole buffer or just the last relevant part
+            # Processing the whole remaining buffer seems intended by the original code
+            tokens_to_process = list(buffer) # Process all remaining
+
+            # Submit final chunk
+            await _submit_audio_task(tokens_to_process, count)
+
+            # Handle potential padding ONLY IF convert_to_audio strictly requires it
+            # This padding logic seems complex and possibly unnecessary unless the model *must*
+            # have fixed-size inputs even at the very end. Let's simplify/remove it unless required.
+            # Original padding logic commented out for clarity/performance unless needed:
+            # padding_needed = IDEAL_FRAMES - len(tokens_to_process)
+            # if padding_needed > 0 and len(tokens_to_process) > 0:
+            #     # Use the very last token for padding
+            #     padded_buffer_list = tokens_to_process + [tokens_to_process[-1]] * padding_needed
+            #     print(f"Processing final padded frame: {len(tokens_to_process)} tokens + {padding_needed} padding")
+            #     await _submit_audio_task(padded_buffer_list, count)
+
+
+    except Exception as e:
+        print(f"Error in tokens_decoder main loop: {e}")
+        traceback.print_exc()
+        # Cancel the producer if it's still running
+        producer_task.cancel()
+    finally:
+        # --- Signal End of Stream to Producer ---
+        # Ensure producer processes all pending tasks before exiting
+        # Submit a final task that just signals the end
+        final_signal_future = loop.run_in_executor(executor, lambda: END_OF_STREAM)
+        pending_futures.append(final_signal_future)
+
+        # --- Yield Results from Queue ---
+        while True:
+            audio_samples = await results_queue.get()
+            if audio_samples is END_OF_STREAM:
+                results_queue.task_done()
+                break # End of stream signal received
             if audio_samples is not None:
                 yield audio_samples
-                
-            # Handle padding if needed
-            padding_needed = IDEAL_FRAMES - len(buffer)
-            if padding_needed > 0:
-                padded_buffer = buffer_list + [buffer_list[-1]] * padding_needed
-                print(f"Processing final partial frame: {len(buffer)} tokens + {padding_needed} repeated-token padding")
-                audio_samples = await process_batch(padded_buffer, count)
-                if audio_samples is not None:
-                    yield audio_samples
-    
-    except Exception as e:
-        import traceback
-        print(f"Error in tokens_decoder: {e}")
-        traceback.print_exc()
-    
-    finally:
-        # Performance reporting
+            results_queue.task_done() # Mark item as processed for backpressure join()
+
+        # Wait for the producer task to finish cleanly
+        await producer_task
+
+        # --- Cleanup ---
+        print("Shutting down executor...")
+        executor.shutdown(wait=True) # Wait for all tasks to complete
+        print("Executor shut down.")
+
+
+        # --- Performance Reporting ---
         total_elapsed = time.time() - start_time
         if total_elapsed > 0:
-            print(f"Total processing time: {total_elapsed:.2f}s, average rate: {count / total_elapsed:.1f} tokens/s")
-            
+             # Use total_tokens_processed_for_audio for a more relevant throughput metric
+             # 'count' includes tokens buffered but maybe not sent for audio processing
+             effective_rate = total_tokens_processed_for_audio / total_elapsed
+             print(f"Total processing time: {total_elapsed:.2f}s")
+             print(f"Total tokens processed for audio: {total_tokens_processed_for_audio}")
+             print(f"Average audio processing rate: {effective_rate:.1f} tokens/s")
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
     """Highly optimized synchronous decoder with 10x performance improvement"""
