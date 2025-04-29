@@ -50,19 +50,19 @@ if torch.cuda.is_available():
         
     if HIGH_END_GPU:
         if not IS_RELOADER:
-            print(f"🖥️Hardware: High-end CUDA GPU detected")
-            print(f"📊Device: {gpu_name}")
-            print(f"📊VRAM: {gpu_mem_gb:.2f} GB")
-            print(f"🧠Using model: {os.environ.get('ORPHEUS_MODEL_NAME', '(not set)')}")
-            print(f"📊Compute Capability: {compute_capability}")
+            print(f"🖥️ Hardware: High-end CUDA GPU detected")
+            print(f"📊 Device: {gpu_name}")
+            print(f"📊 VRAM: {gpu_mem_gb:.2f} GB")
+            print(f"🧠 Using model: {os.environ.get('ORPHEUS_MODEL_NAME', '(not set)')}")
+            print(f"📊 Compute Capability: {compute_capability}")
             print("🚀Using high-performance optimizations")
     else:
         if not IS_RELOADER:
             print(f"🖥️Hardware: CUDA GPU detected")
-            print(f"📊Device: {gpu_name}")
-            print(f"📊VRAM: {gpu_mem_gb:.2f} GB")
-            print(f"🧠Using model: {os.environ.get('ORPHEUS_MODEL_NAME', '(not set)')}")
-            print(f"📊Compute Capability: {compute_capability}")
+            print(f"📊 Device: {gpu_name}")
+            print(f"📊 VRAM: {gpu_mem_gb:.2f} GB")
+            print(f"🧠 Using model: {os.environ.get('ORPHEUS_MODEL_NAME', '(not set)')}")
+            print(f"📊 Compute Capability: {compute_capability}")
             print("🚀Using GPU-optimized settings")
 else:
     # Get CPU info

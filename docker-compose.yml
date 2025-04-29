@@ -69,6 +69,7 @@ services:
       --cont-batching
       --timeout 600
       --mlock
+      --no-mmap
 
   model-init:
     image: curlimages/curl:latest

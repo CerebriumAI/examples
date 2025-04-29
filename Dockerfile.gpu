@@ -1,34 +1,18 @@
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM ubuntu:22.04
 
+# Set non-interactive frontend
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Install CMake, compilers, Git, pkg-config, and CUDA headers
-RUN apt-get update && \
-    apt-get install -y \
-      cmake \
-      build-essential \
-      git \
-      pkg-config \
-      libssl-dev \
-      libcurl4-openssl-dev \
+# Install Python and other dependencies
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    python3-venv \
+    libsndfile1 \
+    ffmpeg \
+    portaudio19-dev \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-      python3.10 \
-      python3-pip \
-      libsndfile1 \
-      ffmpeg \
-      portaudio19-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# (Optional) Switch to NVIDIA's CUDA base instead:
-# FROM nvidia/cuda:12.4.1-devel-ubuntu22.04  :contentReference[oaicite:9]{index=9}
-
-WORKDIR /app
-
-# Clone and build llama.cpp server
-RUN git clone https://github.com/ggml-org/llama.cpp.git /app/llama.cpp && \
-    cd /app/llama.cpp && \
-    cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=$(which nvcc) . && \
-    cmake --build build -j$(nproc)
 # Create non-root user and set up directories
 RUN useradd -m -u 1001 appuser && \
     mkdir -p /app/outputs /app && \
@@ -55,20 +39,6 @@ COPY --chown=appuser:appuser . .
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     USE_GPU=true
-
-ENV GGML_CUDA_FORCE_CUBLAS=1
-ENV GGML_CUDA_FORCE_MMQ=0
-    
-
-ARG CUDA_VERSION=12.4.0
-ARG CUDA_DOCKER_ARCH="8.0;8.9;..."
-# add:
-RUN cmake -B build \
-      -DGGML_CUDA=ON \
-      -DLLAMA_CUBLAS=ON \
-      -DCMAKE_CUDA_COMPILER=$(which nvcc) \
-      . && \
-    cmake --build build --target server-cuda -j
 
 # Expose the port
 EXPOSE 5005
