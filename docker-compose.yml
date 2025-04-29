@@ -36,7 +36,6 @@ services:
     environment:
       # Force use of cuBLAS for faster matmuls
       - GGML_CUDA_FORCE_CUBLAS=1
-      - GGML_CUDA_FORCE_MMQ=3
       
     deploy:
       resources:
@@ -45,7 +44,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: '6gb'
+    shm_size: '4gb'
     ulimits:
       memlock:
         soft: -1
@@ -55,16 +54,16 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
-      --n-gpu-layers 48                      
+      --n-gpu-layers 29                      
       --threads 1                            
       --threads-batch 1                      
-      --batch-size 1                          
-      --ubatch-size 1                      
+      --batch-size 16                         
+      --ubatch-size 16                 
       --ctx-size 8192
       --cont-batching
       --timeout 600
       --mlock
-      --threads-http 1 
+      --threads-http 8 
       --no-mmap    
                        
 
