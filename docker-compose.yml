@@ -62,6 +62,7 @@ services:
       --cont-batching
       --timeout 600
       --mlock
+      --flash-attn
       --threads-http 4 
       --no-mmap                       
 
