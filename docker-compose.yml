@@ -36,8 +36,7 @@ services:
     environment:
       # Force use of cuBLAS for faster matmuls
       - GGML_CUDA_FORCE_CUBLAS=1
-      - GGML_CUDA_FORCE_MMQ=0
-      - GGML_CUDA_FORCE_FLASH_ATTN=1
+      - GGML_CUDA_FORCE_MMQ=3
       
     deploy:
       resources:
@@ -59,7 +58,7 @@ services:
       --n-gpu-layers 48                      
       --threads 1                            
       --threads-batch 1                      
-      --batch-size 32                          
+      --batch-size 64                          
       --ubatch-size 2048                      
       --ctx-size 8192
       --cont-batching
