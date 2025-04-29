@@ -274,7 +274,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
             # More aggressive optimizations for high-end GPUs
             payload.update({
                 "attention_mask_type": "alibi",  # Faster attention mechanism
-                "batch_size": 16.384  # Process more tokens at once
+                "batch_size": 2048  # Process more tokens at once
             })
     
     # Enhanced connection pooling with requests
@@ -475,7 +475,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     audio_segments = []
     
     # Optimize batch sizes for GPU processing
-    batch_size = 16.384 if HIGH_END_GPU else 1024
+    batch_size = 2048 if HIGH_END_GPU else 1024
     
     # If output_file is provided, prepare WAV file with optimized buffering
     wav_file = None

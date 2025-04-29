@@ -57,14 +57,13 @@ services:
       --n-gpu-layers 29                      
       --threads 1                            
       --threads-batch 1                      
-      --batch-size 16                         
+      --batch-size 32                         
       --ubatch-size 16                 
       --ctx-size 8192
       --cont-batching
       --timeout 600
       --mlock
       --threads-http 8 
-      --no-mmap    
                        
 
   model-init:
