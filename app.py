@@ -245,7 +245,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         else:
             batches = [request.input]
 
-        chunk_duration_ms = 50  # 50ms chunks for smoother playback
+        chunk_duration_ms = 200  # 200ms chunks for higher throughput
         samples_per_chunk = int(24000 * (chunk_duration_ms / 1000))
         int16_chunk_bytes = samples_per_chunk * 2
         buffer = bytearray()
