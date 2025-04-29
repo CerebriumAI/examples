@@ -45,19 +45,19 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
-      --n-gpu-layers 999
-      --threads -1
-      --threads-batch -1
+      --n-gpu-layers 10000
+      --threads 8
+      --threads-batch 8
       --ctx-size 1024
-      --prio-batch 3
+      --prio-batch 5
       --n-predict 1024
       --rope-scaling linear
       --flash-attn
-      --batch-size 512
-      --ubatch-size 512
-      --parallel 8
+      --batch-size 1024
+      --ubatch-size 1024
+      --parallel 16
       --no-escape
-      --threads-http 4
+      --threads-http 8
       --pooling none
       --cont-batching
       --timeout 600
