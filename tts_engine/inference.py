@@ -53,7 +53,7 @@ if torch.cuda.is_available():
             print(f"🖥️ Hardware: High-end CUDA GPU detected")
             print(f"📊 Device: {gpu_name}")
             print(f"📊 VRAM: {gpu_mem_gb:.2f} GB")
-print(f"🧠 Using model: {os.environ.get('ORPHEUS_MODEL_NAME', '(not set)')}")
+            print(f"🧠 Using model: {os.environ.get('ORPHEUS_MODEL_NAME', '(not set)')}")
             print(f"📊 Compute Capability: {compute_capability}")
             print("🚀 Using high-performance optimizations")
     else:
