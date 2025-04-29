@@ -338,26 +338,13 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
                 print("⚠️ Buffer underrun detected! (\(bufferUnderrunCount) total)")
                 needsScheduling = false
 
-                // On underrun, schedule a silent buffer to prevent artifacts
-                if jitterBufferEnabled, let outFmt = outputFormat {
-                    if let silentBuf = AVAudioPCMBuffer(pcmFormat: outFmt, frameCapacity: framesPerBuffer) {
-                        silentBuf.frameLength = framesPerBuffer
-                        if let floatData = silentBuf.floatChannelData {
-                            let channels = Int(outFmt.channelCount)
-                            for ch in 0..<channels {
-                                memset(floatData[ch], 0, Int(framesPerBuffer) * MemoryLayout<Float>.size)
-                            }
-                        }
-                        scheduleBuffer(silentBuf)
-                    }
-                }
+                // Stop engine to refill minimum buffer cache
+                playerNode.stop()
+                engine.stop()
+                isSchedulingBuffers = false
+                isPlaying = false
 
-                // If we keep getting underruns, adjust our buffer target
-                if bufferUnderrunCount > 3 && bufferingStrategy != .fixed {
-                    // Increase target buffer level to compensate for network issues
-                    targetBufferLevel = min(targetBufferLevel + 1, 12)
-                    print("Adjusted target buffer level to \(targetBufferLevel)")
-                }
+                return
             }
         }
 
