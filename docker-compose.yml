@@ -34,9 +34,7 @@ services:
     env_file:
       - .env
     environment:
-      # Let llama.cpp pick MMQ by default; remove forced cuBLAS
-      - GGML_CUDA_FORCE_MMQ=1
-      # (no GGML_CUDA_FORCE_CUBLAS) to use MMQ kernels :contentReference[oaicite:10]{index=10}
+     
     deploy:
       resources:
         reservations:
