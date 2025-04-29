@@ -10,6 +10,7 @@ RUN apt-get update && \
       git \
       pkg-config \
       libssl-dev \
+      libcurl4-openssl-dev \
 
       python3.10 \
       python3-pip \
