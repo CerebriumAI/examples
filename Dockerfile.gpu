@@ -40,6 +40,20 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     USE_GPU=true
 
+ENV GGML_CUDA_FORCE_CUBLAS=1
+ENV GGML_CUDA_FORCE_MMQ=0
+    
+
+ARG CUDA_VERSION=12.4.0
+ARG CUDA_DOCKER_ARCH="8.0;8.9;..."
+# add:
+RUN cmake -B build \
+      -DGGML_CUDA=ON \
+      -DLLAMA_CUBLAS=ON \
+      -DCMAKE_CUDA_COMPILER=$(which nvcc) \
+      . && \
+    cmake --build build --target server-cuda -j
+
 # Expose the port
 EXPOSE 5005
 
