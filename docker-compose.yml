@@ -33,6 +33,9 @@ services:
       - ./models:/models
     env_file:
       - .env
+    environment:
+      # Force use of cuBLAS for faster matmuls
+      - GGML_CUDA_FORCE_CUBLAS=1
     deploy:
       resources:
         reservations:
