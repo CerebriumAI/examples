@@ -266,8 +266,8 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     if torch.cuda.is_available():
         num_gpus = torch.cuda.device_count()
         payload.update({
-            "compute_dtype": "float16",  # Use bfloat16 for improved performance
-            "tensor_parallel": num_gpus  # Use all available GPUs
+            "compute_dtype": "bfloat16",  # Use bfloat16 for improved performance
+            "tensor_parallel": 999  # Use all available GPUs
         })
         
         if HIGH_END_GPU:
@@ -1369,7 +1369,7 @@ def cleanup_temp_files(file_list):
 
 # Cache implementation
 _audio_cache = {}
-MAX_CACHE_SIZE = 50  # Adjust based on memory considerations
+MAX_CACHE_SIZE = 500000  # Adjust based on memory considerations
 
 def get_from_cache(key):
     """Get audio segments from cache if available."""
