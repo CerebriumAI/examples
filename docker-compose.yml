@@ -55,16 +55,19 @@ services:
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
       --n-gpu-layers 29                      
-      --threads 2                            
+      --threads 1                           
       --threads-batch 1                      
       --batch-size 8                         
       --ubatch-size 8                 
-      --ctx-size 1024
+      --ctx-size 8192
       --cont-batching
-      --timeout 600
+      --timeout 100
       --mlock
       --flash-attn
       --threads-http 8 
+      --numa
+      --no-mul-mat-q
+      --no-mmap
                        
 
   model-init:
