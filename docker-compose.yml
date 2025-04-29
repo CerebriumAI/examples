@@ -44,7 +44,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: '4gb'
+    shm_size: '10gb'
     ulimits:
       memlock:
         soft: -1
