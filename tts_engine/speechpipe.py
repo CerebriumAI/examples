@@ -404,7 +404,7 @@ def tokens_decoder_sync(syn_token_gen):
     
     # Performance-critical constants
     snac_device = getattr(globals().get('snac', object()), 'device', 'cpu')
-    BATCH_SIZE = 128 if snac_device == "cuda" else 64  # Larger batches for better throughput
+    BATCH_SIZE = 1048 if snac_device == "cuda" else 64  # Larger batches for better throughput
     PREFETCH_FACTOR = 3  # Prefetch multiple batches for continuous processing
     MAX_WORKERS = 8 if snac_device == "cuda" else 4  # Optimized thread count
     
