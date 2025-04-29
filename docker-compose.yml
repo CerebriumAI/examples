@@ -60,9 +60,7 @@ services:
       --batch-size 8                         
       --ubatch-size 8                 
       --ctx-size 1024
-      --cont-batching
       --timeout 600
-      --mlock
       --threads-http 8 
                        
 
