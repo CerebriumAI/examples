@@ -52,15 +52,15 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
-      --n-gpu-layers 28
-      --threads 32
-      --threads-batch 32
+      --n-gpu-layers 29
+      --threads 16
+      --threads-batch 16
       --ctx-size 8192
       --prio-batch 3
       --n-predict 8192
       --rope-scaling linear
       --flash-attn
-      --batch-size 1024
+      --batch-size 1
       --ubatch-size 1024
       --parallel 16
       --no-escape
@@ -70,6 +70,8 @@ services:
       --timeout 600
       --mlock
       --no-mmap
+      --no-offload-kv
+      -DUSE_CUBLAS=on
 
   model-init:
     image: curlimages/curl:latest
