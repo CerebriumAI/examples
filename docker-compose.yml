@@ -53,17 +53,17 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
-      --n-gpu-layers 29                       # full model offload
-      --threads 1                             # single driver thread :contentReference[oaicite:11]{index=11}
-      --threads-batch 1                       # match threads :contentReference[oaicite:12]{index=12}
-      --batch-size 8                          # larger batch for CUDA Graph/flash-attn :contentReference[oaicite:13]{index=13}
-      --ubatch-size 1024                      # prompt prefill batch :contentReference[oaicite:14]{index=14}
+      --n-gpu-layers 29
+      --threads 1
+      --threads-batch 1
+      --batch-size 8
+      --ubatch-size 1024
       --ctx-size 8192
-      --flash-attn                            # enable Flash Attention :contentReference[oaicite:15]{index=15}
+      --flash-attn
       --cont-batching
       --timeout 600
       --mlock
-      --threads-http 4                        # limit HTTP threads :contentReference[oaicite:16]{index=16}
+      --threads-http 4
 
   model-init:
     image: curlimages/curl:latest
