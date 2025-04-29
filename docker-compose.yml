@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   orpheus-fastapi:
     container_name: orpheus-fastapi
@@ -24,6 +26,7 @@ services:
 
   llama-cpp-server:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llama-cpp-server
     ports:
       - "5006:5006"
     volumes:
@@ -31,11 +34,9 @@ services:
     env_file:
       - .env
     environment:
-      - GGML_CUDA_FORCE_CUBLAS=1
+      # Let llama.cpp pick MMQ by default; remove forced cuBLAS
       - GGML_CUDA_FORCE_MMQ=1
-    depends_on:
-      model-init:
-        condition: service_completed_successfully
+      # (no GGML_CUDA_FORCE_CUBLAS) to use MMQ kernels :contentReference[oaicite:10]{index=10}
     deploy:
       resources:
         reservations:
@@ -50,28 +51,19 @@ services:
     restart: unless-stopped
     command: >
       -m /models/${ORPHEUS_MODEL_NAME}
-      --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
-      --n-gpu-layers 29
-      --threads 16
-      --threads-batch 16
+      --port ${LLAMA_ARG_PORT:-5006}
+      --n-gpu-layers 29                       # full model offload
+      --threads 1                             # single driver thread :contentReference[oaicite:11]{index=11}
+      --threads-batch 1                       # match threads :contentReference[oaicite:12]{index=12}
+      --batch-size 8                          # larger batch for CUDA Graph/flash-attn :contentReference[oaicite:13]{index=13}
+      --ubatch-size 1024                      # prompt prefill batch :contentReference[oaicite:14]{index=14}
       --ctx-size 8192
-      --prio-batch 3
-      --n-predict 8192
-      --rope-scaling linear
-      --flash-attn
-      --batch-size 1
-      --ubatch-size 1024
-      --parallel 16
-      --no-escape
-      --threads-http 8
-      --pooling none
+      --flash-attn                            # enable Flash Attention :contentReference[oaicite:15]{index=15}
       --cont-batching
       --timeout 600
       --mlock
-      --no-mmap
-      --no-offload-kv
-      -DUSE_CUBLAS=on
+      --threads-http 4                        # limit HTTP threads :contentReference[oaicite:16]{index=16}
 
   model-init:
     image: curlimages/curl:latest
