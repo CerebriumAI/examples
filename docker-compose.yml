@@ -65,9 +65,9 @@ services:
       --mlock
       --flash-attn
       --threads-http 8 
-      --numa
       --no-mul-mat-q
       --no-mmap
+      --rope-freq-base
                        
 
   model-init:
