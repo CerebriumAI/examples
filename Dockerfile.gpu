@@ -5,12 +5,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 1. Install CMake, compilers, Git, pkg-config, and CUDA headers
 RUN apt-get update && \
     apt-get install -y \
-      cmake \                         # CMake binary for build configuration :contentReference[oaicite:4]{index=4}
-      build-essential \              # gcc, g++, make, etc. :contentReference[oaicite:5]{index=5}
-      git \                          # to clone llama.cpp :contentReference[oaicite:6]{index=6}
-      pkg-config \                   # for library detection :contentReference[oaicite:7]{index=7}
-      libssl-dev \                   # SSL headers (if needed by llama.cpp) :contentReference[oaicite:8]{index=8}
-      cuda-toolkit-12-4 \            # CUDA headers & tools (if available in apt) 
+      cmake \
+      build-essential \
+      git \
+      pkg-config \
+      libssl-dev \
+      cuda-toolkit-12-4 \
+      python3.10 \
+      python3-pip \
+      libsndfile1 \
+      ffmpeg \
+      portaudio19-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # (Optional) Switch to NVIDIA's CUDA base instead:
