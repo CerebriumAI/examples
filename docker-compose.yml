@@ -50,7 +50,7 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
-      --n-gpu-layers -1                      
+      --n-gpu-layers 48                      
       --threads 1                            
       --threads-batch 1                      
       --batch-size 32                          
