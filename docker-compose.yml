@@ -36,6 +36,9 @@ services:
     environment:
       # Force use of cuBLAS for faster matmuls
       - GGML_CUDA_FORCE_CUBLAS=1
+      - GGML_CUDA_FORCE_MMQ=0
+      - GGML_CUDA_FORCE_FLASH_ATTN=1
+      
     deploy:
       resources:
         reservations:
@@ -62,7 +65,6 @@ services:
       --cont-batching
       --timeout 600
       --mlock
-      --flash-attn
       --threads-http 4 
       --no-mmap                       
 
