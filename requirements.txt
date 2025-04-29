@@ -18,6 +18,7 @@ snac==1.2.1       # Required for audio generation from tokens
 
 # System Utilities
 psutil==5.9.0
+cachetools==5.3.1
 
 # PyTorch - Install separately with CUDA support:
 # On Windows/Linux: 
