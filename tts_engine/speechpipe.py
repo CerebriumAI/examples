@@ -77,24 +77,15 @@ def convert_to_audio(multiframe, count):
     
     num_frames = len(multiframe) // 7
     
-    # Pre-allocate tensors with the right shape and directly on target device
-    # Eliminate redundant view/reshape operations by building optimally from the start
-    codes_0 = torch.empty((1, num_frames), dtype=torch.int32, device=snac_device)
-    codes_1 = torch.empty((1, num_frames * 2), dtype=torch.int32, device=snac_device)
-    codes_2 = torch.empty((1, num_frames * 4), dtype=torch.int32, device=snac_device)
-    
-    # Fill tensors with direct indexing (no intermediate allocations)
-    for i in range(num_frames):
-        base_idx = i * 7
-        codes_0[0, i] = multiframe[base_idx]
-        
-        codes_1[0, i*2] = multiframe[base_idx + 1]
-        codes_1[0, i*2 + 1] = multiframe[base_idx + 4]
-        
-        codes_2[0, i*4] = multiframe[base_idx + 2]
-        codes_2[0, i*4 + 1] = multiframe[base_idx + 3]
-        codes_2[0, i*4 + 2] = multiframe[base_idx + 5]
-        codes_2[0, i*4 + 3] = multiframe[base_idx + 6]
+    # Vectorized tensor creation for codes
+    if not isinstance(multiframe, torch.Tensor):
+        mf = torch.tensor(multiframe, dtype=torch.int32, device=snac_device)
+    else:
+        mf = multiframe.to(device=snac_device, dtype=torch.int32)
+    mf = mf.view(num_frames, 7)
+    codes_0 = mf[:, 0].unsqueeze(0)
+    codes_1 = mf[:, [1, 4]].reshape(1, -1)
+    codes_2 = mf[:, [2, 3, 5, 6]].reshape(1, -1)
     
     # Batch validation for range check - much faster than per-element checks
     if (torch.any(codes_0 < 0) or torch.any(codes_0 > 4096) or
@@ -405,8 +396,8 @@ def tokens_decoder_sync(syn_token_gen):
     
     # Performance-critical constants
     snac_device = getattr(globals().get('snac', object()), 'device', 'cpu')
-    BATCH_SIZE = 512 if snac_device == "cuda" else 64  # Larger batches for better throughput
-    PREFETCH_FACTOR = 3  # Prefetch multiple batches for continuous processing
+    BATCH_SIZE = 1024 if snac_device == "cuda" else 64  # Larger batches for better throughput
+    PREFETCH_FACTOR = 8  # Prefetch multiple batches for continuous processing
     MAX_WORKERS = 28 if snac_device == "cuda" else 4  # Optimized thread count
     
     # Use memory-efficient fixed-size numpy arrays instead of lists
