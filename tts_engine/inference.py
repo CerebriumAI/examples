@@ -470,12 +470,12 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     HIGH_END_GPU = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory > 8e9 if use_gpu else False
     
     # Use much larger queue sizes for GPU processing to maximize throughput
-    queue_size = 5000 if HIGH_END_GPU else 2000
+    queue_size = 10000 if HIGH_END_GPU else 2000
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     
     # Optimize batch sizes for GPU processing
-    batch_size = 8192 if HIGH_END_GPU else 1024
+    batch_size = 16.3842 if HIGH_END_GPU else 1024
     
     # If output_file is provided, prepare WAV file with optimized buffering
     wav_file = None
@@ -1154,7 +1154,7 @@ def stitch_wav_files_mmap(input_files, output_file):
         outf.setparams(params)
         
         # Process files in batches to control memory usage
-        batch_size = 10
+        batch_size = 20
         for i in range(0, len(valid_files), batch_size):
             batch = valid_files[i:i+batch_size]
             
