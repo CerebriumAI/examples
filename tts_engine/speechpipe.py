@@ -404,7 +404,7 @@ def tokens_decoder_sync(syn_token_gen):
     
     # Performance-critical constants
     snac_device = getattr(globals().get('snac', object()), 'device', 'cpu')
-    BATCH_SIZE = 8192 if snac_device == "cuda" else 64  # Larger batches for better throughput
+    BATCH_SIZE = 512 if snac_device == "cuda" else 64  # Larger batches for better throughput
     PREFETCH_FACTOR = 3  # Prefetch multiple batches for continuous processing
     MAX_WORKERS = 28 if snac_device == "cuda" else 4  # Optimized thread count
     
@@ -416,7 +416,7 @@ def tokens_decoder_sync(syn_token_gen):
     result_queue = queue.Queue(maxsize=BATCH_SIZE * PREFETCH_FACTOR)
     
     # Cache token processing results to avoid redundant computation
-    @lru_cache(maxsize=1024)
+    @lru_cache(maxsize=2048)
     def process_token(token):
         # This would call the actual token processing function
         tokens_decoder = globals().get('tokens_decoder', lambda x: x)
