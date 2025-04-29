@@ -661,7 +661,9 @@ if __name__ == "__main__":
         print("⚠️ Invalid ORPHEUS_PORT value, using 5005 as fallback")
         port = 5005
     
+    model_name = os.environ.get("ORPHEUS_MODEL_NAME", "(not set)")
     print(f"🔥 Starting Orpheus-FASTAPI Server on {host}:{port}")
+    print(f"🧠 Using model: {model_name}")
     print(f"💬 Web UI available at http://{host if host != '0.0.0.0' else 'localhost'}:{port}")
     print(f"📖 API docs available at http://{host if host != '0.0.0.0' else 'localhost'}:{port}/docs")
     
