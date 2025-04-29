@@ -30,6 +30,9 @@ services:
       - ./models:/models
     env_file:
       - .env
+    environment:
+      - GGML_CUDA_FORCE_CUBLAS=1
+      - GGML_CUDA_FORCE_MMQ=1
     depends_on:
       model-init:
         condition: service_completed_successfully
