@@ -58,14 +58,15 @@ services:
       --n-gpu-layers 48                      
       --threads 1                            
       --threads-batch 1                      
-      --batch-size 8192                          
-      --ubatch-size 512                      
+      --batch-size 16384                          
+      --ubatch-size 1024                      
       --ctx-size 8192
       --cont-batching
       --timeout 600
       --mlock
       --threads-http 4 
-      --no-mmap                       
+      --no-mmap    
+      --no-kv-offload                   
 
   model-init:
     image: curlimages/curl:latest
