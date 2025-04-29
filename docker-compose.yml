@@ -64,9 +64,9 @@ services:
       --cont-batching
       --timeout 600
       --mlock
-      --threads-http 4 
+      --threads-http 1 
       --no-mmap    
-      --no-kv-offload                   
+                       
 
   model-init:
     image: curlimages/curl:latest
