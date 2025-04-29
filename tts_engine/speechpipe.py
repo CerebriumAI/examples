@@ -318,9 +318,9 @@ def tokens_decoder_sync(syn_token_gen):
     
     # Constants and configuration
     snac_device = getattr(globals().get('snac', object()), 'device', 'cpu')
-    BATCH_SIZE = 64 if snac_device == "cuda" else 16  # Increased batch sizes
-    BUFFER_SIZE = 16  # Larger buffer for smoother output
-    MAX_WORKERS = 4  # Thread pool size for parallel processing
+    BATCH_SIZE = 128 if snac_device == "cuda" else 16  # Increased batch sizes
+    BUFFER_SIZE = 32  # Larger buffer for smoother output
+    MAX_WORKERS = 8  # Thread pool size for parallel processing
     
     # Pre-allocate memory for audio buffer
     audio_buffer = []
