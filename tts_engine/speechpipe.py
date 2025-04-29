@@ -115,7 +115,8 @@ def convert_to_audio(multiframe, count):
                     torch.cuda.synchronize()  # Ensure previous operations are complete
                 
                 # Decode the audio
-                audio_hat = model.decode(codes)
+                with torch.cuda.amp.autocast():
+                    audio_hat = model.decode(codes)
                 
                 # Directly slice to the portion we need (no temporary tensors)
                 audio_slice = audio_hat[:, :, 2048:4096]
