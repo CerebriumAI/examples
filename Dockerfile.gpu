@@ -1,61 +1,36 @@
-FROM ubuntu:22.04
+# Stage 1: Build llama.cpp server-cuda
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder  # CUDA & cuDNN support :contentReference[oaicite:12]{index=12}
 
-# Set non-interactive frontend
+RUN apt-get update && apt-get install -y \
+      cmake \
+      build-essential \
+      git \
+      pkg-config \
+      libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+RUN git clone https://github.com/ggml-org/llama.cpp.git . && \
+    cmake -B build -DGGML_CUDA=ON -DLLAMA_CUBLAS=ON -DCMAKE_CUDA_COMPILER=$(which nvcc) . && \
+    cmake --build build --target server-cuda -j$(nproc)
+
+# Stage 2: Final Orpheus-FastAPI image
+FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python and other dependencies
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
-    python3-venv \
-    libsndfile1 \
-    ffmpeg \
-    portaudio19-dev \
- && apt-get clean && rm -rf /var/lib/apt/lists/*
+# (Or optionally start again FROM a smaller Python base...)
+RUN apt-get update && apt-get install -y python3.10 python3-pip libsndfile1 ffmpeg portaudio19-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user and set up directories
-RUN useradd -m -u 1001 appuser && \
-    mkdir -p /app/outputs /app && \
-    chown -R appuser:appuser /app
+# Copy only the server binary from builder
+COPY --from=builder /build/build/server-cuda /usr/local/bin/llama-server
 
-USER appuser
-WORKDIR /app
+# Then set up your Python venv, install torch & Orpheus dependencies…
+COPY requirements.txt .
+RUN python3 -m venv /venv && \
+    /venv/bin/pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 \
+    && /venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# Copy dependency files
-COPY --chown=appuser:appuser requirements.txt ./requirements.txt
-
-# Create and activate virtual environment
-RUN python3 -m venv /app/venv
-ENV PATH="/app/venv/bin:$PATH"
-
-# Install PyTorch with CUDA support and other dependencies
-RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 && \
-    pip3 install --no-cache-dir -r requirements.txt
-
-# Copy project files
-COPY --chown=appuser:appuser . .
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    USE_GPU=true
-
-ENV GGML_CUDA_FORCE_CUBLAS=1
-ENV GGML_CUDA_FORCE_MMQ=0
-    
-
-ARG CUDA_VERSION=12.4.0
-ARG CUDA_DOCKER_ARCH="8.0;8.9;..."
-# add:
-RUN cmake -B build \
-      -DGGML_CUDA=ON \
-      -DLLAMA_CUBLAS=ON \
-      -DCMAKE_CUDA_COMPILER=$(which nvcc) \
-      . && \
-    cmake --build build --target server-cuda -j
-
-# Expose the port
+# Expose your FastAPI port and entrypoint
 EXPOSE 5005
-
-# Run FastAPI server with uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5005", "--workers", "1"]
+CMD ["/venv/bin/uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5005"]
