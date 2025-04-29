@@ -40,6 +40,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    shm_size: '1gb'
     ulimits:
       memlock:
         soft: -1
@@ -49,11 +50,11 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
-      --n-gpu-layers 29                      
+      --n-gpu-layers -1                      
       --threads 1                            
       --threads-batch 1                      
-      --batch-size 8                          
-      --ubatch-size 1024                      
+      --batch-size 32                          
+      --ubatch-size 2048                      
       --ctx-size 8192
       --cont-batching
       --timeout 600
