@@ -186,7 +186,7 @@ async def create_speech_api(request: SpeechRequest):
         voice=request.voice,
         output_file=output_path,
         use_batching=use_batching,
-        max_batch_chars=500  # Process in ~1000 character chunks (roughly 1 paragraph)
+        max_batch_chars=100  # Process in ~1000 character chunks (roughly 1 paragraph)
     )
     end = time.time()
     generation_time = round(end - start, 2)
@@ -245,7 +245,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         else:
             batches = [request.input]
 
-        chunk_duration_ms = 1000  # 200ms chunks for higher throughput
+        chunk_duration_ms = 50  # 200ms chunks for higher throughput
         samples_per_chunk = int(24000 * (chunk_duration_ms / 1000))
         int16_chunk_bytes = samples_per_chunk * 2
         buffer = bytearray()
