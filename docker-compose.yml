@@ -58,8 +58,8 @@ services:
       --n-gpu-layers 48                      
       --threads 1                            
       --threads-batch 1                      
-      --batch-size 64                          
-      --ubatch-size 2048                      
+      --batch-size 8192                          
+      --ubatch-size 512                      
       --ctx-size 8192
       --cont-batching
       --timeout 600
