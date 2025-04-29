@@ -40,14 +40,25 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     restart: unless-stopped
     command: >
       -m /models/${ORPHEUS_MODEL_NAME}
       --port ${LLAMA_ARG_PORT:-5006}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
-      --n-gpu-layers 1000000
+      --n-gpu-layers 28
       --threads 32
       --threads-batch 32
+      mkdir -p build && cd build
+      cmake .. \
+        -DGGML_CUDA=ON \
+        -DCMAKE_CUDA_COMPILER="$(which nvcc)" \
+        -DGGML_BLAS=ON \
+        -DGGML_BLAS_VENDOR=OpenBLAS
+      make -j"$(nproc)"
       --ctx-size 8192
       --prio-batch 3
       --n-predict 8192
