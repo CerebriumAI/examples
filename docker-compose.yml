@@ -55,7 +55,6 @@ services:
       --batch-size 8                          
       --ubatch-size 1024                      
       --ctx-size 8192
-      --flash-attn                            
       --cont-batching
       --timeout 600
       --mlock
