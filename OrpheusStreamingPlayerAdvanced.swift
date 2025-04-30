@@ -49,7 +49,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     private var crossfadeEnabled = true
     private var lastAudioBuffer: AVAudioPCMBuffer?
     private var crossfadeDuration = 0.01    // 10ms crossfade to smooth transitions
-    private var renderQuality: AVAudioQuality = .high
+    private var renderQuality: Int = 127    // Changed from AVAudioQuality to an integer (kAudioConverterQuality_Max = 127)
     private var useHardwareCodec = true
     private var audioBufferPool = [AVAudioPCMBuffer]() // Buffer pool for reuse
 
@@ -662,9 +662,12 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
 
         // Perform the conversion with quality settings
         var error: NSError?
+        // Use the integer value directly for quality
         converter.sampleRateConverterQuality = renderQuality
+        
         if useHardwareCodec {
-            converter.sampleRateConverterAlgorithm = AVAudioQuality.high.rawValue
+            // Use a direct constant value for algorithm (kAudioConverterQuality_Max = 127)
+            converter.sampleRateConverterAlgorithm = 127
         }
         
         let conversionResult = converter.convert(to: outputBuffer, error: &error) { packetCount, status in
@@ -918,10 +921,12 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
 
         // Create the converter with high quality settings for smooth audio
         converter = AVAudioConverter(from: sourceFormat!, to: outputFormat!)
+        // Use the integer value directly for quality
         converter?.sampleRateConverterQuality = renderQuality
         
         if useHardwareCodec {
-            converter?.sampleRateConverterAlgorithm = AVAudioQuality.high.rawValue
+            // Use a direct constant value for algorithm (kAudioConverterQuality_Max = 127)
+            converter?.sampleRateConverterAlgorithm = 127
         }
         
         if converter == nil {
