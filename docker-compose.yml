@@ -64,7 +64,7 @@ services:
       --timeout 100
       --mlock
       --flash-attn
-      --parallel 2
+      --parallel 8
       --threads-http 8 
       --no-mmap
                        
