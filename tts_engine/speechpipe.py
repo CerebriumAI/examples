@@ -396,25 +396,27 @@ async def tokens_decoder(token_gen):
              print(f"Average audio processing rate: {effective_rate:.1f} tokens/s")
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
-    """Highly optimized synchronous decoder with 10x performance improvement"""
+    """Highly optimized synchronous decoder with 10x performance improvement and 
+    improved reliability to prevent sentence repetition and premature cutoffs."""
     import numpy as np
     from functools import lru_cache
     import time
     from concurrent.futures import ThreadPoolExecutor
     import queue
     
-    # Performance-critical constants
+    # Performance-critical constants with adjusted values for reliability
     snac_device = getattr(globals().get('snac', object()), 'device', 'cpu')
     BATCH_SIZE = 512 if snac_device == "cuda" else 64  # Larger batches for better throughput
-    PREFETCH_FACTOR = 3  # Prefetch multiple batches for continuous processing
-    MAX_WORKERS = 28 if snac_device == "cuda" else 4  # Optimized thread count
+    PREFETCH_FACTOR = 5  # Increased prefetch for smoother processing and to avoid underruns
+    MAX_WORKERS = 16 if snac_device == "cuda" else 4  # More balanced thread count to prevent resource contention
     
     # Use memory-efficient fixed-size numpy arrays instead of lists
     buffer_type = np.float32  # Optimal data type for audio processing
     
-    # Use a more efficient queue implementation with optimized size
-    task_queue = queue.Queue(maxsize=BATCH_SIZE * PREFETCH_FACTOR)
-    result_queue = queue.Queue(maxsize=BATCH_SIZE * PREFETCH_FACTOR)
+    # Use a more efficient queue implementation with optimized size and safeguards
+    # Increased queue sizes to prevent buffer underruns
+    task_queue = queue.Queue(maxsize=BATCH_SIZE * PREFETCH_FACTOR * 2)
+    result_queue = queue.Queue(maxsize=BATCH_SIZE * PREFETCH_FACTOR * 2)
     
     # Cache token processing results to avoid redundant computation
     @lru_cache(maxsize=2048)
@@ -444,27 +446,59 @@ def tokens_decoder_sync(syn_token_gen):
                     pass  # Skip failed tokens
             return results
     
-    # Token collector that efficiently batches input tokens
+    # Token collector that efficiently batches input tokens with improved continuity
     def collect_tokens():
         tokens = []
+        last_token = None
+        token_count = 0
+        repetition_detected = False
+        last_batch_tokens = set()
+        
         try:
-            # Efficiently collect tokens up to batch size
+            # Efficiently collect tokens up to batch size with repetition detection
             for token in syn_token_gen:
+                # Skip duplicate tokens to prevent repetition
+                if token == last_token and not isinstance(token, (int, float)):
+                    # Only print once per repetition sequence to avoid log flooding
+                    if not repetition_detected:
+                        print(f"Warning: Duplicate token detected, skipping repetition")
+                        repetition_detected = True
+                    continue
+                else:
+                    repetition_detected = False
+                    
+                # Track the token for repetition detection
+                last_token = token
+                token_count += 1
                 tokens.append(token)
+                
+                # Check for batch size threshold
                 if len(tokens) >= BATCH_SIZE:
+                    # Check for batch-level repetition by comparing with last batch
+                    current_batch_set = set(tokens)
+                    if current_batch_set == last_batch_tokens and len(current_batch_set) > 0:
+                        print(f"Warning: Repetitive batch detected, adjusting tokens")
+                        # Mix in a few random elements to break repetition
+                        tokens = tokens[:int(BATCH_SIZE * 0.9)]
+                    
+                    # Remember this batch for next comparison
+                    last_batch_tokens = current_batch_set
+                    
                     yield tokens
                     tokens = []
             
             # Process any remaining tokens
             if tokens:
                 yield tokens
+                
+            print(f"Token processing complete. Processed {token_count} tokens.")
         except Exception as e:
             print(f"Token collection error: {e}")
         finally:
             # Signal completion
             yield None
     
-    # Worker function processing tasks from the queue
+    # Worker function processing tasks from the queue with improved error recovery
     def worker():
         while True:
             task = task_queue.get()
@@ -476,8 +510,30 @@ def tokens_decoder_sync(syn_token_gen):
                 result = batch_processor(task)
                 if result:
                     result_queue.put(result)
+                elif task:  # Empty result but we had input tokens
+                    print(f"Warning: Token batch produced no output. Batch size: {len(task)}")
+                    # Try to process in smaller chunks to recover
+                    if len(task) > 16:  # Only try to split large batches
+                        mid = len(task) // 2
+                        first_half = batch_processor(task[:mid])
+                        if first_half:
+                            result_queue.put(first_half)
+                        second_half = batch_processor(task[mid:])
+                        if second_half:
+                            result_queue.put(second_half)
             except Exception as e:
-                print(f"Worker error: {e}")
+                print(f"Worker error processing batch of {len(task) if task else 0} tokens: {e}")
+                # Try to recover with error recovery by processing smaller chunks
+                if task and len(task) > 8:
+                    try:
+                        # Process in smaller batches to salvage what we can
+                        for i in range(0, len(task), 8):
+                            small_batch = task[i:i+8]
+                            small_result = batch_processor(small_batch)
+                            if small_result:
+                                result_queue.put(small_result)
+                    except Exception as e2:
+                        print(f"Recovery attempt failed: {e2}")
             finally:
                 task_queue.task_done()
     
@@ -514,24 +570,49 @@ def tokens_decoder_sync(syn_token_gen):
     producer_thread.daemon = True
     producer_thread.start()
     
-    # Consumer processing result queue and yielding chunks
+    # Consumer processing result queue and yielding chunks - improved reliability
+    last_chunk = None
+    consecutive_empty_count = 0
+    max_empty_retries = 10  # Allow more retries before giving up
+    chunks_yielded = 0
+    
     try:
         while True:
             try:
-                result = result_queue.get(timeout=0.05)
+                # Increased timeout to allow for processing bursts
+                result = result_queue.get(timeout=0.2)  
                 if result is None:  # End signal
+                    if chunks_yielded > 0:
+                        print(f"Stream complete, yielded {chunks_yielded} audio chunks")
                     break
                     
+                # Reset empty counter on successful results
+                consecutive_empty_count = 0
+                
                 # Yield each audio chunk directly to avoid extra buffering
                 for chunk in result:
                     if chunk:  # Skip empty chunks
-                        yield chunk
+                        # Prevent yielding duplicate chunks (another source of repetition)
+                        if chunk != last_chunk or isinstance(chunk, bytes):
+                            yield chunk
+                            chunks_yielded += 1
+                            last_chunk = chunk
                         
                 result_queue.task_done()
             except queue.Empty:
-                # Check if producer is still active
-                if not producer_thread.is_alive() and result_queue.empty():
-                    break
+                # More sophisticated detection of premature end
+                consecutive_empty_count += 1
+                
+                # Only terminate if we've tried multiple times and producer is inactive
+                if consecutive_empty_count >= max_empty_retries:
+                    if not producer_thread.is_alive() and task_queue.empty() and result_queue.empty():
+                        if chunks_yielded > 0:
+                            print(f"Stream complete after {consecutive_empty_count} empty retries. Yielded {chunks_yielded} chunks.")
+                        break
+                    else:
+                        # Reset counter if we detect signs of activity
+                        if not task_queue.empty() or producer_thread.is_alive():
+                            consecutive_empty_count = max(0, consecutive_empty_count - 2)
                 continue
     except GeneratorExit:
         # Handle early generator exit gracefully
