@@ -138,7 +138,7 @@ if not IS_RELOADER:
     print(f"  REPETITION_PENALTY: {REPETITION_PENALTY}")
 
 # Parallel processing settings
-NUM_WORKERS = 12 if HIGH_END_GPU else 2
+NUM_WORKERS = 4 if HIGH_END_GPU else 2
 
 # Define voices by language
 ENGLISH_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
