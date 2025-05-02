@@ -78,7 +78,6 @@ services:
       --parallel 16
       --threads-http 16 
       --no-mmap
-      --gpu-layers-cpu-offload
       --tensor-split 0
                        
 
