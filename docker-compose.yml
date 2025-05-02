@@ -80,8 +80,8 @@ services:
       --n-gpu-layers 29                     
       --threads 6                           
       --threads-batch 6                      
-      --batch-size 25000                         
-      --ubatch-size 25000                 
+      --batch-size 20000                         
+      --ubatch-size 20000                 
       --ctx-size 16384
       --cont-batching
       --timeout 100
