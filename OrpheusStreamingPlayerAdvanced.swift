@@ -795,7 +795,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     }
 
     private func fetchNextAudioSegment() {
-        guard let url = URL(string: "http://34.71.2.239:5005/v1/audio/speech/stream") else { return }
+        guard let url = URL(string: "http://") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

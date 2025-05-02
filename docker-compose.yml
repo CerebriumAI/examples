@@ -55,7 +55,10 @@ services:
       - LLAMA_CUDA_HOST_BUFFER=64        # increase host–GPU buffer (MiB)
       # Memory management
       - LLAMA_MMAP=1 
-      
+      - GGML_CUDA_SPLIT_TENSORS=1  # Add this for more efficient tensor splitting
+      - GGML_TENSOR_SPLIT_MODE=row  # Add this for better tensor distribution
+      - GGML_CUDA_COMPUTE_CAPABILITY=8
+
     deploy:
       resources:
         reservations:
@@ -63,7 +66,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: '16gb'
+    shm_size: '24gb'
     ulimits:
       memlock:
         soft: -1
@@ -75,15 +78,15 @@ services:
       --port ${LLAMA_ARG_PORT:-5006}
       --n-gpu-layers 29                     
       --threads 6                           
-      --threads-batch 1                      
-      --batch-size 64                         
-      --ubatch-size 64                 
-      --ctx-size 8192
+      --threads-batch 4                      
+      --batch-size 128                         
+      --ubatch-size 128                 
+      --ctx-size 16384
       --cont-batching
       --timeout 100
       --mlock
       --flash-attn
-      --parallel 8
+      --parallel 2
       --threads-http 2 
                        
 
