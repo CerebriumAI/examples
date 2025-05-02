@@ -51,8 +51,8 @@ services:
             # CUDA tuning
       - CUDA_VISIBLE_DEVICES=0
       - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
-      - GGML_CUDA_PEER_MAX_BATCH_SIZE=4096
-      - LLAMA_CUDA_HOST_BUFFER=4096        # increase host–GPU buffer (MiB)
+      - GGML_CUDA_PEER_MAX_BATCH_SIZE=1024
+      - LLAMA_CUDA_HOST_BUFFER=1024        # increase host–GPU buffer (MiB)
       # Memory management
       - LLAMA_MMAP=1 
       - GGML_CUDA_SPLIT_TENSORS=1  # Add this for more efficient tensor splitting
@@ -77,12 +77,11 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
-      --n-gpu-layers 29                     
-      --threads 6                           
-      --threads-batch 6                      
+      --n-gpu-layers -1                     
+      --threads 6                                                 
       --batch-size 10000                         
       --ubatch-size 10000                 
-      --ctx-size 16384
+      --ctx-size 8192
       --cont-batching
       --timeout 100
       --mlock
