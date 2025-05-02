@@ -79,8 +79,8 @@ services:
       --port ${LLAMA_ARG_PORT:-5006}
       --n-gpu-layers 29                     
       --threads 6                                                 
-      --batch-size 30000                         
-      --ubatch-size 30000                 
+      --batch-size 20000                         
+      --ubatch-size 20000                 
       --ctx-size 16834
       --cont-batching
       --timeout 100
