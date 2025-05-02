@@ -75,8 +75,8 @@ services:
       --timeout 100
       --mlock
       --flash-attn
-      --parallel 16
-      --threads-http 16 
+      --parallel 32
+      --threads-http 2 
       --no-mmap
       --tensor-split 0
                        
