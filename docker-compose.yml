@@ -51,8 +51,8 @@ services:
             # CUDA tuning
       - CUDA_VISIBLE_DEVICES=0
       - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
-      - GGML_CUDA_PEER_MAX_BATCH_SIZE=512
-      - LLAMA_CUDA_HOST_BUFFER=128        # increase host–GPU buffer (MiB)
+      - GGML_CUDA_PEER_MAX_BATCH_SIZE=128
+      - LLAMA_CUDA_HOST_BUFFER=64        # increase host–GPU buffer (MiB)
       # Memory management
       - LLAMA_MMAP=1 
       
@@ -74,10 +74,10 @@ services:
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
       --n-gpu-layers 29                     
-      --threads 4                           
-      --threads-batch 4                      
-      --batch-size 16                         
-      --ubatch-size 16                 
+      --threads 6                           
+      --threads-batch 1                      
+      --batch-size 64                         
+      --ubatch-size 64                 
       --ctx-size 8192
       --cont-batching
       --timeout 100
