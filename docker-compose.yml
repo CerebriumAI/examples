@@ -58,6 +58,7 @@ services:
       - GGML_CUDA_SPLIT_TENSORS=1  # Add this for more efficient tensor splitting
       - GGML_TENSOR_SPLIT_MODE=row  # Add this for better tensor distribution
       - GGML_CUDA_COMPUTE_CAPABILITY=8
+      - GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
 
     deploy:
       resources:
@@ -78,7 +79,7 @@ services:
       --port ${LLAMA_ARG_PORT:-5006}
       --n-gpu-layers 29                     
       --threads 6                           
-      --threads-batch 2                      
+      --threads-batch 6                      
       --batch-size 256                         
       --ubatch-size 256                 
       --ctx-size 16384
@@ -86,7 +87,7 @@ services:
       --timeout 100
       --mlock
       --flash-attn
-      --parallel 4
+      --parallel 6
       --threads-http 2 
                        
 
