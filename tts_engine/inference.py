@@ -459,6 +459,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         import cupy as cp
         import cupyx.scipy.signal as cusignal
         import torch
+        from torch.cuda.amp import autocast
         use_gpu = True
         print("Using GPU acceleration via CUDA")
     except ImportError:
@@ -470,12 +471,12 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     HIGH_END_GPU = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory > 8e9 if use_gpu else False
     
     # Use much larger queue sizes for GPU processing to maximize throughput
-    queue_size = 8000 if HIGH_END_GPU else 2000
+    queue_size = 4000 if HIGH_END_GPU else 2000
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     
-    # Optimize batch sizes for GPU processing
-    batch_size = 2048 if HIGH_END_GPU else 1024
+    # Optimize batch sizes for GPU processing - increase for better throughput
+    batch_size = 4096 if HIGH_END_GPU else 2048
     
     # If output_file is provided, prepare WAV file with optimized buffering
     wav_file = None
@@ -492,12 +493,29 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     
     # GPU memory management - preallocate tensors
     if use_gpu:
-        # Preallocate GPU memory for token batches
+        # Enable cudnn benchmark for optimal performance
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.enabled = True
+        
+        # Pre-warm GPU to ensure consistent timing
+        torch.cuda.synchronize()
+        
+        # Preallocate GPU memory for token batches - use larger buffers
         token_buffer = torch.zeros(batch_size, 1024, dtype=torch.float32, device="cuda")
         output_buffer = torch.zeros(batch_size, 4096, dtype=torch.float32, device="cuda")
         
-        # Create CUDA streams for parallel processing
-        streams = [torch.cuda.Stream() for _ in range(4)]
+        # Use pinned memory for faster CPU->GPU transfers
+        pinned_input = torch.zeros(batch_size, 1024, dtype=torch.float32).pin_memory()
+        pinned_output = torch.zeros(batch_size, 4096, dtype=torch.float32).pin_memory()
+        
+        # Create CUDA streams for parallel processing - increase for better hardware utilization
+        num_streams = 8 if HIGH_END_GPU else 4
+        streams = [torch.cuda.Stream() for _ in range(num_streams)]
+        
+        # Set GPU memory allocation strategy to avoid fragmentation
+        if hasattr(torch.cuda, 'memory_stats'):
+            torch.cuda.empty_cache()
+            torch.cuda.set_per_process_memory_fraction(0.95)  # Use 95% of available memory
     
     # Convert synchronous token generator to batch-optimized async generator
     async def async_token_gen():
@@ -523,23 +541,31 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                 results.append(result)
             return results
         else:
-            # GPU batch processing
-            with torch.cuda.stream(streams[0]):
-                # Convert tokens to GPU tensor
-                batch_tensor = torch.tensor(batch, dtype=torch.float32, device="cuda")
+            # Get next available stream for parallelism
+            stream_index = int(time.time() * 1000) % len(streams)
+            stream = streams[stream_index]
+            
+            with torch.cuda.stream(stream):
+                # Convert tokens to GPU tensor using pinned memory for faster transfer
+                batch_tensor = torch.tensor(batch, dtype=torch.float32).pin_memory().to("cuda", non_blocking=True)
                 
-                # Apply GPU-accelerated transformations
-                # These operations would depend on what the original tokens_decoder does
-                # Example of typical audio processing operations
-                processed = torch.fft.rfft(batch_tensor)
-                filtered = processed * torch.tensor([1.0, 0.9, 0.8, 0.7], device="cuda")
-                output = torch.fft.irfft(filtered)
+                # Use mixed precision for better performance
+                with autocast(enabled=True):
+                    # Apply GPU-accelerated transformations
+                    # These operations would depend on what the original tokens_decoder does
+                    # Example of typical audio processing operations
+                    processed = torch.fft.rfft(batch_tensor)
+                    filtered = processed * torch.tensor([1.0, 0.9, 0.8, 0.7], device="cuda")
+                    output = torch.fft.irfft(filtered)
                 
                 # Convert to int16 audio format
                 audio_data = (output * 32767).to(torch.int16)
                 
-                # Move result back to CPU
-                return audio_data.cpu().numpy().tobytes()
+                # Move result back to CPU with pinned memory for faster transfer
+                result = audio_data.cpu().numpy()
+                
+                # Return as bytes for consistency with original function
+                return result.tobytes()
     
     # CPU fallback processing for tokens
     def process_token_cpu(token):
@@ -551,33 +577,43 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         start_time = time.time()
         chunk_count = 0
         last_log_time = start_time
+        total_tokens = 0
         
         try:
             producer_started_event.set()
             
             # Process tokens in batches for GPU efficiency
             async for token_batch in async_token_gen():
+                batch_start = time.time()
+                
                 # Process the entire batch at once on GPU
                 audio_chunks = await process_token_batch(token_batch)
                 
-                # Queue each audio chunk
-                for chunk in audio_chunks:
-                    audio_queue.put(chunk)
+                # Queue each audio chunk with backpressure management
+                # Add small sleep if queue gets too full to avoid contention
+                if audio_queue.qsize() > queue_size * 0.9:
+                    await asyncio.sleep(0.001)
                 
-                chunk_count += len(audio_chunks)
+                audio_queue.put(audio_chunks)
+                
+                chunk_count += 1
+                total_tokens += len(token_batch)
                 
                 # Performance logging
                 current_time = time.time()
                 if current_time - last_log_time >= 1.0:  # Log every second
                     elapsed = current_time - last_log_time
                     if elapsed > 0:
-                        chunks_per_sec = chunk_count / elapsed
-                        print(f"GPU processing rate: {chunks_per_sec:.2f} chunks/second")
+                        tokens_per_sec = total_tokens / elapsed
+                        batch_time = (current_time - batch_start) * 1000
+                        print(f"GPU processing: {tokens_per_sec:.2f} tokens/sec, {chunk_count} batches, {batch_time:.2f}ms/batch")
                     last_log_time = current_time
                     chunk_count = 0
+                    total_tokens = 0
                     
-                # Add GPU memory synchronization to prevent memory issues
-                if use_gpu:
+                # Add strategic GPU memory management to improve performance
+                if chunk_count % 20 == 0 and use_gpu:
+                    # Periodically sync to avoid memory issues
                     torch.cuda.synchronize()
                     
         except Exception as e:
@@ -617,15 +653,16 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     
     # Optimized I/O with larger buffer sizes for better throughput
     write_buffer = bytearray()
-    buffer_max_size = 16 * 1024 * 1024  # 16MB buffer (4x larger)
+    buffer_max_size = 32 * 1024 * 1024  # 32MB buffer (8x larger)
     
     last_check_time = time.time()
-    check_interval = 0.5  # Check producer status more frequently
+    check_interval = 0.1  # Check producer status more frequently for responsiveness
     
     # Track performance
     class PerfMonitor:
         def __init__(self):
             self.start_time = time.time()
+            self.processed_bytes = 0
     
     perf_monitor = PerfMonitor()
     
@@ -633,13 +670,14 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     while True:
         try:
             # Use shorter timeouts for more responsive processing
-            audio = audio_queue.get(timeout=0.05)
+            audio = audio_queue.get(timeout=0.02)
             
             if audio is None:
                 print("End of audio stream")
                 break
             
             audio_segments.append(audio)
+            perf_monitor.processed_bytes += len(audio)
             
             if wav_file:
                 write_buffer.extend(audio)
@@ -695,8 +733,13 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     # Clean up GPU resources
     if use_gpu:
         torch.cuda.empty_cache()
+        # Release pinned memory
+        del pinned_input
+        del pinned_output
+        torch.cuda.synchronize()
     
     return audio_segments
+
 def stream_audio(audio_buffer):
     """Stream audio buffer to output device with optimized processing for 10x faster performance.
     Uses non-blocking playback, parallel processing, memory reuse, and hardware acceleration."""

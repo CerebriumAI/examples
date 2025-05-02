@@ -12,6 +12,8 @@ services:
       - .env
     environment:
       - ORPHEUS_API_URL=http://llama-cpp-server:5006/v1/completions
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
     deploy:
       resources:
         reservations:
@@ -19,6 +21,11 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    shm_size: '8gb'
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     restart: unless-stopped
     depends_on:
       llama-cpp-server:
@@ -36,6 +43,10 @@ services:
     environment:
       # Force use of cuBLAS for faster matmuls
       - GGML_CUDA_FORCE_CUBLAS=1
+      - CUDA_VISIBLE_DEVICES=0
+      - GGML_CUDA_FORCE_MMQ=1
+      - GGML_CUDA_DMMV_X=32
+      - GGML_CUDA_MMV_Y=32
       
     deploy:
       resources:
@@ -44,7 +55,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: '10gb'
+    shm_size: '16gb'
     ulimits:
       memlock:
         soft: -1
@@ -54,19 +65,21 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
-      --n-gpu-layers 29                     
-      --threads 1                           
-      --threads-batch 1                      
-      --batch-size 8                         
-      --ubatch-size 8                 
+      --n-gpu-layers 99                     
+      --threads 4                           
+      --threads-batch 4                      
+      --batch-size 16                         
+      --ubatch-size 16                 
       --ctx-size 8192
       --cont-batching
       --timeout 100
       --mlock
       --flash-attn
-      --parallel 8
-      --threads-http 8 
+      --parallel 16
+      --threads-http 16 
       --no-mmap
+      --gpu-layers-cpu-offload
+      --tensor-split 0
                        
 
   model-init:
