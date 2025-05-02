@@ -13,7 +13,7 @@ services:
     environment:
       - ORPHEUS_API_URL=http://llama-cpp-server:5006/v1/completions
       - CUDA_VISIBLE_DEVICES=0
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512,expandable_segments:True
     deploy:
       resources:
         reservations:
@@ -47,6 +47,7 @@ services:
       - GGML_CUDA_FORCE_MMQ=1
       - GGML_CUDA_DMMV_X=32
       - GGML_CUDA_MMV_Y=32
+      - GGML_CUDA_FORCE_F16=1
             # CUDA tuning
       - CUDA_VISIBLE_DEVICES=0
       - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
