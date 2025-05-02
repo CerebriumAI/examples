@@ -267,14 +267,14 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
         num_gpus = torch.cuda.device_count()
         payload.update({
             "compute_dtype": "bfloat16",  # Use bfloat16 for improved performance
-            "tensor_parallel": 999  # Use all available GPUs
+            "tensor_parallel": 100000  # Use all available GPUs
         })
         
         if HIGH_END_GPU:
             # More aggressive optimizations for high-end GPUs
             payload.update({
                 "attention_mask_type": "alibi",  # Faster attention mechanism
-                "batch_size": 2048  # Process more tokens at once
+                "batch_size": 8192  # Process more tokens at once
             })
     
     # Enhanced connection pooling with requests

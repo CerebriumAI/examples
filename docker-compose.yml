@@ -45,20 +45,20 @@ services:
       - GGML_CUDA_FORCE_CUBLAS=1
       - CUDA_VISIBLE_DEVICES=0
       - GGML_CUDA_FORCE_MMQ=1
-      - GGML_CUDA_DMMV_X=64
-      - GGML_CUDA_MMV_Y=64
+      - GGML_CUDA_DMMV_X=256
+      - GGML_CUDA_MMV_Y=256
       - GGML_CUDA_FORCE_F16=1
             # CUDA tuning
       - CUDA_VISIBLE_DEVICES=0
       - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
-      - GGML_CUDA_PEER_MAX_BATCH_SIZE=8
-      - LLAMA_CUDA_HOST_BUFFER=8        # increase host–GPU buffer (MiB)
+      - GGML_CUDA_PEER_MAX_BATCH_SIZE=8192
+      - LLAMA_CUDA_HOST_BUFFER=8192        # increase host–GPU buffer (MiB)
       # Memory management
       - LLAMA_MMAP=1 
       - GGML_CUDA_SPLIT_TENSORS=1  # Add this for more efficient tensor splitting
       - GGML_TENSOR_SPLIT_MODE=row  # Add this for better tensor distribution
       - GGML_CUDA_COMPUTE_CAPABILITY=8
-      - GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
+     # - GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
 
     deploy:
       resources:
@@ -79,15 +79,15 @@ services:
       --port ${LLAMA_ARG_PORT:-5006}
       --n-gpu-layers 29                     
       --threads 6                                                 
-      --batch-size 10000                         
-      --ubatch-size 10000                 
-      --ctx-size 8192
+      --batch-size 30000                         
+      --ubatch-size 30000                 
+      --ctx-size 16834
       --cont-batching
       --timeout 100
       --mlock
       --flash-attn
       --parallel 6
-      --threads-http 2 
+      --threads-http 2  
                        
 
   model-init:
