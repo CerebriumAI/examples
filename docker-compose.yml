@@ -47,6 +47,13 @@ services:
       - GGML_CUDA_FORCE_MMQ=1
       - GGML_CUDA_DMMV_X=32
       - GGML_CUDA_MMV_Y=32
+            # CUDA tuning
+      - CUDA_VISIBLE_DEVICES=0
+      - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
+      - GGML_CUDA_PEER_MAX_BATCH_SIZE=128
+      - LLAMA_CUDA_HOST_BUFFER=32        # increase host–GPU buffer (MiB)
+      # Memory management
+      - LLAMA_MMAP=1 
       
     deploy:
       resources:
@@ -65,7 +72,7 @@ services:
       -m /models/${ORPHEUS_MODEL_NAME}
       --host ${LLAMA_ARG_HOST:-0.0.0.0}
       --port ${LLAMA_ARG_PORT:-5006}
-      --n-gpu-layers 99                     
+      --n-gpu-layers 29                     
       --threads 4                           
       --threads-batch 4                      
       --batch-size 16                         
@@ -77,8 +84,6 @@ services:
       --flash-attn
       --parallel 8
       --threads-http 2 
-      --no-mmap
-      --tensor-split 0
                        
 
   model-init:
