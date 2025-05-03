@@ -13,7 +13,7 @@ services:
     environment:
       - ORPHEUS_API_URL=http://llama-cpp-server:5006/v1/completions
       - CUDA_VISIBLE_DEVICES=0
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512,expandable_segments:True
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:2048,expandable_segments:True
     deploy:
       resources:
         reservations:
@@ -52,7 +52,7 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
       - GGML_CUDA_PEER_MAX_BATCH_SIZE=8192
-      - LLAMA_CUDA_HOST_BUFFER=8192        # increase host–GPU buffer (MiB)
+      - LLAMA_CUDA_HOST_BUFFER=16384         # increase host–GPU buffer (MiB)
       # Memory management
       - LLAMA_MMAP=1 
       - GGML_CUDA_SPLIT_TENSORS=1  # Add this for more efficient tensor splitting
