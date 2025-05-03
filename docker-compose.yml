@@ -50,7 +50,6 @@ services:
       - GGML_CUDA_FORCE_F16=1
             # CUDA tuning
       - CUDA_VISIBLE_DEVICES=0
-      - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
       - GGML_CUDA_PEER_MAX_BATCH_SIZE=8000
       - LLAMA_CUDA_HOST_BUFFER=16384         # increase host–GPU buffer (MiB)
       # Memory management
@@ -58,7 +57,6 @@ services:
       - GGML_CUDA_SPLIT_TENSORS=1  # Add this for more efficient tensor splitting
       - GGML_TENSOR_SPLIT_MODE=row  # Add this for better tensor distribution
       - GGML_CUDA_COMPUTE_CAPABILITY=8
-      - GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
       - GGML_CUDA_NO_FUSED_MLP=0
 
 
