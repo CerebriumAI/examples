@@ -52,7 +52,7 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - GGML_CUDA_NO_FUSED_MLP=1         # disable fused-MLP if needed
       - GGML_CUDA_PEER_MAX_BATCH_SIZE=32768
-      - LLAMA_CUDA_HOST_BUFFER=16384         # increase host–GPU buffer (MiB)
+      - LLAMA_CUDA_HOST_BUFFER=22000         # increase host–GPU buffer (MiB)
       # Memory management
       - LLAMA_MMAP=1 
       - GGML_CUDA_SPLIT_TENSORS=1  # Add this for more efficient tensor splitting
@@ -88,7 +88,7 @@ services:
       --timeout 100
       --mlock
       --flash-attn
-      --parallel 6
+      --parallel 12
       --threads-http 2  
                        
 

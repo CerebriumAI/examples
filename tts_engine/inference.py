@@ -138,7 +138,7 @@ if not IS_RELOADER:
     print(f"  REPETITION_PENALTY: {REPETITION_PENALTY}")
 
 # Parallel processing settings
-NUM_WORKERS = 4 if HIGH_END_GPU else 2
+NUM_WORKERS = 8 if HIGH_END_GPU else 2
 
 # Define voices by language
 ENGLISH_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
@@ -475,7 +475,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     audio_segments = []
     
     # Optimize batch sizes for GPU processing
-    batch_size = 2048 if HIGH_END_GPU else 1024
+    batch_size = 8192 if HIGH_END_GPU else 1024
     
     # If output_file is provided, prepare WAV file with optimized buffering
     wav_file = None
