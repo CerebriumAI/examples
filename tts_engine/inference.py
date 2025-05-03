@@ -1369,7 +1369,7 @@ def cleanup_temp_files(file_list):
 
 # Cache implementation
 _audio_cache = {}
-MAX_CACHE_SIZE = 500000  # Adjust based on memory considerations
+MAX_CACHE_SIZE = 1000000  # Adjust based on memory considerations
 
 def get_from_cache(key):
     """Get audio segments from cache if available."""
