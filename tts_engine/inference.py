@@ -261,6 +261,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
         "model": model_name,
         "use_cache": True,  # Enable KV cache for faster inference
         "n_batch": 1024,
+        "n_threads": -1
     }
     
     # Add GPU optimization parameters
