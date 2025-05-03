@@ -259,7 +259,8 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
         "repeat_penalty": repetition_penalty,
         "stream": True,
         "model": model_name,
-        "use_cache": True  # Enable KV cache for faster inference
+        "use_cache": True,  # Enable KV cache for faster inference
+        "n_batch": 1024,
     }
     
     # Add GPU optimization parameters
