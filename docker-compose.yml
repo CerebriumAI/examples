@@ -87,7 +87,6 @@ services:
       --cont-batching
       --timeout 100
       --mlock
-      --flash-attn
       --parallel 12
       --threads-http 2  
                        

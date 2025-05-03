@@ -1132,54 +1132,45 @@ def process_batches_in_parallel(batches, voice, temperature, top_p, max_tokens, 
     return [seg for seg in all_segments if seg is not None]
 
 def stitch_wav_files_mmap(input_files, output_file):
-    """Stitch WAV files together using memory-mapped files for better performance (GPU-accelerated)."""
+    """Stitch WAV files together using memory-mapped files for better performance."""
     import wave
     import numpy as np
-    import cupy as cp
     import os
-
+    
     if not input_files:
         return
-
+    
     # Check if all input files exist
     valid_files = [f for f in input_files if os.path.exists(f) and os.path.getsize(f) > 0]
     if not valid_files:
         return
-
+    
     # Get parameters from first file
     with wave.open(valid_files[0], 'rb') as wf:
         params = wf.getparams()
-        sampwidth = wf.getsampwidth()
-        n_channels = wf.getnchannels()
-
-    # Read all audio data into a list of cupy arrays
-    audio_arrays = []
-    for file in valid_files:
-        try:
-            with wave.open(file, 'rb') as wf:
-                # Read all frames as bytes
-                frames = wf.readframes(wf.getnframes())
-                # Convert bytes to numpy array
-                dtype = np.int16 if sampwidth == 2 else np.uint8  # handle common cases
-                np_audio = np.frombuffer(frames, dtype=dtype)
-                # Move to GPU
-                cp_audio = cp.asarray(np_audio)
-                audio_arrays.append(cp_audio)
-        except Exception as e:
-            print(f"Error processing file {file}: {e}")
-
-    if not audio_arrays:
-        return
-
-    # Concatenate all audio arrays on GPU
-    stitched_audio_gpu = cp.concatenate(audio_arrays)
-    # Move back to CPU
-    stitched_audio = cp.asnumpy(stitched_audio_gpu)
-
-    # Write to output WAV file
+    
+    # Open output file
     with wave.open(output_file, 'wb') as outf:
         outf.setparams(params)
-        outf.writeframes(stitched_audio.tobytes())
+        
+        # Process files in batches to control memory usage
+        batch_size = 20
+        for i in range(0, len(valid_files), batch_size):
+            batch = valid_files[i:i+batch_size]
+            
+            # Use memory mapping for large files
+            for file in batch:
+                try:
+                    with wave.open(file, 'rb') as wf:
+                        # Use a reasonable chunk size for efficient reading
+                        chunk_size = 1024 * 1024  # 1MB chunks
+                        while True:
+                            data = wf.readframes(chunk_size)
+                            if not data:
+                                break
+                            outf.writeframes(data)
+                except Exception as e:
+                    print(f"Error processing file {file}: {e}")
 
 def cleanup_temp_files_with_timeout(temp_files, timeout_seconds=30):
     """Clean up temporary files with timeout to prevent hanging."""
