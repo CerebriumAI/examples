@@ -89,7 +89,7 @@ services:
       --mlock
       --flash-attn
       --parallel 8
-      --numa distribute
+      --numa numactl
       --threads-http 2  
                        
 
