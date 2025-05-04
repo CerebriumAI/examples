@@ -65,10 +65,7 @@ if snac_device == "cuda":
         print("Using CUDA stream for parallel processing")
 
 
-def convert_to_audio(multiframe, count,
-                     snac_device="cuda",
-                     cuda_stream=None,
-                     return_time=False):
+def convert_to_audio(multiframe, count):
     """
     Highly optimized version of convert_to_audio with execution-time logging.
 
