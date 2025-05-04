@@ -1,6 +1,6 @@
-import torch
 import pytest
 from tts_engine.speechpipe import convert_to_audio, CUSTOM_TOKEN_PREFIX
+import torch
 
 class DummyModel:
     def decode(self, codes):
