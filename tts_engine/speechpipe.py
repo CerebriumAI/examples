@@ -65,7 +65,7 @@ if snac_device == "cuda":
         print("Using CUDA stream for parallel processing")
 
 
-def convert_to_audio_fast(multiframe, count=None):
+def convert_to_audio(multiframe, count=None):
     """
     Vectorized and batch-optimized version of convert_to_audio:
     - Converts input list/array to a single tensor once
