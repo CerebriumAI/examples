@@ -67,78 +67,69 @@ if snac_device == "cuda":
 
 def convert_to_audio(multiframe, count=None):
     """
-    Ultra-fast conversion of SNAC multiframe codes to 16-bit audio.
-    – 100 % tensorised: no Python per-frame loops.
-    – Works on CUDA / MPS / CPU.
-    – Prints elapsed time for every call.
+    Ultra-fast SNAC code to 16-bit PCM audio conversion.
+    - Fully tensorized: no Python loops.
+    - Supports optional `count` frames.
+    - Logs execution time.
+
     Parameters
     ----------
-    multiframe : Sequence[int] | torch.Tensor
-        Flat list/array/tensor with length multiple of 7.
-    count : int | None
-        Optional frame count; when given only the first ``count`` frames are used.
+    multiframe : Sequence[int] or Tensor
+        Flat sequence (length multiple of 7).
+    count : int or None
+        Number of frames to process; defaults to all available.
+
     Returns
     -------
-    bytes
-        Decoded 16-bit PCM audio (little-endian, 24 kHz mono).
+    bytes or None
+        PCM audio bytes or None if insufficient frames.
     """
     import time
     t0 = time.perf_counter()
 
-    # --- validate & slice --------------------------------------------------
-    total_len = len(multiframe)
-    if total_len < 7:
-        print(f"[convert_to_audio] early-exit (<7 samples) – {time.perf_counter() - t0:.6f}s")
+    # Convert to tensor on target device
+    mf = (multiframe if isinstance(multiframe, torch.Tensor)
+          else torch.as_tensor(multiframe, dtype=torch.int32))
+    mf = mf.to(snac_device, non_blocking=True)
+
+    # Total available frames
+    total_frames = mf.numel() // 7
+    if total_frames == 0:
+        print(f"[convert_to_audio] early-exit (<1 frame) – {time.perf_counter()-t0:.6f}s")
         return None
 
-    if count is not None:
-        needed = count * 7
-        if total_len < needed:
-            print(f"[convert_to_audio] early-exit (frames<count) – {time.perf_counter() - t0:.6f}s")
-            return None
-        multiframe = multiframe[:needed]
-        total_len = needed
-
-    # --- tensorise on target device ---------------------------------------
-    device = snac_device  # cuda / mps / cpu
-    mf_tensor = (multiframe if isinstance(multiframe, torch.Tensor) else
-                 torch.as_tensor(multiframe, dtype=torch.int32))
-    mf_tensor = mf_tensor.to(device, non_blocking=True, copy=False)
-
-    num_frames = total_len // 7
-    mf_reshaped = mf_tensor.view(num_frames, 7)
-
-    # --- vectorised code extraction ---------------------------------------
-    codes_0 = mf_reshaped[:, 0].unsqueeze(0)                 # (1, N)
-    codes_1 = mf_reshaped[:, (1, 4)].reshape(1, -1)          # (1, 2N)
-    codes_2 = mf_reshaped[:, (2, 3, 5, 6)].reshape(1, -1)    # (1, 4N)
-
-    # --- range guard -------------------------------------------------------
-    if mf_tensor.min() < 0 or mf_tensor.max() > 4096:
-        print(f"[convert_to_audio] invalid code range – {time.perf_counter() - t0:.6f}s")
+    # Determine frames to use
+    use_frames = total_frames if count is None else count
+    if use_frames > total_frames or use_frames <= 0:
+        print(f"[convert_to_audio] early-exit (invalid count) – {time.perf_counter()-t0:.6f}s")
         return None
 
-    codes = [codes_0, codes_1, codes_2]
+    # Slice and reshape
+    segment = mf[:use_frames * 7].view(use_frames, 7)
 
-    # --- decode ------------------------------------------------------------
+    # Vectorized code extraction
+    codes = [
+        segment[:, [0]].T,
+        segment[:, [1, 4]].reshape(1, -1),
+        segment[:, [2, 3, 5, 6]].reshape(1, -1)
+    ]
+
+    # Decode
     with torch.inference_mode():
-        if device == "cuda" and cuda_stream is not None:
+        if snac_device == "cuda" and cuda_stream is not None:
             with torch.cuda.stream(cuda_stream), torch.cuda.amp.autocast():
                 audio_hat = model.decode(codes)
         else:
             audio_hat = model.decode(codes)
 
-    # --- slice & scale -----------------------------------------------------
-    audio_slice = audio_hat[..., 2048:4096]       # keep center chunk only
-    audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
+    # Slice center 2048 samples and convert
+    audio_int16 = (audio_hat[..., 2048:4096] * 32767.0).round().to(torch.int16)
 
-    # --- move to CPU (async when CUDA) -------------------------------------
-    if device == "cuda":
-        out = audio_int16.detach().cpu().numpy().tobytes()
-    else:
-        out = audio_int16.numpy().tobytes()
+    # Transfer to CPU and to bytes
+    out = audio_int16.detach().cpu().numpy().tobytes()
 
-    print(f"[convert_to_audio] ok – {time.perf_counter() - t0:.6f}s for {num_frames} frames")
+    # Log timing
+    print(f"[convert_to_audio] ok – {time.perf_counter()-t0:.6f}s for {use_frames} frames")
     return out
 
 # Define the custom token prefix
