@@ -269,7 +269,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
         "cont_batching": True,
         "timeout": 100,
         "mlock": True,
-        "flash_attn": True,
+        "flash_attn": False,
         "parallel": 8,
         "numa": "numactl",
         "threads_http": 2,
@@ -279,8 +279,8 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     if torch.cuda.is_available():
         num_gpus = torch.cuda.device_count()
         payload.update({
-            "compute_dtype": "bfloat16",  # Use bfloat16 for improved performance
-            "tensor_parallel": 100000  # Use all available GPUs
+            "compute_dtype": "int4",  # Use bfloat16 for improved performance
+            "tensor_parallel": 29  # Use all available GPUs
         })
         
         if HIGH_END_GPU:
