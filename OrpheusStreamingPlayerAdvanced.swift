@@ -45,7 +45,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     private var minChunkSize = 2048
 
     // Underrun protection
-    private var silencePaddingEnabled = false  // Changed to false - don't fill gaps
+    private var silencePaddingEnabled = false   // Enable silence padding to avoid underruns
     private var silencePaddingFrames: AVAudioFrameCount = 8820  // About 200ms of silence at 44.1kHz
     private var lastUnderrunTime = Date.distantPast
     private var underrunProtectionActive = false
@@ -158,7 +158,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
 
         // Don't schedule silence buffer anymore
         // Just stop the player node to create a clean break
-        playerNode.pause()
+       // playerNode.pause()
 
         // Stop scheduling new buffers by setting the flag
         isSchedulingBuffers = false
@@ -381,13 +381,13 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
 
         // Use fixed buffering strategy for all text lengths
         bufferingStrategy = .aggressive
-        targetBufferLevel = 20
+        targetBufferLevel = 0
         prefillBufferCount = 0
         minBufferLevel = 0
         criticalBufferLevel = 0
         refillTargetLevel = 0
-        bufferConsumptionRate = 2
-        maxAggregatedChunks = 3
+        bufferConsumptionRate = 0
+        maxAggregatedChunks = 0
 
         print("📊 Using fixed buffering for text (\(text.count) chars)")
 
@@ -459,12 +459,16 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
             // Process multiple chunks at once if enabled (adjusted by consumption rate)
             let chunksToProcess = processBufferChunks()
 
-            // If we didn't get any chunks, check for underrun
+            // If we didn't get any chunks, schedule silence padding to avoid underrun
             if chunksToProcess.isEmpty {
-                if isPlaying {
+                if silencePaddingEnabled, let silence = silenceBuffer {
+                    scheduleBuffer(silence)
+                } else if isPlaying {
                     handlePotentialBufferUnderrun(0)
                 }
-                sleep(1) // Wait a bit longer before trying again
+                // Brief sleep to pace loop
+                let sleepMicroseconds = UInt32(bufferDuration * 500_000) // half buffer duration
+                usleep(sleepMicroseconds)
                 continue
             }
 
@@ -795,7 +799,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     }
 
     private func fetchNextAudioSegment() {
-        guard let url = URL(string: "http://") else { return }
+        guard let url = URL(string: "http://34.71.2.239:5005/v1/audio/speech/stream") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

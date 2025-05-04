@@ -65,87 +65,61 @@ if snac_device == "cuda":
         print("Using CUDA stream for parallel processing")
 
 
-def convert_to_audio(multiframe, count):
+def convert_to_audio_fast(multiframe, count=None):
     """
-    Highly optimized version of convert_to_audio that eliminates inefficient 
-    tensor operations and reduces CPU-GPU transfers for much faster inference
-    on high-end GPUs.
+    Vectorized and batch-optimized version of convert_to_audio:
+    - Converts input list/array to a single tensor once
+    - Uses reshaping and advanced indexing instead of Python loops
+    - Minimizes CPU-GPU transfers and memory allocations
+    - Assumes multiframe length is a multiple of 7 and >= 7
     """
-    # Early validation with direct indexing instead of slicing
-    if len(multiframe) < 7:
+    # Quick length check
+    total_len = len(multiframe)
+    if total_len < 7 or total_len % 7 != 0:
         return None
     
-    num_frames = len(multiframe) // 7
+    # Convert to GPU tensor once
+    device = snac_device if torch.cuda.is_available() else 'cpu'
+    mf_tensor = torch.as_tensor(multiframe, dtype=torch.int32, device=device)
+    num_frames = total_len // 7
     
-    # Pre-allocate tensors with the right shape and directly on target device
-    # Eliminate redundant view/reshape operations by building optimally from the start
-    codes_0 = torch.empty((1, num_frames), dtype=torch.int32, device=snac_device)
-    codes_1 = torch.empty((1, num_frames * 2), dtype=torch.int32, device=snac_device)
-    codes_2 = torch.empty((1, num_frames * 4), dtype=torch.int32, device=snac_device)
+    # Reshape into (frames, 7)
+    mf_reshaped = mf_tensor.view(num_frames, 7)
     
-    # Fill tensors with direct indexing (no intermediate allocations)
-    for i in range(num_frames):
-        base_idx = i * 7
-        codes_0[0, i] = multiframe[base_idx]
-        
-        codes_1[0, i*2] = multiframe[base_idx + 1]
-        codes_1[0, i*2 + 1] = multiframe[base_idx + 4]
-        
-        codes_2[0, i*4] = multiframe[base_idx + 2]
-        codes_2[0, i*4 + 1] = multiframe[base_idx + 3]
-        codes_2[0, i*4 + 2] = multiframe[base_idx + 5]
-        codes_2[0, i*4 + 3] = multiframe[base_idx + 6]
+    # Extract codes with batch indexing
+    codes_0 = mf_reshaped[:, 0:1].T  # shape (1, num_frames)
+    codes_1 = mf_reshaped[:, [1, 4]].reshape(1, -1)  # shape (1, num_frames*2)
+    codes_2 = mf_reshaped[:, [2, 3, 5, 6]].reshape(1, -1)  # shape (1, num_frames*4)
     
-    # Batch validation for range check - much faster than per-element checks
-    if (torch.any(codes_0 < 0) or torch.any(codes_0 > 4096) or
-        torch.any(codes_1 < 0) or torch.any(codes_1 > 4096) or
-        torch.any(codes_2 < 0) or torch.any(codes_2 > 4096)):
+    # Range check in batch
+    if mf_tensor.min() < 0 or mf_tensor.max() > 4096:
         return None
     
-    codes = [codes_0, codes_1, codes_2]  # No unsqueeze needed - already correct shape
+    codes = [codes_0, codes_1, codes_2]
     
-    # Use CUDA stream for parallel processing if available
-    # Enable memory pinning for faster CPU<->GPU transfers
     with torch.inference_mode():
-        # Use stream executor for non-blocking execution
-        if cuda_stream is not None:
-            with torch.cuda.stream(cuda_stream):
-                # Pin memory for faster transfers if not already on GPU
-                if not isinstance(multiframe, torch.Tensor) or multiframe.device.type != 'cuda':
-                    torch.cuda.synchronize()  # Ensure previous operations are complete
-                
-                # Decode the audio
-                with torch.cuda.amp.autocast():
-                    audio_hat = model.decode(codes)
-                
-                # Directly slice to the portion we need (no temporary tensors)
-                audio_slice = audio_hat[:, :, 2048:4096]
-                
-                # Convert to int16 on GPU with minimal precision operations
-                audio_int16_tensor = (audio_slice * 32767.0).round().to(torch.int16)
-                
-                # Asynchronous copy to CPU if needed
-                if snac_device == "cuda":
-                    # Use pinned memory for faster transfer
-                    cpu_tensor = torch.empty_like(audio_int16_tensor, device="cpu", pin_memory=True)
-                    cpu_tensor.copy_(audio_int16_tensor, non_blocking=True)
-                    torch.cuda.synchronize()  # Ensure copy is complete
-                    return cpu_tensor.numpy().tobytes()
-                else:
-                    return audio_int16_tensor.numpy().tobytes()
+        # Decode
+        if cuda_stream is not None and torch.cuda.is_available():
+            stream = cuda_stream
+            with torch.cuda.stream(stream), torch.cuda.amp.autocast():
+                audio_hat = model.decode(codes)
         else:
-            # Non-stream version (optimized for CPU)
             audio_hat = model.decode(codes)
-            audio_slice = audio_hat[:, :, 2048:4096]
-            
-            # Optimize CPU computation
-            if snac_device == "cuda":
-                audio_int16_tensor = (audio_slice * 32767.0).round().to(torch.int16)
-                return audio_int16_tensor.cpu().numpy().tobytes()
-            else:
-                # For CPU, avoid unnecessary copies
-                audio_np = audio_slice.numpy()  # Direct numpy conversion
-                return (audio_np * 32767.0).round().astype(np.int16).tobytes()
+
+        # Slice and convert
+        audio_slice = audio_hat[..., 2048:4096]
+        # Multiply and cast on GPU
+        audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
+
+        # Move to CPU if needed, non-blocking with pinning
+        if device.startswith('cuda'):
+            cpu_buf = torch.empty_like(audio_int16, device='cpu', pin_memory=True)
+            cpu_buf.copy_(audio_int16, non_blocking=True)
+            torch.cuda.synchronize()
+            return cpu_buf.numpy().tobytes()
+        else:
+            return audio_int16.numpy().tobytes()
+
 
 # Define the custom token prefix
 CUSTOM_TOKEN_PREFIX = "<custom_token_"

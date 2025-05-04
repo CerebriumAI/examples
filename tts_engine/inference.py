@@ -483,7 +483,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     HIGH_END_GPU = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory > 8e9 if use_gpu else False
     
     # Use much larger queue sizes for GPU processing to maximize throughput
-    queue_size = 1000 if HIGH_END_GPU else 2000
+    queue_size = 100 if HIGH_END_GPU else 20
     audio_queue = queue.Queue(maxsize=queue_size)
     audio_segments = []
     

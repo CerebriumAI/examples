@@ -245,7 +245,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
         else:
             batches = [request.input]
 
-        chunk_duration_ms = 10  # 10ms chunks for higher throughput
+        chunk_duration_ms = 100  # 100ms chunks for larger transfers and reduced overhead
         samples_per_chunk = int(24000 * (chunk_duration_ms / 1000))
         int16_chunk_bytes = samples_per_chunk * 2
         buffer = bytearray()
@@ -269,7 +269,7 @@ async def stream_speech_api(request: StreamingSpeechRequest):
                         total_bytes += len(chunk)
                         yield chunk
                         del buffer[:chunk_bytes]
-                        await asyncio.sleep(chunk_duration_ms / 1000)
+                        pass
             # Flush remaining buffer padded to full chunk
             if buffer:
                 chunk_bytes = samples_per_chunk * 2
