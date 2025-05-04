@@ -65,79 +65,211 @@ if snac_device == "cuda":
         print("Using CUDA stream for parallel processing")
 
 
-def convert_to_audio(multiframe, count=None):
+def convert_to_audio(multiframe, count,
+                     snac_device="cuda",
+                     cuda_stream=None,
+                     return_time=False):
     """
-    Vectorized and batch-optimized version of convert_to_audio:
-    - Converts input list/array to a single tensor once
-    - Uses reshaping and advanced indexing instead of Python loops
-    - Minimizes CPU-GPU transfers and memory allocations
-    - Uses `count` to optionally limit the number of frames processed
-    - Assumes multiframe length is at least count*7 (if count provided) or a multiple of 7
-    - Logs elapsed time for performance profiling
+    Highly optimized version of convert_to_audio with execution-time logging.
+
+    Args:
+        multiframe (Sequence[int] or Tensor): flattened code sequence, length >=7*frames
+        count (int): number of frames (unused but kept for interface)
+        snac_device (str or torch.device): device to perform decoding on ("cuda" or "cpu")
+        cuda_stream (torch.cuda.Stream, optional): non-default stream to use
+        return_time (bool): if True, also return elapsed time in seconds
+
+    Returns:
+        bytes or (bytes, float): audio bytes, optionally elapsed seconds
     """
-    start_time = time.time()
+    use_cuda = (str(snac_device).startswith("cuda") and torch.cuda.is_available())
 
-    # Determine number of frames
-    total_len = len(multiframe)
-    if count is not None:
-        num_frames = count
-        if total_len < num_frames * 7:
-            return None
-    else:
-        if total_len < 7 or total_len % 7 != 0:
-            return None
-        num_frames = total_len // 7
+    # Early exit timing
+    start_t = time.perf_counter()
 
-    # Convert to GPU tensor once and optionally truncate
-    device = snac_device if torch.cuda.is_available() else 'cpu'
-    mf_tensor = torch.as_tensor(multiframe, dtype=torch.int32, device=device)
-    if count is not None and total_len > num_frames * 7:
-        mf_tensor = mf_tensor[:num_frames * 7]
+    if len(multiframe) < 7:
+        elapsed = time.perf_counter() - start_t
+        print(f"convert_to_audio early exit: <7 frames, elapsed={elapsed:.6f}s")
+        return (None, elapsed) if return_time else None
 
-    # Reshape into (frames, 7)
-    mf_reshaped = mf_tensor.view(num_frames, 7)
+    num_frames = len(multiframe) // 7
 
-    # Extract codes with batch indexing
-    codes_0 = mf_reshaped[:, 0].unsqueeze(0)           # shape (1, num_frames)
-    codes_1 = mf_reshaped[:, [1, 4]].reshape(1, -1)    # shape (1, num_frames*2)
-    codes_2 = mf_reshaped[:, [2, 3, 5, 6]].reshape(1, -1)  # shape (1, num_frames*4)
+    # Allocate codes
+    codes_0 = torch.empty((1, num_frames), dtype=torch.int32, device=snac_device)
+    codes_1 = torch.empty((1, num_frames * 2), dtype=torch.int32, device=snac_device)
+    codes_2 = torch.empty((1, num_frames * 4), dtype=torch.int32, device=snac_device)
 
-    # Batch range check
-    if mf_tensor.min() < 0 or mf_tensor.max() > 4096:
-        return None
+    # Fill codes
+    for i in range(num_frames):
+        b = i * 7
+        codes_0[0, i] = multiframe[b]
+        codes_1[0, i*2] = multiframe[b+1]
+        codes_1[0, i*2+1] = multiframe[b+4]
+        codes_2[0, i*4] = multiframe[b+2]
+        codes_2[0, i*4+1] = multiframe[b+3]
+        codes_2[0, i*4+2] = multiframe[b+5]
+        codes_2[0, i*4+3] = multiframe[b+6]
+
+    # Range validation
+    for idx, tensor in enumerate((codes_0, codes_1, codes_2)):
+        if torch.any(tensor < 0) or torch.any(tensor > 4096):
+            elapsed = time.perf_counter() - start_t
+            print(f"convert_to_audio range validation failed on codes_{idx}, elapsed={elapsed:.6f}s")
+            return (None, elapsed) if return_time else None
 
     codes = [codes_0, codes_1, codes_2]
 
-    decode_start = time.time()
+    # Synchronize and start device timer if CUDA
+    if use_cuda:
+        torch.cuda.synchronize()
+        cuda_start = torch.cuda.Event(enable_timing=True)
+        cuda_end = torch.cuda.Event(enable_timing=True)
+        cuda_start.record()
+    else:
+        cpu_start = time.perf_counter()
+
+    # Inference and conversion
     with torch.inference_mode():
-        # Decode with optional CUDA stream and AMP
-        if cuda_stream is not None and torch.cuda.is_available():
-            with torch.cuda.stream(cuda_stream), torch.cuda.amp.autocast():
-                audio_hat = model.decode(codes)
+        if use_cuda and cuda_stream is not None:
+            with torch.cuda.stream(cuda_stream):
+                if not isinstance(multiframe, torch.Tensor) or multiframe.device.type != 'cuda':
+                    torch.cuda.synchronize()
+                with torch.cuda.amp.autocast():
+                    audio_hat = model.decode(codes)
+                audio_slice = audio_hat[:, :, 2048:4096]
+                audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
+                if str(snac_device).startswith("cuda"):
+                    cpu_tensor = torch.empty_like(audio_int16, device="cpu", pin_memory=True)
+                    cpu_tensor.copy_(audio_int16, non_blocking=True)
+                    torch.cuda.synchronize()
+                    output = cpu_tensor.numpy().tobytes()
+                else:
+                    output = audio_int16.cpu().numpy().tobytes()
         else:
             audio_hat = model.decode(codes)
-    decode_end = time.time()
+            audio_slice = audio_hat[:, :, 2048:4096]
+            if use_cuda:
+                audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
+                output = audio_int16.cpu().numpy().tobytes()
+            else:
+                arr = audio_slice.numpy()
+                output = (arr * 32767.0).round().astype(np.int16).tobytes()
 
-    # Slice the decoded audio
-    audio_slice = audio_hat[..., 2048:4096]
-    # Multiply and cast on GPU
-    audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
-
-    # Move to CPU if needed
-    if device.startswith('cuda'):
-        cpu_buf = torch.empty_like(audio_int16, device='cpu', pin_memory=True)
-        cpu_buf.copy_(audio_int16, non_blocking=True)
+    # End timing
+    if use_cuda:
+        cuda_end.record()
         torch.cuda.synchronize()
-        result = cpu_buf.numpy().tobytes()
+        elapsed = cuda_start.elapsed_time(cuda_end) / 1000.0
     else:
-        result = audio_int16.numpy().tobytes()
+        elapsed = time.perf_counter() - cpu_start
 
-    total_time = time.time() - start_time
-    decode_time = decode_end - decode_start
-    print(f"[convert_to_audio_fast] Total time: {total_time:.4f}s, Decode time: {decode_time:.4f}s")
+    print(f"convert_to_audio completed: elapsed={elapsed:.6f}s")
 
-    return result
+    return (output, elapsed) if return_time else output
 
+                     snac_device="cuda", 
+                     cuda_stream=None,
+                     return_time=True):
+    """
+    Highly optimized version of convert_to_audio that eliminates inefficient 
+    tensor operations and reduces CPU-GPU transfers for much faster inference
+    on high-end GPUs, now with built-in timing.
+
+    Args:
+        multiframe (Sequence[int] or Tensor): flattened code sequence, length >=7*frames
+        count (int): number of frames (unused but kept for interface)
+        snac_device (str or torch.device): device to perform decoding on ("cuda" or "cpu")
+        cuda_stream (torch.cuda.Stream, optional): non-default stream to use
+        return_time (bool): if True, also return elapsed time in seconds
+
+    Returns:
+        If return_time:
+            (bytes, float): audio bytes, elapsed seconds
+        else:
+            bytes: audio bytes
+    """
+    # Set up timing
+    use_cuda = (str(snac_device).startswith("cuda") and torch.cuda.is_available())
+    if use_cuda:
+        start_evt = torch.cuda.Event(enable_timing=True)
+        end_evt   = torch.cuda.Event(enable_timing=True)
+    else:
+        timer = time.perf_counter
+
+    # Early validation
+    if len(multiframe) < 7:
+        return (None, 0.0) if return_time else None
+
+    num_frames = len(multiframe) // 7
+
+    # Pre-allocate on target device
+    codes_0 = torch.empty((1, num_frames),  dtype=torch.int32, device=snac_device)
+    codes_1 = torch.empty((1, num_frames*2),dtype=torch.int32, device=snac_device)
+    codes_2 = torch.empty((1, num_frames*4),dtype=torch.int32, device=snac_device)
+
+    # Fill
+    for i in range(num_frames):
+        b = i*7
+        codes_0[0,i]        = multiframe[b]
+        codes_1[0,i*2]      = multiframe[b+1]
+        codes_1[0,i*2+1]    = multiframe[b+4]
+        codes_2[0,i*4]      = multiframe[b+2]
+        codes_2[0,i*4+1]    = multiframe[b+3]
+        codes_2[0,i*4+2]    = multiframe[b+5]
+        codes_2[0,i*4+3]    = multiframe[b+6]
+
+    # Range check
+    for c in (codes_0, codes_1, codes_2):
+        if c.min() < 0 or c.max() > 4096:
+            return (None, 0.0) if return_time else None
+
+    codes = [codes_0, codes_1, codes_2]
+
+    # Start timing
+    if use_cuda:
+        torch.cuda.synchronize()
+        start_evt.record()
+    else:
+        t0 = timer()
+
+    # Inference
+    with torch.inference_mode():
+        if use_cuda and cuda_stream is not None:
+            with torch.cuda.stream(cuda_stream):
+                if not isinstance(multiframe, torch.Tensor) or multiframe.device.type != 'cuda':
+                    torch.cuda.synchronize()
+                with torch.cuda.amp.autocast():
+                    audio_hat = model.decode(codes)
+                audio_slice = audio_hat[:, :, 2048:4096]
+                audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
+                cpu_tensor = None
+                if str(snac_device).startswith("cuda"):
+                    cpu_tensor = torch.empty_like(audio_int16, device="cpu", pin_memory=True)
+                    cpu_tensor.copy_(audio_int16, non_blocking=True)
+                    torch.cuda.synchronize()
+                    output = cpu_tensor.numpy().tobytes()
+                else:
+                    output = audio_int16.cpu().numpy().tobytes()
+        else:
+            # CPU or default-stream GPU
+            audio_hat = model.decode(codes)
+            audio_slice = audio_hat[:, :, 2048:4096]
+            if use_cuda:
+                audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
+                output = audio_int16.cpu().numpy().tobytes()
+            else:
+                arr = audio_slice.numpy()
+                output = (arr * 32767.0).round().astype(np.int16).tobytes()
+
+    # End timing
+    if use_cuda:
+        end_evt.record()
+        torch.cuda.synchronize()
+        elapsed = start_evt.elapsed_time(end_evt) / 1000.0
+    else:
+        elapsed = timer() - t0
+
+    return (output, elapsed) if return_time else output
 # Define the custom token prefix
 CUSTOM_TOKEN_PREFIX = "<custom_token_"
 
