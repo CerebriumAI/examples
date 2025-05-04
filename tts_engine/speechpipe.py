@@ -71,55 +71,72 @@ def convert_to_audio(multiframe, count=None):
     - Converts input list/array to a single tensor once
     - Uses reshaping and advanced indexing instead of Python loops
     - Minimizes CPU-GPU transfers and memory allocations
-    - Assumes multiframe length is a multiple of 7 and >= 7
+    - Uses `count` to optionally limit the number of frames processed
+    - Assumes multiframe length is at least count*7 (if count provided) or a multiple of 7
+    - Logs elapsed time for performance profiling
     """
-    # Quick length check
+    start_time = time.time()
+
+    # Determine number of frames
     total_len = len(multiframe)
-    if total_len < 7 or total_len % 7 != 0:
-        return None
-    
-    # Convert to GPU tensor once
+    if count is not None:
+        num_frames = count
+        if total_len < num_frames * 7:
+            return None
+    else:
+        if total_len < 7 or total_len % 7 != 0:
+            return None
+        num_frames = total_len // 7
+
+    # Convert to GPU tensor once and optionally truncate
     device = snac_device if torch.cuda.is_available() else 'cpu'
     mf_tensor = torch.as_tensor(multiframe, dtype=torch.int32, device=device)
-    num_frames = total_len // 7
-    
+    if count is not None and total_len > num_frames * 7:
+        mf_tensor = mf_tensor[:num_frames * 7]
+
     # Reshape into (frames, 7)
     mf_reshaped = mf_tensor.view(num_frames, 7)
-    
+
     # Extract codes with batch indexing
-    codes_0 = mf_reshaped[:, 0:1].T  # shape (1, num_frames)
-    codes_1 = mf_reshaped[:, [1, 4]].reshape(1, -1)  # shape (1, num_frames*2)
+    codes_0 = mf_reshaped[:, 0].unsqueeze(0)           # shape (1, num_frames)
+    codes_1 = mf_reshaped[:, [1, 4]].reshape(1, -1)    # shape (1, num_frames*2)
     codes_2 = mf_reshaped[:, [2, 3, 5, 6]].reshape(1, -1)  # shape (1, num_frames*4)
-    
-    # Range check in batch
+
+    # Batch range check
     if mf_tensor.min() < 0 or mf_tensor.max() > 4096:
         return None
-    
+
     codes = [codes_0, codes_1, codes_2]
-    
+
+    decode_start = time.time()
     with torch.inference_mode():
-        # Decode
+        # Decode with optional CUDA stream and AMP
         if cuda_stream is not None and torch.cuda.is_available():
-            stream = cuda_stream
-            with torch.cuda.stream(stream), torch.cuda.amp.autocast():
+            with torch.cuda.stream(cuda_stream), torch.cuda.amp.autocast():
                 audio_hat = model.decode(codes)
         else:
             audio_hat = model.decode(codes)
+    decode_end = time.time()
 
-        # Slice and convert
-        audio_slice = audio_hat[..., 2048:4096]
-        # Multiply and cast on GPU
-        audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
+    # Slice the decoded audio
+    audio_slice = audio_hat[..., 2048:4096]
+    # Multiply and cast on GPU
+    audio_int16 = (audio_slice * 32767.0).round().to(torch.int16)
 
-        # Move to CPU if needed, non-blocking with pinning
-        if device.startswith('cuda'):
-            cpu_buf = torch.empty_like(audio_int16, device='cpu', pin_memory=True)
-            cpu_buf.copy_(audio_int16, non_blocking=True)
-            torch.cuda.synchronize()
-            return cpu_buf.numpy().tobytes()
-        else:
-            return audio_int16.numpy().tobytes()
+    # Move to CPU if needed
+    if device.startswith('cuda'):
+        cpu_buf = torch.empty_like(audio_int16, device='cpu', pin_memory=True)
+        cpu_buf.copy_(audio_int16, non_blocking=True)
+        torch.cuda.synchronize()
+        result = cpu_buf.numpy().tobytes()
+    else:
+        result = audio_int16.numpy().tobytes()
 
+    total_time = time.time() - start_time
+    decode_time = decode_end - decode_start
+    print(f"[convert_to_audio_fast] Total time: {total_time:.4f}s, Decode time: {decode_time:.4f}s")
+
+    return result
 
 # Define the custom token prefix
 CUSTOM_TOKEN_PREFIX = "<custom_token_"
