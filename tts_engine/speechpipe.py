@@ -163,10 +163,6 @@ def convert_to_audio(multiframe, count):
     print(f"convert_to_audio completed: elapsed={elapsed:.6f}s")
 
     return (output, elapsed) if return_time else output
-
-                     snac_device="cuda", 
-                     cuda_stream=None,
-                     return_time=True):
     """
     Highly optimized version of convert_to_audio that eliminates inefficient 
     tensor operations and reduces CPU-GPU transfers for much faster inference
