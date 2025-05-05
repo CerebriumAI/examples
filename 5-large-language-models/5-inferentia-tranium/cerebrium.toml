@@ -19,7 +19,7 @@ memory = 330.0
 gpu_count = 16
 
 [cerebrium.scaling]
-min_replicas = 1
+min_replicas = 1 # Note: This incurs a constant cost since at least one instance is always running.
 max_replicas = 5
 cooldown = 60
 response_grace_period = 2700 

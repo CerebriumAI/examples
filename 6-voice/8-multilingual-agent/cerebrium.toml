@@ -19,7 +19,7 @@ entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765"]
 healthcheck_endpoint = "/health"
 
 [cerebrium.scaling]
-min_replicas = 1
+min_replicas = 1 # Note: This incurs a constant cost since at least one instance is always running.
 max_replicas = 2
 cooldown = 30
 replica_concurrency = 1
