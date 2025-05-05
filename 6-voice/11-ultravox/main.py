@@ -9,7 +9,7 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask, PipelineParams
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.services.ultravox.sst import UltravoxSTTService
+from pipecat.services.ultravox.stt import UltravoxSTTService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 from fastapi import FastAPI
