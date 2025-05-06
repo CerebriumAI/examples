@@ -15,7 +15,7 @@ memory = 12.0
 gpu_count = 0
 
 [cerebrium.scaling]
-min_replicas = 1
+min_replicas = 1 # Note: This incurs a constant cost since at least one instance is always running.
 max_replicas = 2
 cooldown = 180
 replica_concurrency = 100
