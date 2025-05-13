@@ -77,7 +77,6 @@ async def main(room_url: str, token: str):
 
         llm = OpenAILLMService(
             name="LLM",
-            # api_key="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9qZWN0SWQiOiJwLTk4ZGIyZTk1IiwibmFtZSI6IiIsImRlc2NyaXB0aW9uIjoiIiwiZXhwIjoyMDYwOTQxMzYyfQ.dfRNCrXqOIXla9ulZUQo1VWMBSwmph0jBABdh_cshIWTjDK5veG56jY760GVQycYilYynkh_sPU5keCyT4dD6QfLYcEmyXmubtQO_ITWloxmgEa6YJvrRznFe97fZLeb7HjhzKVQ0YzEDLTBIQ9IhgR5MTjfWsbJkyZPHJVAbw9l3ZYenVPfvQtvn8GrOJkSUkWiOqwzyPZN2F-3rKap6GxK8UNoyPXuPC7qg0RV35vThDPU-95WZ66KFig0p_PtDAIkQV7IiiTQi0LsEQ6CUrv_pyjxFI_xC6h95AOzfWiYkaWZDCvUA1SZ0OXjsaSJ3yYi3B3-6TWytJsM-rPYgg",#os.environ.get("OPENAI_API_KEY"),
             model="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8",
             base_url="https://api.cortex.cerebrium.ai/v4/p-xxxxxxx/llama-llm/run",
         )
