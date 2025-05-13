@@ -36,7 +36,7 @@ pyaudio = "latest"
 pydantic-settings = "latest"
 textual = "latest"
 loguru = "latest"
-"pipecat-ai[cartesia,daily,silero,ultravox]" = "0.0.66"
+"pipecat-ai[cartesia,daily,silero,ultravox]" = "0.0.67"
 fastapi = "latest"
 uvicorn = "latest"
 
