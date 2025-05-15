@@ -18,7 +18,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     private var bufferSemaphore = DispatchSemaphore(value: 1)
 
     // Buffer settings for smooth playback
-    private var prefillBufferCount = 25    // Significantly increased for smoother playback
+    private var prefillBufferCount = 0    // Significantly increased for smoother playback
     private let bufferDuration = 0.15      // Larger chunks for more stability
     private let maximumBufferedDuration = 12.0  // Increased to ensure enough buffer
     private var lastScheduledTime: AVAudioTime?
@@ -30,13 +30,13 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
 
     // Advanced jitter buffer
     private var jitterBufferEnabled = false  // Disabled jitter buffer
-    private var targetBufferLevel = 25
-    private var minBufferLevel = 18
-    private var maxBufferLevel = 40
-    private var bufferingStrategy = BufferingStrategy.fixed
-    private var criticalBufferLevel = 12
-    private var refillTargetLevel = 20
-    private var bufferConsumptionRate = 2   // Default higher consumption rate
+    private var targetBufferLevel = 0
+    private var minBufferLevel = 0
+    private var maxBufferLevel = 0
+    private var bufferingStrategy = BufferingStrategy.aggressive
+    private var criticalBufferLevel = 5
+    private var refillTargetLevel = 5
+    private var bufferConsumptionRate = 3   // Default higher consumption rate
 
     // Chunk aggregation to reduce processing overhead
     private var chunkAggregationEnabled = true
@@ -154,31 +154,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
     }
 
     private func pausePlaybackForBuffering() {
-        isPaused = true
-
-        // Don't schedule silence buffer anymore
-        // Just stop the player node to create a clean break
-       // playerNode.pause()
-
-        // Stop scheduling new buffers by setting the flag
-        isSchedulingBuffers = false
-
-        // Increase the minimum buffer level after experiencing starvation
-        consecutiveLowBufferEvents += 1
-
-        // If we're experiencing repeated buffer starvation, increase our buffer targets
-        if consecutiveLowBufferEvents > 2 {
-            let newTarget = min(targetBufferLevel + 2, 30)
-            let newCritical = min(criticalBufferLevel + 1, 10)
-            let newRefill = min(refillTargetLevel + 2, 25)
-
-            if newTarget != targetBufferLevel || newCritical != criticalBufferLevel || newRefill != refillTargetLevel {
-                print("🔄 Adjusting buffer levels due to repeated starvation: target=\(newTarget), critical=\(newCritical), refill=\(newRefill)")
-                targetBufferLevel = newTarget
-                criticalBufferLevel = newCritical
-                refillTargetLevel = newRefill
-            }
-        }
+        // No-op: continue playback silently on buffer underrun
     }
 
     private func resumePlaybackAfterBuffering() {
@@ -381,13 +357,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
 
         // Use fixed buffering strategy for all text lengths
         bufferingStrategy = .aggressive
-        targetBufferLevel = 0
-        prefillBufferCount = 0
-        minBufferLevel = 0
-        criticalBufferLevel = 0
-        refillTargetLevel = 0
-        bufferConsumptionRate = 0
-        maxAggregatedChunks = 0
+
 
         print("📊 Using fixed buffering for text (\(text.count) chars)")
 
@@ -461,12 +431,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
 
             // If we didn't get any chunks, schedule silence padding to avoid underrun
             if chunksToProcess.isEmpty {
-                if silencePaddingEnabled, let silence = silenceBuffer {
-                    scheduleBuffer(silence)
-                } else if isPlaying {
-                    handlePotentialBufferUnderrun(0)
-                }
-                // Brief sleep to pace loop
+                // No buffers; playback remains silent while waiting for buffers
                 let sleepMicroseconds = UInt32(bufferDuration * 500_000) // half buffer duration
                 usleep(sleepMicroseconds)
                 continue
@@ -619,12 +584,7 @@ class OrpheusStreamingPlayerAdvanced: NSObject, URLSessionDataDelegate {
         lastUnderrunTime = Date()
         print("⚠️ Buffer underrun detected! (count: \(bufferUnderrunCount))")
 
-        // Immediately pause playback to prevent artifacts when underrun detected
-        if !isPaused {
-            pausePlaybackForBuffering()
-        }
-
-        // We're no longer using silence padding for underruns
+        // No longer pausing on buffer underrun
         underrunProtectionActive = false
     }
 

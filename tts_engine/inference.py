@@ -261,25 +261,25 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
         "model": model_name,
         "use_cache": True,  # Enable KV cache for faster inference
         "n_batch": 4096,
-        "n_threads": -1,
+        "n_threads": 2,
         "batch_size": 4096,
         "ubatch_size": 4096,
         "n_gpu_layers": 29,
-        "ctx_size": 16834,
+        "ctx_size": 8096,
         "cont_batching": True,
         "timeout": 100,
         "mlock": True,
         "flash_attn": False,
         "parallel": 8,
         "numa": "numactl",
-        "threads_http": 2,
+        "threads_http": 4,
     }
     
     # Add GPU optimization parameters
     if torch.cuda.is_available():
         num_gpus = torch.cuda.device_count()
         payload.update({
-            "compute_dtype": "int4",  # Use bfloat16 for improved performance
+            "compute_dtype": "float16",  # Use bfloat16 for improved performance
             "tensor_parallel": 29  # Use all available GPUs
         })
         

@@ -37,7 +37,23 @@ try:
 except:
     pass
 
-model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").eval()
+# --- Quantized SNAC model support ---
+# Allow override via env var, default to quantized if available
+SNAC_MODEL_ID = os.environ.get(
+    "SNAC_MODEL_ID",
+    "hubertsiuzdak/snac_24khz"  # Default to standard model (no quantized version available)
+)
+try:
+    model = SNAC.from_pretrained(SNAC_MODEL_ID).eval()
+    if not IS_RELOADER:
+        print(f"Loaded SNAC model: {SNAC_MODEL_ID}")
+except Exception as e:
+    if not IS_RELOADER:
+        print(f"Failed to load quantized SNAC model '{SNAC_MODEL_ID}': {e}\nFalling back to standard model.")
+    # Fallback: load standard model
+    model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").eval()
+    if not IS_RELOADER:
+        print("Loaded fallback SNAC model: hubertsiuzdak/snac_24khz")
 
 # Check if CUDA is available and set device accordingly
 snac_device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
