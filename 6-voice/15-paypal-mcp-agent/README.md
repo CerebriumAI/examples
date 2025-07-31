@@ -62,7 +62,7 @@ cerebrium deploy
 
 It should return a deployment url that you can then hit in order to join a meeting room. The request should be something like:
 ```
-curl --location 'https://api.aws.us-east-1.cerebrium.ai/v4/p-c6754f15/pipecat-agent/start_bot' \
+curl --location 'https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxx/pipecat-agent/start_bot' \
 --header 'Authorization: Bearer <CEREBRIUM_API_TOKEN>' \
 --header 'Content-Type: application/json' \
 --data '{"paypal_access_token": <PAYPAL_ACCESS_TOKEN>, "paypal_environment": <PAYPAL_ENV>}'
