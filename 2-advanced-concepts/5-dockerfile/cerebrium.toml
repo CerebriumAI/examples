@@ -10,16 +10,15 @@ cpu = 1
 memory = 1.0
 compute = "CPU"
 gpu_count = 0
-provider = "aws"
-region = "us-east-1"
 
 [cerebrium.runtime.custom]
 port = 8192
 healthcheck_endpoint = "/health"
+readycheck_endpoint = "/ready"
 dockerfile_path = "./Dockerfile"
 
 [cerebrium.scaling]
-min_replicas = 0
-max_replicas = 2
+min_replicas = 5
+max_replicas = 5
 cooldown = 1
-replica_concurrency = 100
+replica_concurrency = 1
