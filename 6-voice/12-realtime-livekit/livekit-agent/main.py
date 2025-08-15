@@ -65,5 +65,5 @@ async def entrypoint(ctx: agents.JobContext):
 
 if __name__ == '__main__':
     if len(sys.argv) == 1:
-            sys.argv.append('dev')
+            sys.argv.append('start')
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, worker_type=WorkerType.ROOM, port=8600))

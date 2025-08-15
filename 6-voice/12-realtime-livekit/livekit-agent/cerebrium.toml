@@ -32,4 +32,4 @@ roll_out_duration_seconds = 0
 
 [cerebrium.runtime.custom]
 port = 8600
-entrypoint = ["python", "main.py", "dev"]
+dockerfile_path = "./Dockerfile"

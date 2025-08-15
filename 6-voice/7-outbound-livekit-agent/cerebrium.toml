@@ -22,4 +22,4 @@ pip = "requirements.txt"
 
 [cerebrium.runtime.custom]
 port = 8600
-entrypoint = ["python", "main.py", "start"]
+dockerfile_path = "./Dockerfile"
