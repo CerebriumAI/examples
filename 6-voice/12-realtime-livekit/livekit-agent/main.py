@@ -28,9 +28,9 @@ async def entrypoint(ctx: agents.JobContext):
     await ctx.connect()
 
     session = AgentSession(
-        stt=deepgram.STT(base_url="ws://p-xxxxxx-deepgram.tenant-cerebrium-prod.svc.cluster.local/v1/listen", model="nova-3",),
-        llm=openai.LLM(api_key=os.environ.get("CEREBRIUM_API_KEY"), model="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8", base_url="http://p-xxxxxx-llama-llm.tenant-cerebrium-prod.svc.cluster.local/run"),
-        tts=deepgram.TTS(base_url="http://p-xxxxx-deepgram.tenant-cerebrium-prod.svc.cluster.local/v1/speak", model="aura-stella-en"),
+        stt=deepgram.STT(base_url="ws://api.aws/v4/p-xxxxxx/deepgram/v1/listen", model="nova-3",), #inter-cluster url
+        llm=openai.LLM(api_key=os.environ.get("CEREBRIUM_API_KEY"), model="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8", base_url="http://api.aws/v4/p-xxxxxx/llama-llm/run/"),
+        tts=cartesia.TTS(model="sonic-2", voice="f786b574-daa5-4673-aa0c-cbe3e8534c02"),
         vad=silero.VAD.load(),
         turn_detection=EnglishModel(),
     )
