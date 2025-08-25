@@ -125,5 +125,4 @@ For each successful contribution, we'll send you exclusive Cerebrium swag! To be
 
 - 📚 [Documentation](https://docs.cerebrium.ai)
 - 💬 [Discord Community](https://discord.gg/ATj6USmeE2)
-- 💬 [Slack Community](https://join.slack.com/t/cerebriumworkspace/shared_invite/zt-1qojg3eac-q4xyu5O~MeniNIg2jNeadg)
-- 📧 [Support Email](support@cerebrium.ai)
+- 📧 [Support Email](mailto:support@cerebrium.ai)
