@@ -1,0 +1,71 @@
+# Dockerfile for llama.cpp server with Orpheus model
+FROM ghcr.io/ggml-org/llama.cpp:server-cuda
+
+# Install wget for model downloading
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Create models directory
+RUN mkdir -p /models
+
+# Set environment variables for CUDA optimization
+ENV GGML_CUDA_FORCE_CUBLAS=1 \
+    CUDA_VISIBLE_DEVICES=0 \
+    GGML_CUDA_FORCE_MMQ=1 \
+    GGML_CUDA_DMMV_X=1024 \
+    GGML_CUDA_MMV_Y=1024 \
+    GGML_CUDA_FORCE_F16=1 \
+    GGML_CUDA_PEER_MAX_BATCH_SIZE=8000 \
+    LLAMA_CUDA_HOST_BUFFER=16384 \
+    LLAMA_MMAP=1 \
+    GGML_CUDA_SPLIT_TENSORS=1 \
+    GGML_TENSOR_SPLIT_MODE=row \
+    GGML_CUDA_COMPUTE_CAPABILITY=8 \
+    GGML_CUDA_NO_FUSED_MLP=0
+
+# Default model configuration
+ENV ORPHEUS_MODEL_NAME=Orpheus-3b-FT-Q8_0.gguf \
+    LLAMA_ARG_HOST=0.0.0.0 \
+    LLAMA_ARG_PORT=5006
+
+# Expose the server port
+EXPOSE 5006
+
+# Find the correct server binary location and create entrypoint
+RUN find /app -name "*server*" -type f && ls -la /app/
+RUN echo '#!/bin/bash' > /entrypoint.sh && \
+    echo 'if [ ! -f "/models/$ORPHEUS_MODEL_NAME" ]; then' >> /entrypoint.sh && \
+    echo '  echo "Downloading model file..."' >> /entrypoint.sh && \
+    echo '  wget --no-check-certificate -O "/models/$ORPHEUS_MODEL_NAME" "https://huggingface.co/lex-au/Orpheus-3b-FT-Q8_0.gguf/resolve/main/Orpheus-3b-FT-Q8_0.gguf"' >> /entrypoint.sh && \
+    echo 'else' >> /entrypoint.sh && \
+    echo '  echo "Model file already exists"' >> /entrypoint.sh && \
+    echo 'fi' >> /entrypoint.sh && \
+    echo 'echo "Starting llama.cpp server with Orpheus model..."' >> /entrypoint.sh && \
+    echo 'SERVER_BIN=""' >> /entrypoint.sh && \
+    echo 'if [ -f "/app/server" ]; then SERVER_BIN="/app/server"; fi' >> /entrypoint.sh && \
+    echo 'if [ -f "/app/llama-server" ]; then SERVER_BIN="/app/llama-server"; fi' >> /entrypoint.sh && \
+    echo 'if command -v llama-server >/dev/null 2>&1; then SERVER_BIN="llama-server"; fi' >> /entrypoint.sh && \
+    echo 'if [ -z "$SERVER_BIN" ]; then echo "Error: Could not find server binary"; exit 1; fi' >> /entrypoint.sh && \
+    echo 'echo "Using server binary: $SERVER_BIN"' >> /entrypoint.sh && \
+    echo 'exec "$SERVER_BIN" \' >> /entrypoint.sh && \
+    echo '  -m "/models/$ORPHEUS_MODEL_NAME" \' >> /entrypoint.sh && \
+    echo '  --host "$LLAMA_ARG_HOST" \' >> /entrypoint.sh && \
+    echo '  --port "$LLAMA_ARG_PORT" \' >> /entrypoint.sh && \
+    echo '  --n-gpu-layers 29 \' >> /entrypoint.sh && \
+    echo '  --threads 6 \' >> /entrypoint.sh && \
+    echo '  --batch-size 8192 \' >> /entrypoint.sh && \
+    echo '  --ubatch-size 8192 \' >> /entrypoint.sh && \
+    echo '  --ctx-size 16834 \' >> /entrypoint.sh && \
+    echo '  --cont-batching \' >> /entrypoint.sh && \
+    echo '  --timeout 100 \' >> /entrypoint.sh && \
+    echo '  --mlock \' >> /entrypoint.sh && \
+    echo '  --flash-attn \' >> /entrypoint.sh && \
+    echo '  --parallel 25 \' >> /entrypoint.sh && \
+    echo '  --numa numactl \' >> /entrypoint.sh && \
+    echo '  --threads-http 32' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

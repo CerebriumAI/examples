@@ -1,0 +1,25 @@
+[cerebrium.deployment]
+name = "17-orpheus-server"
+python_version = "3.11"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.hardware]
+cpu = 6.0
+memory = 12.0
+compute = "ADA_L40"
+provider = "aws"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 25
+scaling_metric = "concurrency_utilization"
+
+[cerebrium.runtime.custom]
+port = 5006
+dockerfile_path = "./Dockerfile.llama"
