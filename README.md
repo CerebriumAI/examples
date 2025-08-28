@@ -101,7 +101,7 @@ We love contributions! Here's how you can contribute to our examples repository:
   - Expected outputs
   - (Optional) Link to a blog post or tutorial video
 
-Share your fork with us on our [Discord](https://discord.gg/ATj6USmeE2) & [Slack](https://join.slack.com/t/cerebriumworkspace/shared_invite/zt-1qojg3eac-q4xyu5O~MeniNIg2jNeadg) communities or on social media. Highly valuable examples for the community will be merged into the master repo.
+Share your fork with us on our [Discord](https://discord.gg/ATj6USmeE2) community or on social media. Highly valuable examples for the community will be merged into the master repo.
 
 #### 🎁 Get Free Swag!
 For each successful contribution, we'll send you exclusive Cerebrium swag! To be eligible:
