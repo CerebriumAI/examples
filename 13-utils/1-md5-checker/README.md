@@ -7,7 +7,7 @@
  --data '{
      "file_path": "/persistent-storage/file_name.ext"
  }'
- ```
+```
 
 # Example response:
 

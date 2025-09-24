@@ -60,6 +60,7 @@ cerebrium deploy
 ```
 
 The deployment process will:
+
 - Upload your files
 - Build a container with dependencies
 - Provision the A10 GPU
@@ -71,6 +72,7 @@ The deployment process will:
 ### API Endpoint
 
 After deployment, your API will be available at:
+
 ```
 https://api.aws.us-east-1.cerebrium.ai/v4/[YOUR_PROJECT_ID]/10-sesame-voice-api/generate_audio
 ```

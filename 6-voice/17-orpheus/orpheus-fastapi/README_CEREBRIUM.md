@@ -2,6 +2,7 @@
 
 1. Git clone https://github.com/timonharz/Orpheus-FastAPI
 2. Create a file called cerebrium.toml and add the following:
+
 ```
 [cerebrium.deployment]
 name = "17-orpheus-fastapi"
@@ -36,11 +37,13 @@ pip = "requirements.txt"
 [cerebrium.dependencies.apt]
 libportaudio2 = "latest"
 ```
+
 3. Add a empty file called `main.py`. Don't worry about this.
 4. To your requirements.txt, uncomment the line to install `torch torchvision torchaudio`
 5. Update your .env file with your deployment url from your orpheus server (just fill in your project id) abd upload to your secrets on the cerebrium dashboard
 6. Run `cerebrium deploy`
 7. You should then be able to make the following CURL request
+
 ```
 curl --location 'https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxx/17-orpheus-fastapi/v1/audio/speech/stream' \
 --header 'Authorization: Bearer <AUTH_TOKEN>' \

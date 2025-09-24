@@ -17,17 +17,17 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     torch_dtype=torch.bfloat16,
-    device_map="auto"  # Automatically uses available GPUs
+    device_map="auto",  # Automatically uses available GPUs
 )
 
 # Initialize the text generation pipeline
 generator = pipeline(
-    'text-generation',
+    "text-generation",
     model=model,
     tokenizer=tokenizer,
     device_map="auto",
     # Set default values for parameters that might cause warnings
-    do_sample=True  # Enable sampling
+    do_sample=True,  # Enable sampling
 )
 
 
@@ -49,7 +49,9 @@ class BatchProcessor:
         self.current_batch = []
         self.timer = None
 
-    def add_request(self, item: Item, callback: Callable[[str], None], result_event: threading.Event):
+    def add_request(
+        self, item: Item, callback: Callable[[str], None], result_event: threading.Event
+    ):
         with self.lock:
             # Append the request with its callback and event
             self.current_batch.append((item, callback, result_event))
@@ -80,7 +82,9 @@ class BatchProcessor:
                 try:
                     # Extract prompts for each item
                     prompts = [item.prompt for item, _, _ in self.current_batch]
-                    first_item = self.current_batch[0][0]  # Use first item for generation params
+                    first_item = self.current_batch[0][
+                        0
+                    ]  # Use first item for generation params
 
                     # Generate results using the generator
                     outputs = generator(
@@ -92,14 +96,16 @@ class BatchProcessor:
                         num_return_sequences=1,
                         return_full_text=False,
                         repetition_penalty=first_item.frequency_penalty,
-                        do_sample=True  # Ensure sampling is enabled
+                        do_sample=True,  # Ensure sampling is enabled
                     )
 
                     # Extract generated text for each prompt
-                    results = [output[0]['generated_text'] for output in outputs]
+                    results = [output[0]["generated_text"] for output in outputs]
 
                     # Call each request's callback with its corresponding result
-                    for (_, callback, result_event), result_text in zip(self.current_batch, results):
+                    for (_, callback, result_event), result_text in zip(
+                        self.current_batch, results
+                    ):
                         callback(result_text)
                         result_event.set()  # Unblock the waiting `predict` call
 
@@ -121,12 +127,12 @@ batch_processor = BatchProcessor(max_batch_size=10, max_wait_time=30.0)
 
 
 def predict(
-        prompt: str,
-        temperature: float = 0.8,
-        top_p: float = 0.75,
-        top_k: int = 40,
-        max_tokens: int = 256,
-        frequency_penalty: float = 1.0
+    prompt: str,
+    temperature: float = 0.8,
+    top_p: float = 0.75,
+    top_k: int = 40,
+    max_tokens: int = 256,
+    frequency_penalty: float = 1.0,
 ) -> str:
     item = Item(
         prompt=prompt,

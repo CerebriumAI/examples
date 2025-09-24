@@ -32,11 +32,17 @@ def watermark(
     sample_rate: int,
     watermark_key: list[int],
 ) -> tuple[torch.Tensor, int]:
-    audio_array_44khz = torchaudio.functional.resample(audio_array, orig_freq=sample_rate, new_freq=44100)
-    encoded, _ = watermarker.encode_wav(audio_array_44khz, 44100, watermark_key, calc_sdr=False, message_sdr=36)
+    audio_array_44khz = torchaudio.functional.resample(
+        audio_array, orig_freq=sample_rate, new_freq=44100
+    )
+    encoded, _ = watermarker.encode_wav(
+        audio_array_44khz, 44100, watermark_key, calc_sdr=False, message_sdr=36
+    )
 
     output_sample_rate = min(44100, sample_rate)
-    encoded = torchaudio.functional.resample(encoded, orig_freq=44100, new_freq=output_sample_rate)
+    encoded = torchaudio.functional.resample(
+        encoded, orig_freq=44100, new_freq=output_sample_rate
+    )
     return encoded, output_sample_rate
 
 
@@ -47,8 +53,12 @@ def verify(
     sample_rate: int,
     watermark_key: list[int],
 ) -> bool:
-    watermarked_audio_44khz = torchaudio.functional.resample(watermarked_audio, orig_freq=sample_rate, new_freq=44100)
-    result = watermarker.decode_wav(watermarked_audio_44khz, 44100, phase_shift_decoding=True)
+    watermarked_audio_44khz = torchaudio.functional.resample(
+        watermarked_audio, orig_freq=sample_rate, new_freq=44100
+    )
+    result = watermarker.decode_wav(
+        watermarked_audio_44khz, 44100, phase_shift_decoding=True
+    )
 
     is_watermarked = result["status"]
     if is_watermarked:

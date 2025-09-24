@@ -16,9 +16,9 @@ class Item(BaseModel):
 
 
 login(token=os.environ.get("HF_AUTH_TOKEN"))
-os.environ[
-    "NEURON_COMPILE_CACHE_URL"
-] = "/persistent-storage/plain-neuron-compile-cache"
+os.environ["NEURON_COMPILE_CACHE_URL"] = (
+    "/persistent-storage/plain-neuron-compile-cache"
+)
 
 name = "meta-llama/Meta-Llama-3-8B-Instruct"
 

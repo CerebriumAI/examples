@@ -42,12 +42,13 @@ async def run(room_url: str, token: str):
 
     tts = CartesiaTTSService(
         api_key=os.environ.get("CARTESIA_API_KEY"),
-        voice_id='97f4b8fb-f2fe-444b-bb9a-c109783a857a',
-
+        voice_id="97f4b8fb-f2fe-444b-bb9a-c109783a857a",
     )
 
     # Create pipeline using transport.input() and transport.output()
-    pipeline = Pipeline([transport.input(), ultravox_processor, tts, transport.output()])
+    pipeline = Pipeline(
+        [transport.input(), ultravox_processor, tts, transport.output()]
+    )
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
@@ -91,7 +92,7 @@ def create_room():
     else:
         data = response.json()
         if data.get("error") == "invalid-request-error" and "rooms reached" in data.get(
-                "info", ""
+            "info", ""
         ):
             print("We are currently at capacity for this demo. Please try again later.")
             return {

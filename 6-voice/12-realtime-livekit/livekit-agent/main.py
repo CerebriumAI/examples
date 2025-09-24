@@ -1,7 +1,14 @@
 from dotenv import load_dotenv
 
 from livekit import agents
-from livekit.agents import AgentSession, Agent, RoomInputOptions,cli, WorkerOptions, WorkerType
+from livekit.agents import (
+    AgentSession,
+    Agent,
+    RoomInputOptions,
+    cli,
+    WorkerOptions,
+    WorkerType,
+)
 from livekit.plugins import (
     openai,
     cartesia,
@@ -14,10 +21,12 @@ from livekit.plugins.turn_detector.english import EnglishModel
 from livekit.agents import metrics, MetricsCollectedEvent
 import sys
 import os
+
 load_dotenv()
 usage_collector = metrics.UsageCollector()
 
 os.environ["HF_HOME"] = "/cortex/.cache/"
+
 
 class Assistant(Agent):
     def __init__(self) -> None:
@@ -28,8 +37,15 @@ async def entrypoint(ctx: agents.JobContext):
     await ctx.connect()
 
     session = AgentSession(
-        stt=deepgram.STT(base_url="ws://api.aws/v4/p-xxxxxx/deepgram/v1/listen", model="nova-3",), #inter-cluster url
-        llm=openai.LLM(api_key=os.environ.get("CEREBRIUM_API_KEY"), model="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8", base_url="http://api.aws/v4/p-xxxxxx/llama-llm/run/"),
+        stt=deepgram.STT(
+            base_url="ws://api.aws/v4/p-xxxxxx/deepgram/v1/listen",
+            model="nova-3",
+        ),  # inter-cluster url
+        llm=openai.LLM(
+            api_key=os.environ.get("CEREBRIUM_API_KEY"),
+            model="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8",
+            base_url="http://api.aws/v4/p-xxxxxx/llama-llm/run/",
+        ),
         tts=cartesia.TTS(model="sonic-2", voice="f786b574-daa5-4673-aa0c-cbe3e8534c02"),
         vad=silero.VAD.load(),
         turn_detection=EnglishModel(),
@@ -42,7 +58,7 @@ async def entrypoint(ctx: agents.JobContext):
             # LiveKit Cloud enhanced noise cancellation
             # - If self-hosting, omit this parameter
             # - For telephony applications, use `BVCTelephony` for best results
-            noise_cancellation=noise_cancellation.BVC(), 
+            noise_cancellation=noise_cancellation.BVC(),
         ),
     )
 
@@ -63,7 +79,9 @@ async def entrypoint(ctx: agents.JobContext):
     ctx.add_shutdown_callback(log_usage)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) == 1:
-            sys.argv.append('start')
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, worker_type=WorkerType.ROOM, port=8600))
+        sys.argv.append("start")
+    cli.run_app(
+        WorkerOptions(entrypoint_fnc=entrypoint, worker_type=WorkerType.ROOM, port=8600)
+    )

@@ -29,6 +29,7 @@ twilio = Client(
     os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN")
 )
 
+
 async def main(websocket_client, stream_sid):
     transport = FastAPIWebsocketTransport(
         websocket=websocket_client,
@@ -42,7 +43,9 @@ async def main(websocket_client, stream_sid):
         ),
     )
 
-    stt = WhisperSTTService(model="brandenkmurray/faster-whisper-large-v3-french-distil-dec16")
+    stt = WhisperSTTService(
+        model="brandenkmurray/faster-whisper-large-v3-french-distil-dec16"
+    )
     llm = OpenAILLMService(
         name="LLM",
         api_key=os.environ.get("OPENAI_API_KEY"),
@@ -52,7 +55,7 @@ async def main(websocket_client, stream_sid):
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
         voice_id="79a125e8-cd45-4c13-8a67-188112f4dd22",  # British Lady
-    )   
+    )
 
     messages = [
         {
@@ -80,7 +83,9 @@ async def main(websocket_client, stream_sid):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         # Kick off the conversation.
-        messages.append({"role": "system", "content": "Please introduce yourself to the user."})
+        messages.append(
+            {"role": "system", "content": "Please introduce yourself to the user."}
+        )
         await task.queue_frames([LLMMessagesFrame(messages)])
 
     @transport.event_handler("on_client_disconnected")

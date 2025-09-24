@@ -12,14 +12,16 @@ from pipecat.frames.frames import (
     TranscriptionFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
-    ErrorFrame
+    ErrorFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection
 from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 from cartesia import Cartesia
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('translator')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("translator")
 
 cartesia_client = Cartesia(api_key=os.environ.get("CARTESIA_API_KEY"))
 ws = cartesia_client.tts.websocket()
@@ -32,18 +34,18 @@ OUTPUT_FORMAT = {
 }
 
 VOICE_CONFIG = {
-    'en': {
-        'voice_id': '71a7ad14-091c-4e8e-a314-022ece01c121',  # English voice
-        'model_id': 'sonic-2'
+    "en": {
+        "voice_id": "71a7ad14-091c-4e8e-a314-022ece01c121",  # English voice
+        "model_id": "sonic-2",
     },
-    'es': {
-        'voice_id': '5c5ad5e7-1020-476b-8b91-fdcbe9cc313c',  # Spanish voice
-        'model_id': 'sonic-2'
+    "es": {
+        "voice_id": "5c5ad5e7-1020-476b-8b91-fdcbe9cc313c",  # Spanish voice
+        "model_id": "sonic-2",
     },
-    'default': {
-        'voice_id': '71a7ad14-091c-4e8e-a314-022ece01c121',  # Default to English
-        'model_id': 'sonic-2'
-    }
+    "default": {
+        "voice_id": "71a7ad14-091c-4e8e-a314-022ece01c121",  # Default to English
+        "model_id": "sonic-2",
+    },
 }
 
 
@@ -72,8 +74,10 @@ class TranslationService(EventHandler):
 
     def __init__(self, room_url, target_language="es", user_name="Guest", user_id=None):
         """Initialize the translation service"""
-        logger.info(f"Initializing Translation Service for user_name={user_name}, room_url={room_url}, "
-                    f"target_language={target_language}, user_id={user_id}")
+        logger.info(
+            f"Initializing Translation Service for user_name={user_name}, room_url={room_url}, "
+            f"target_language={target_language}, user_id={user_id}"
+        )
 
         # Daily.js client setup
         self.client = CallClient(event_handler=self)
@@ -101,7 +105,7 @@ class TranslationService(EventHandler):
         self.vad = Daily.create_native_vad(
             reset_period_ms=self.VAD_RESET_PERIOD_MS,
             sample_rate=self.SAMPLE_RATE,
-            channels=self.CHANNELS
+            channels=self.CHANNELS,
         )
 
         # Initialize microphone device
@@ -110,7 +114,7 @@ class TranslationService(EventHandler):
                 "translator-mic",
                 sample_rate=16000,
                 channels=self.CHANNELS,
-                non_blocking=True
+                non_blocking=True,
             )
             logger.info("Microphone device created")
         except Exception as e:
@@ -118,16 +122,23 @@ class TranslationService(EventHandler):
             self.mic_device = None
 
         # Set client inputs
-        self.client.update_inputs({
-            "camera": False,
-            "microphone": {"isEnabled": True, "settings": {"deviceId": "translator-mic"}}
-        })
+        self.client.update_inputs(
+            {
+                "camera": False,
+                "microphone": {
+                    "isEnabled": True,
+                    "settings": {"deviceId": "translator-mic"},
+                },
+            }
+        )
 
         # Initialize models
         self._init_models()
 
         # Start streaming processor thread
-        self.streaming_thread = threading.Thread(target=self._streaming_processor, daemon=True)
+        self.streaming_thread = threading.Thread(
+            target=self._streaming_processor, daemon=True
+        )
         self.streaming_thread.start()
 
         # Start queue processor with dedicated event loop
@@ -135,7 +146,9 @@ class TranslationService(EventHandler):
 
         def run_queue_processor():
             asyncio.set_event_loop(self.queue_event_loop)
-            self.queue_event_loop.run_until_complete(self._translation_queue_processor())
+            self.queue_event_loop.run_until_complete(
+                self._translation_queue_processor()
+            )
 
         self.queue_thread = threading.Thread(target=run_queue_processor, daemon=True)
         self.queue_thread.start()
@@ -149,7 +162,7 @@ class TranslationService(EventHandler):
                 sample_rate=16000,
                 no_speech_prob=0.6,
                 beam_size=1,
-                vad_parameters={"min_silence_duration_ms": self.SILENCE_THRESHOLD_MS}
+                vad_parameters={"min_silence_duration_ms": self.SILENCE_THRESHOLD_MS},
             )
 
             # Initialize translation models for each supported language pair
@@ -157,8 +170,8 @@ class TranslationService(EventHandler):
 
             # For now, initialize models for English and Spanish
             language_pairs = [
-                ('en', 'es'),  # English to Spanish
-                ('es', 'en')  # Spanish to English
+                ("en", "es"),  # English to Spanish
+                ("es", "en"),  # Spanish to English
                 # Add more language pairs as needed
             ]
 
@@ -168,13 +181,19 @@ class TranslationService(EventHandler):
                     tokenizer = AutoTokenizer.from_pretrained(model_name)
                     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
                     self.translation_models[(source_lang, target_lang)] = {
-                        'tokenizer': tokenizer,
-                        'model': model,
-                        'pipeline': pipeline("translation", model=model, tokenizer=tokenizer)
+                        "tokenizer": tokenizer,
+                        "model": model,
+                        "pipeline": pipeline(
+                            "translation", model=model, tokenizer=tokenizer
+                        ),
                     }
-                    logger.info(f"Loaded translation model: {source_lang} to {target_lang}")
+                    logger.info(
+                        f"Loaded translation model: {source_lang} to {target_lang}"
+                    )
                 except Exception as e:
-                    logger.error(f"Error loading translation model {source_lang} to {target_lang}: {e}")
+                    logger.error(
+                        f"Error loading translation model {source_lang} to {target_lang}: {e}"
+                    )
 
             logger.info("Models loaded successfully")
         except Exception as e:
@@ -204,14 +223,19 @@ class TranslationService(EventHandler):
             if self.user_id is None:
                 self.user_id = participant["id"]
 
-            logger.info(f"Local participant joined with ID: {self.local_participant_id}")
+            logger.info(
+                f"Local participant joined with ID: {self.local_participant_id}"
+            )
 
-        if not participant["info"]["isLocal"] or participant["id"] != self.local_participant_id:
+        if (
+            not participant["info"]["isLocal"]
+            or participant["id"] != self.local_participant_id
+        ):
             # Set up audio rendering for non-local participants
             self.client.set_audio_renderer(
                 participant["id"],
                 callback=self.on_audio_frame,
-                audio_source="microphone"
+                audio_source="microphone",
             )
 
             # Initialize volume level
@@ -235,16 +259,22 @@ class TranslationService(EventHandler):
             current_time_ms = time.time() * 1000
 
             # Skip processing if we already have a large buffer being processed
-            if (self.audio_buffer.is_processing and
-                    self.audio_buffer.started_at is not None and
-                    len(self.audio_buffer.frames) > 50):
+            if (
+                self.audio_buffer.is_processing
+                and self.audio_buffer.started_at is not None
+                and len(self.audio_buffer.frames) > 50
+            ):
                 return
 
             # Use VAD with dynamic threshold adjustment
             base_threshold = self.SPEECH_THRESHOLD
 
             # Lower threshold for continuing speech, higher for new speech
-            adjusted_threshold = base_threshold * 0.8 if self.audio_buffer.started_at is not None else base_threshold * 1.2
+            adjusted_threshold = (
+                base_threshold * 0.8
+                if self.audio_buffer.started_at is not None
+                else base_threshold * 1.2
+            )
 
             confidence = self.vad.analyze_frames(frame.audio_frames)
 
@@ -254,7 +284,7 @@ class TranslationService(EventHandler):
                 audio_raw_frame = AudioRawFrame(
                     audio=frame.audio_frames,
                     sample_rate=16000,
-                    num_channels=self.CHANNELS
+                    num_channels=self.CHANNELS,
                 )
 
                 if self.audio_buffer.started_at is None:
@@ -294,15 +324,22 @@ class TranslationService(EventHandler):
                     frame_float[noise_mask] = 0
 
                     # Add to buffer if valid and not too large
-                    if (not np.isnan(frame_float).any() and
-                            not np.isinf(frame_float).any() and
-                            len(self.audio_buffer.frames) < 200):
+                    if (
+                        not np.isnan(frame_float).any()
+                        and not np.isinf(frame_float).any()
+                        and len(self.audio_buffer.frames) < 200
+                    ):
                         self.audio_buffer.frames.append(audio_raw_frame)
                         self.audio_buffer.audio_arrays.append(frame_float)
             else:
                 # Check for silence after speech
-                if self.audio_buffer.started_at is not None and self.audio_buffer.last_updated_at is not None:
-                    silence_duration = current_time_ms - self.audio_buffer.last_updated_at
+                if (
+                    self.audio_buffer.started_at is not None
+                    and self.audio_buffer.last_updated_at is not None
+                ):
+                    silence_duration = (
+                        current_time_ms - self.audio_buffer.last_updated_at
+                    )
 
                     adaptive_silence = self.SILENCE_THRESHOLD_MS
                     if len(self.audio_buffer.frames) > 50:
@@ -311,7 +348,9 @@ class TranslationService(EventHandler):
                     if silence_duration > adaptive_silence:
                         speech_stop_frame = UserStoppedSpeakingFrame()
                         self._finalize_speech_buffer(speech_stop_frame)
-                        logger.debug(f"Speech ended after {len(self.audio_buffer.frames)} frames")
+                        logger.debug(
+                            f"Speech ended after {len(self.audio_buffer.frames)} frames"
+                        )
         except Exception as e:
             logger.error(f"Audio frame error: {e}")
 
@@ -320,7 +359,10 @@ class TranslationService(EventHandler):
         Adjust the volume of the original speaker when translation is playing
         """
         try:
-            if self.is_translator_speaking and participant == self.audio_buffer.speaker_id:
+            if (
+                self.is_translator_speaking
+                and participant == self.audio_buffer.speaker_id
+            ):
                 # Lower the volume but don't mute completely
                 new_volume = self.VOLUME_REDUCTION
                 current_volume = self.volume_levels.get(participant, 1.0)
@@ -329,17 +371,22 @@ class TranslationService(EventHandler):
                     self.volume_levels[participant] = new_volume
 
                     # Apply volume adjustment using Daily's API if available
-                    if hasattr(self.client, 'set_participant_volume'):
+                    if hasattr(self.client, "set_participant_volume"):
                         try:
                             self.client.set_participant_volume(participant, new_volume)
-                            logger.debug(f"Reduced volume for participant {participant} to {new_volume}")
+                            logger.debug(
+                                f"Reduced volume for participant {participant} to {new_volume}"
+                            )
                         except Exception as e:
                             logger.warning(f"Failed to adjust participant volume: {e}")
-            elif participant in self.volume_levels and self.volume_levels[participant] != 1.0:
+            elif (
+                participant in self.volume_levels
+                and self.volume_levels[participant] != 1.0
+            ):
                 # Restore volume to normal when not speaking
                 self.volume_levels[participant] = 1.0
 
-                if hasattr(self.client, 'set_participant_volume'):
+                if hasattr(self.client, "set_participant_volume"):
                     try:
                         self.client.set_participant_volume(participant, 1.0)
                         logger.debug(f"Restored volume for participant {participant}")
@@ -355,22 +402,31 @@ class TranslationService(EventHandler):
                 current_time_ms = time.time() * 1000
 
                 # Check if we have an active buffer
-                if (self.audio_buffer.started_at is not None and
-                        not self.audio_buffer.is_processing and
-                        len(self.audio_buffer.frames) > 0):
+                if (
+                    self.audio_buffer.started_at is not None
+                    and not self.audio_buffer.is_processing
+                    and len(self.audio_buffer.frames) > 0
+                ):
 
                     buffer_duration = current_time_ms - self.audio_buffer.started_at
-                    last_process_duration = (current_time_ms - self.audio_buffer.last_updated_at
-                                             if hasattr(self.audio_buffer, 'last_processed_at')
-                                             else buffer_duration)
+                    last_process_duration = (
+                        current_time_ms - self.audio_buffer.last_updated_at
+                        if hasattr(self.audio_buffer, "last_processed_at")
+                        else buffer_duration
+                    )
 
                     # Process in chunks during ongoing speech - even if translator is speaking
-                    if buffer_duration > self.PROCESSING_CHUNK_MS and last_process_duration > self.PROCESSING_INTERVAL_MS:
+                    if (
+                        buffer_duration > self.PROCESSING_CHUNK_MS
+                        and last_process_duration > self.PROCESSING_INTERVAL_MS
+                    ):
                         # Special handling for concurrent speech and translation
                         if self.is_translator_speaking:
                             # Process with increased chunk threshold to avoid too many interruptions
                             if buffer_duration > self.PROCESSING_CHUNK_MS * 1.5:
-                                logger.debug("Processing speech chunk while translator is speaking")
+                                logger.debug(
+                                    "Processing speech chunk while translator is speaking"
+                                )
                                 self._process_speech_chunk(is_final=False)
                         else:
                             # Normal processing
@@ -379,7 +435,9 @@ class TranslationService(EventHandler):
                     # Process if buffer is too large
                     max_buffer_duration = self.MAX_BUFFER_DURATION_SEC * 1000
                     if buffer_duration > max_buffer_duration:
-                        logger.info(f"Processing speech chunk due to large buffer size ({buffer_duration / 1000:.1f}s)")
+                        logger.info(
+                            f"Processing speech chunk due to large buffer size ({buffer_duration / 1000:.1f}s)"
+                        )
                         self._process_speech_chunk(is_final=True)
 
                 time.sleep(0.1)
@@ -401,13 +459,17 @@ class TranslationService(EventHandler):
                     "translator-mic",
                     sample_rate=16000,
                     channels=self.CHANNELS,
-                    non_blocking=True
+                    non_blocking=True,
                 )
                 logger.info("Created new microphone device")
 
             # Get voice configuration based on target language
-            voice_config = VOICE_CONFIG.get(self.target_language, VOICE_CONFIG['default'])
-            logger.info(f"Using voice for language {self.target_language}: {voice_config['voice_id']}")
+            voice_config = VOICE_CONFIG.get(
+                self.target_language, VOICE_CONFIG["default"]
+            )
+            logger.info(
+                f"Using voice for language {self.target_language}: {voice_config['voice_id']}"
+            )
 
             # Set up audio chunks collection
             audio_chunks = []
@@ -417,11 +479,11 @@ class TranslationService(EventHandler):
             # Generate speech with Cartesia
             try:
                 for output in ws.send(
-                        model_id=voice_config['model_id'],
-                        transcript=text,
-                        voice_id=voice_config['voice_id'],
-                        output_format=OUTPUT_FORMAT,
-                        stream=True,
+                    model_id=voice_config["model_id"],
+                    transcript=text,
+                    voice_id=voice_config["voice_id"],
+                    output_format=OUTPUT_FORMAT,
+                    stream=True,
                 ):
                     # Check timeout
                     if time.time() - start_time > timeout_sec:
@@ -436,19 +498,25 @@ class TranslationService(EventHandler):
 
                     # If we have the first chunk, start playback to the target user
                     if len(audio_chunks) == 1:
-                        logger.info(f"Playing first audio chunk to user {self.user_id}: {len(buffer)} bytes")
+                        logger.info(
+                            f"Playing first audio chunk to user {self.user_id}: {len(buffer)} bytes"
+                        )
 
                         # If we're playing to a specific user and not the local participant
                         if self.user_id != self.local_participant_id:
                             try:
                                 # Only send audio to the specific user if we have the API
-                                if hasattr(self.client, 'send_audio_to_participant'):
-                                    self.client.send_audio_to_participant(self.user_id, buffer)
+                                if hasattr(self.client, "send_audio_to_participant"):
+                                    self.client.send_audio_to_participant(
+                                        self.user_id, buffer
+                                    )
                                 else:
                                     # Fallback: play to everyone through the mic
                                     self.mic_device.write_frames(buffer)
                             except Exception as e:
-                                logger.error(f"Error sending audio to user {self.user_id}: {e}")
+                                logger.error(
+                                    f"Error sending audio to user {self.user_id}: {e}"
+                                )
                                 # Fallback to the microphone device
                                 self.mic_device.write_frames(buffer)
                         else:
@@ -460,11 +528,14 @@ class TranslationService(EventHandler):
 
             # Play remaining chunks
             if len(audio_chunks) > 1:
-                remaining_buffer = b''.join(audio_chunks[1:])
+                remaining_buffer = b"".join(audio_chunks[1:])
                 if remaining_buffer:
-                    audio_duration = len(remaining_buffer) / OUTPUT_FORMAT['sample_rate'] / 4
+                    audio_duration = (
+                        len(remaining_buffer) / OUTPUT_FORMAT["sample_rate"] / 4
+                    )
                     logger.info(
-                        f"Playing remaining audio: {len(remaining_buffer)} bytes, duration ~{audio_duration:.2f}s")
+                        f"Playing remaining audio: {len(remaining_buffer)} bytes, duration ~{audio_duration:.2f}s"
+                    )
 
                     try:
                         # Play in smaller chunks for more reliable playback
@@ -472,31 +543,42 @@ class TranslationService(EventHandler):
                         for i in range(0, len(remaining_buffer), chunk_size):
                             # If a new speech buffer has started with a different speaker during playback,
                             # ensure we're still processing their frames (don't block new speech)
-                            if (self.audio_buffer.speaker_id is not None and
-                                    active_speaker_id is not None and
-                                    self.audio_buffer.speaker_id != active_speaker_id):
+                            if (
+                                self.audio_buffer.speaker_id is not None
+                                and active_speaker_id is not None
+                                and self.audio_buffer.speaker_id != active_speaker_id
+                            ):
 
                                 # Process any accumulated speech from new speaker
-                                if (not self.audio_buffer.is_processing and
-                                        len(self.audio_buffer.frames) > 20):
-                                    logger.debug("Processing new speech while translation is playing")
+                                if (
+                                    not self.audio_buffer.is_processing
+                                    and len(self.audio_buffer.frames) > 20
+                                ):
+                                    logger.debug(
+                                        "Processing new speech while translation is playing"
+                                    )
                                     # Use a separate thread to process speech in parallel
                                     threading.Thread(
                                         target=self._process_speech_chunk,
                                         args=(False, None),
-                                        daemon=True
+                                        daemon=True,
                                     ).start()
 
                             # Get the current chunk
-                            chunk = remaining_buffer[i:i + chunk_size]
+                            chunk = remaining_buffer[i : i + chunk_size]
 
                             # Play to specific user if possible
-                            if self.user_id != self.local_participant_id and hasattr(self.client,
-                                                                                     'send_audio_to_participant'):
+                            if self.user_id != self.local_participant_id and hasattr(
+                                self.client, "send_audio_to_participant"
+                            ):
                                 try:
-                                    self.client.send_audio_to_participant(self.user_id, chunk)
+                                    self.client.send_audio_to_participant(
+                                        self.user_id, chunk
+                                    )
                                 except Exception as e:
-                                    logger.error(f"Error sending chunk to user {self.user_id}: {e}")
+                                    logger.error(
+                                        f"Error sending chunk to user {self.user_id}: {e}"
+                                    )
                                     self.mic_device.write_frames(chunk)
                             else:
                                 # Default playback for local participant
@@ -521,9 +603,11 @@ class TranslationService(EventHandler):
             logger.info("Speech generation complete")
             self.is_translator_speaking = False
 
-            if (not self.audio_buffer.is_processing and
-                    self.audio_buffer.started_at is not None and
-                    len(self.audio_buffer.frames) > 10):
+            if (
+                not self.audio_buffer.is_processing
+                and self.audio_buffer.started_at is not None
+                and len(self.audio_buffer.frames) > 10
+            ):
                 logger.debug("Processing accumulated speech after translation playback")
                 self._process_speech_chunk(is_final=False)
 
@@ -536,7 +620,9 @@ class TranslationService(EventHandler):
             try:
                 # Get next translation task - with timeout to avoid blocking forever
                 try:
-                    translation_task = await asyncio.wait_for(self.translation_queue.get(), timeout=1.0)
+                    translation_task = await asyncio.wait_for(
+                        self.translation_queue.get(), timeout=1.0
+                    )
                     # Reset error counter on successful task retrieval
                     consecutive_errors = 0
                 except asyncio.TimeoutError:
@@ -545,13 +631,21 @@ class TranslationService(EventHandler):
                     continue
 
                 # Validate task format before processing
-                if not translation_task or not isinstance(translation_task, tuple) or len(translation_task) != 5:
-                    logger.warning(f"Invalid translation task format: {type(translation_task)}")
+                if (
+                    not translation_task
+                    or not isinstance(translation_task, tuple)
+                    or len(translation_task) != 5
+                ):
+                    logger.warning(
+                        f"Invalid translation task format: {type(translation_task)}"
+                    )
                     self.translation_queue.task_done()
                     continue
 
                 # Unpack the translation task
-                audio_arrays, raw_frames, start_frame, stop_frame, is_final = translation_task
+                audio_arrays, raw_frames, start_frame, stop_frame, is_final = (
+                    translation_task
+                )
 
                 # Validate task components
                 if not audio_arrays or len(audio_arrays) == 0:
@@ -562,7 +656,9 @@ class TranslationService(EventHandler):
                 # Process the translation
                 self.active_translation_process = True
                 try:
-                    await self._process_audio(audio_arrays, raw_frames, start_frame, stop_frame, is_final)
+                    await self._process_audio(
+                        audio_arrays, raw_frames, start_frame, stop_frame, is_final
+                    )
                 except Exception as e:
                     logger.error(f"Error processing audio in queue task: {str(e)}")
                     consecutive_errors += 1
@@ -570,7 +666,8 @@ class TranslationService(EventHandler):
                     # If we have too many consecutive errors, clear the queue
                     if consecutive_errors >= max_consecutive_errors:
                         logger.warning(
-                            f"Too many consecutive errors ({consecutive_errors}), clearing translation queue")
+                            f"Too many consecutive errors ({consecutive_errors}), clearing translation queue"
+                        )
                         self._clear_translation_queue()
                         consecutive_errors = 0
 
@@ -580,7 +677,9 @@ class TranslationService(EventHandler):
 
                 # Safety check - if too many errors, reset the queue
                 if consecutive_errors >= max_consecutive_errors:
-                    logger.warning("Multiple consecutive queue errors, resetting translation system")
+                    logger.warning(
+                        "Multiple consecutive queue errors, resetting translation system"
+                    )
                     self._clear_translation_queue()
                     consecutive_errors = 0
                     await asyncio.sleep(1.0)  # Brief pause to let system recover
@@ -646,7 +745,9 @@ class TranslationService(EventHandler):
                 # Keep a small overlap for context
                 overlap_frames = min(5, len(self.audio_buffer.frames))
                 self.audio_buffer.frames = self.audio_buffer.frames[-overlap_frames:]
-                self.audio_buffer.audio_arrays = self.audio_buffer.audio_arrays[-overlap_frames:]
+                self.audio_buffer.audio_arrays = self.audio_buffer.audio_arrays[
+                    -overlap_frames:
+                ]
                 if self.audio_buffer.started_at is not None:
                     self.audio_buffer.started_at = time.time() * 1000
 
@@ -658,13 +759,15 @@ class TranslationService(EventHandler):
 
                 try:
                     # Run the async task in this thread's event loop
-                    loop.run_until_complete(self._add_to_translation_queue(
-                        audio_arrays_to_process,
-                        frames_to_process,
-                        start_frame,
-                        stop_frame,
-                        is_final
-                    ))
+                    loop.run_until_complete(
+                        self._add_to_translation_queue(
+                            audio_arrays_to_process,
+                            frames_to_process,
+                            start_frame,
+                            stop_frame,
+                            is_final,
+                        )
+                    )
                 except Exception as e:
                     logger.error(f"Error in queue_task: {str(e)}")
                 finally:
@@ -678,13 +781,17 @@ class TranslationService(EventHandler):
             logger.error(f"Speech chunk processing error: {str(e)}")
             self.audio_buffer.is_processing = False
 
-    async def _add_to_translation_queue(self, audio_arrays, frames, start_frame, stop_frame, is_final):
+    async def _add_to_translation_queue(
+        self, audio_arrays, frames, start_frame, stop_frame, is_final
+    ):
         """Add a translation task to the queue with better queue management"""
         try:
             if self.translation_queue.qsize() >= self.translation_queue.maxsize - 1:
                 # If queue is nearly full and this isn't a final chunk, we can skip it
                 if not is_final:
-                    logger.warning("Queue almost full, skipping non-final translation task")
+                    logger.warning(
+                        "Queue almost full, skipping non-final translation task"
+                    )
                     return
 
                 # For final chunks, try to make room by removing oldest non-final task
@@ -701,9 +808,13 @@ class TranslationService(EventHandler):
                         filtered_items = []
                         for item in temp_items:
                             # Item structure is (audio_arrays, frames, start_frame, stop_frame, is_final)
-                            if not removed_item and not item[4]:  # if not removed and not final
+                            if (
+                                not removed_item and not item[4]
+                            ):  # if not removed and not final
                                 removed_item = True  # Skip this item
-                                logger.warning("Removed oldest non-final task from queue to make room")
+                                logger.warning(
+                                    "Removed oldest non-final task from queue to make room"
+                                )
                             else:
                                 filtered_items.append(item)
 
@@ -720,16 +831,23 @@ class TranslationService(EventHandler):
             try:
                 await asyncio.wait_for(self.translation_queue.put(task), timeout=1.0)
                 logger.info(
-                    f"Added translation task to queue (final={is_final}, queue size={self.translation_queue.qsize()}/{self.translation_queue.maxsize})")
+                    f"Added translation task to queue (final={is_final}, queue size={self.translation_queue.qsize()}/{self.translation_queue.maxsize})"
+                )
             except asyncio.TimeoutError:
                 if is_final:
-                    logger.error("Failed to add final chunk to queue after timeout - queue might be deadlocked")
+                    logger.error(
+                        "Failed to add final chunk to queue after timeout - queue might be deadlocked"
+                    )
                 else:
-                    logger.warning("Queue full after timeout, dropping non-final translation request")
+                    logger.warning(
+                        "Queue full after timeout, dropping non-final translation request"
+                    )
         except Exception as e:
             logger.error(f"Failed to add to translation queue: {str(e)}")
 
-    async def _process_audio(self, audio_arrays, raw_frames, start_frame=None, stop_frame=None, is_final=True):
+    async def _process_audio(
+        self, audio_arrays, raw_frames, start_frame=None, stop_frame=None, is_final=True
+    ):
         """Process audio through the translation pipeline"""
         try:
             # Skip if no frames
@@ -775,7 +893,9 @@ class TranslationService(EventHandler):
             # Start processing
             if start_frame:
                 await self.stt_service.start_processing_metrics()
-                await self.stt_service.process_frame(start_frame, FrameDirection.UPSTREAM)
+                await self.stt_service.process_frame(
+                    start_frame, FrameDirection.UPSTREAM
+                )
 
             # Process audio
             audio_bytes = audio_int16.tobytes()
@@ -785,7 +905,7 @@ class TranslationService(EventHandler):
                     if isinstance(result_frame, TranscriptionFrame):
                         transcription_result = result_frame.text
                         # Get detected language from Whisper
-                        if hasattr(result_frame, 'language') and result_frame.language:
+                        if hasattr(result_frame, "language") and result_frame.language:
                             detected_language = result_frame.language
                         else:
                             detected_language = "en"
@@ -793,7 +913,9 @@ class TranslationService(EventHandler):
                     elif isinstance(result_frame, ErrorFrame):
                         logger.error(f"STT error: {result_frame}")
                 if stop_frame and is_final:
-                    await self.stt_service.process_frame(stop_frame, FrameDirection.DOWNSTREAM)
+                    await self.stt_service.process_frame(
+                        stop_frame, FrameDirection.DOWNSTREAM
+                    )
             except Exception as e:
                 logger.error(f"STT processing error: {e}")
 
@@ -806,17 +928,24 @@ class TranslationService(EventHandler):
             # Store detected language for this speaker if we detected one
             if detected_language and self.audio_buffer.speaker_id:
                 self.audio_buffer.detected_language = detected_language
-                self.participant_languages[self.audio_buffer.speaker_id] = detected_language
-                logger.info(f"Detected language for participant {self.audio_buffer.speaker_id}: {detected_language}")
+                self.participant_languages[self.audio_buffer.speaker_id] = (
+                    detected_language
+                )
+                logger.info(
+                    f"Detected language for participant {self.audio_buffer.speaker_id}: {detected_language}"
+                )
 
             # If we don't have a detected language, use previous detection or default to 'en'
             if not detected_language and self.audio_buffer.speaker_id:
-                detected_language = self.participant_languages.get(self.audio_buffer.speaker_id, 'en')
+                detected_language = self.participant_languages.get(
+                    self.audio_buffer.speaker_id, "en"
+                )
 
             # Skip translation if source language matches target language
             if detected_language == self.target_language:
                 logger.info(
-                    f"Skipping translation as source language ({detected_language}) matches target language ({self.target_language})")
+                    f"Skipping translation as source language ({detected_language}) matches target language ({self.target_language})"
+                )
                 return
 
             # 2. Translate the transcript
@@ -832,21 +961,27 @@ class TranslationService(EventHandler):
                 # Check if we need to reverse the model and use it bidirectionally
                 reverse_key = (self.target_language, detected_language)
                 if reverse_key in self.translation_models:
-                    logger.warning(f"Using reverse translation model: {reverse_key} instead of {translation_key}")
+                    logger.warning(
+                        f"Using reverse translation model: {reverse_key} instead of {translation_key}"
+                    )
                     translation_key = reverse_key
                 else:
-                    logger.error(f"No translation model available for {translation_key}")
+                    logger.error(
+                        f"No translation model available for {translation_key}"
+                    )
                     return
 
-            translator = self.translation_models[translation_key]['pipeline']
+            translator = self.translation_models[translation_key]["pipeline"]
             translation_result = translator(transcription_result, max_length=512)
-            translated_text = translation_result[0]['translation_text']
+            translated_text = translation_result[0]["translation_text"]
 
             # Extract only new content if needed
             if self.translation_context and not is_final:
-                last_context = self.translation_context[-1] if self.translation_context else ""
+                last_context = (
+                    self.translation_context[-1] if self.translation_context else ""
+                )
                 if last_context in translated_text:
-                    translated_text = translated_text[len(last_context):].strip()
+                    translated_text = translated_text[len(last_context) :].strip()
 
             # Skip if empty translation
             if not translated_text.strip():
@@ -856,7 +991,9 @@ class TranslationService(EventHandler):
             if is_final:
                 self.translation_context.append(translated_text)
                 if len(self.translation_context) > self.max_context_sentences:
-                    self.translation_context = self.translation_context[-self.max_context_sentences:]
+                    self.translation_context = self.translation_context[
+                        -self.max_context_sentences :
+                    ]
 
             # 3. Text-to-speech with Cartesia
             await self._generate_and_play_speech(translated_text, detected_language)

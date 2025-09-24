@@ -29,7 +29,11 @@ def format_chat_prompt(messages: list) -> str:
         formatted_messages.append(
             f"<|start_header_id|>{msg_obj.role}<|end_header_id|>\n{msg_obj.content}<|eot_id|>"
         )
-    return "<|begin_of_text|>" + "".join(formatted_messages) + "<|start_header_id|>assistant<|end_header_id|>"
+    return (
+        "<|begin_of_text|>"
+        + "".join(formatted_messages)
+        + "<|start_header_id|>assistant<|end_header_id|>"
+    )
 
 
 async def run(
@@ -45,7 +49,9 @@ async def run(
     # Format your prompt for llama-friendly usage:
     prompt = format_chat_prompt(messages)
 
-    sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+    sampling_params = SamplingParams(
+        temperature=temperature, top_p=top_p, max_tokens=max_tokens
+    )
     results_generator = engine.generate(prompt, sampling_params, run_id)
 
     previous_text = ""

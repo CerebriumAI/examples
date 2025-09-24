@@ -4,7 +4,7 @@ This example demonstrates how to deploy a Cerebrium app using an ASGI server and
 
 Warning: This functionality is in beta and may change in the future.
 
-## Notes 
+## Notes
 
 - This application uses Gradio as the frontend
 - The model is hosted as a separate instance due to the differing hardware and uptime requirements between our model and the frontend. We'd like our Gradio frontend to be always-on and running on a CPU, and for our model to scale and start as necessary on GPU instances.
@@ -12,6 +12,7 @@ Warning: This functionality is in beta and may change in the future.
 ## Required changes
 
 ### cerebrium.toml
+
 - The `port` should be set to the port on which the ASGI server will run. Note that your requests to cerebrium will still be made to port 443.
 - The `entrypoint` should be set to the command that starts the ASGI server.
 - The code lives in the `/cortex` directory and this is also the entrypoint workdir.
@@ -24,8 +25,9 @@ Warning: This functionality is in beta and may change in the future.
   entrypoint = "uvicorn main:app --host 0.0.0.0 --port 5000"
   healthcheck_endpoint = "/health"
   ```
-  
+
 ## Running your application
+
 - Make the necessary changes listed in the _Required changes_ section above
 - Deploy your application using `cerebrium deploy -y`
 - In your browser, navigate to `https://api.aws.us-east-1.cerebrium.ai/v4/<your-project-id>/34-asgi-gradio-interface/` to interact with the Gradio app

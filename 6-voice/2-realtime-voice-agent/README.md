@@ -32,4 +32,3 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 - [Pipecat](https://github.com/pipecat-ai/pipecat) - Open source framework for voice and multimodal conversational AI
 - [Daily](https://www.daily.co/) - WebRTC platform for real-time video and audio communication
 - [Cerebrium](https://www.cerebrium.ai/) - Platform for deploying and scaling AI applications
-

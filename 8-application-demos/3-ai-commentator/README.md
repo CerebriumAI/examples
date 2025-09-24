@@ -15,5 +15,4 @@ This project demonstrates how to build a real-time AI commentator system that ca
 5. The commentary is converted to speech using Cartesia's text-to-speech API
 6. The generated audio is streamed back in real-time through LiveKit
 
-
 For more details on implementation and setup, check out the [full blog post](https://www.cerebrium.ai/blog/creating-a-realtime-ai-commentator-with-cerebrium-livekit-and-cartesia) or the [frontend code repository](https://github.com/CerebriumAI/realtime-ai-commentator).

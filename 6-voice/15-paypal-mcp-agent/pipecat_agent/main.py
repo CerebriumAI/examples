@@ -41,7 +41,9 @@ logger.add(sys.stderr, level="DEBUG")
 deepgram_voice: str = "aura-asteria-en"
 
 
-async def main(room_url: str, token: str, paypal_access_token: str, paypal_environment: str):
+async def main(
+    room_url: str, token: str, paypal_access_token: str, paypal_environment: str
+):
     async with aiohttp.ClientSession() as session:
         transport = DailyTransport(
             room_url,
@@ -63,8 +65,8 @@ async def main(room_url: str, token: str, paypal_access_token: str, paypal_envir
                 model="nova-3-general",
                 language="en-US",
                 smart_format=True,
-                vad_events=True
-            )
+                vad_events=True,
+            ),
         )
 
         tts = CartesiaTTSService(
@@ -76,12 +78,11 @@ async def main(room_url: str, token: str, paypal_access_token: str, paypal_envir
         mcp = MCPClient(
             server_params=StdioServerParameters(
                 command="npx",
-                args=[
-                    "-y",
-                    "@paypal/mcp",
-                    "--tools=all"
-                ],
-                env={"PAYPAL_ACCESS_TOKEN": paypal_access_token, "PAYPAL_ENVIRONMENT": paypal_environment},
+                args=["-y", "@paypal/mcp", "--tools=all"],
+                env={
+                    "PAYPAL_ACCESS_TOKEN": paypal_access_token,
+                    "PAYPAL_ENVIRONMENT": paypal_environment,
+                },
             )
         )
         llm = OpenAILLMService(
@@ -89,11 +90,11 @@ async def main(room_url: str, token: str, paypal_access_token: str, paypal_envir
             model="gpt-4.1",
         )
 
-    # Create tools schema from the MCP server and register them with llm
+        # Create tools schema from the MCP server and register them with llm
         tools = await mcp.register_tools(llm)
 
         context = OpenAILLMContext(
-            messages = [
+            messages=[
                 {
                     "role": "system",
                     "content": "You are a helpful assistant with access to PayPal tools. You have access to MCP tools. Before doing a tool call, please say 'Sure, give me a moment'",
@@ -118,10 +119,7 @@ async def main(room_url: str, token: str, paypal_access_token: str, paypal_envir
 
         task = PipelineTask(
             pipeline,
-            params=PipelineParams(
-                allow_interruptions=True,
-                enable_metrics=True
-            ),
+            params=PipelineParams(allow_interruptions=True, enable_metrics=True),
         )
 
         # When the first participant joins, the bot should introduce itself.
@@ -163,14 +161,16 @@ async def start_bot(paypal_access_token: str, paypal_environment: str):
 
         room_url = room_info["url"]
         room_token = room_info["token"]
-        
+
         # Start main() in background task so we can return room info immediately
-        asyncio.create_task(main(room_url, room_token, paypal_access_token, paypal_environment))
-        
+        asyncio.create_task(
+            main(room_url, room_token, paypal_access_token, paypal_environment)
+        )
+
         return {
             "message": "Room created successfully",
             "status_code": 200,
-            "room_url": room_url
+            "room_url": room_url,
         }
     except Exception as e:
         logger.error(f"Exception in main: {e}")
@@ -237,6 +237,7 @@ def create_token(room_name: str):
         logger.error(f"Failed to create token: {response.status_code}")
         return None
 
+
 ##uncomment this to run locally
 # if __name__ == "__main__":
 #     """Initialize main function by creating room and token"""
@@ -250,4 +251,3 @@ def create_token(room_name: str):
 
 #     print(f"Access token: {os.environ.get('PAYPAL_ACCESS_TOKEN')}")
 #     asyncio.run(main(room_url=room_url, token=room_token, paypal_access_token=os.environ.get("PAYPAL_ACCESS_TOKEN"), paypal_environment="PRODUCTION"))
-

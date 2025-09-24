@@ -24,6 +24,7 @@ A modern AI-powered coding assistant that generates and deploys code to a secure
 - **Preview**: Sandboxed environment for secure code execution running on E2B
 
 ## 🚦 Limitations
+
 - LLMs are capable of hallucinating. As we're using a large language model with half-precision, it may generate code that doesn't work as expected. Please review the generated code before running it in a production environment.
 
 ## 📦 Quick Start
@@ -40,5 +41,6 @@ cerebrium deploy -y
 ```
 
 ## 📚 Resources
+
 - Check out the full blog post, [here](https://www.cerebrium.ai/blog/building-a-real-time-coding-assistant)
 - Frontend code repository can be found, [here](https://github.com/CerebriumAI/example-ai-coding-agent)

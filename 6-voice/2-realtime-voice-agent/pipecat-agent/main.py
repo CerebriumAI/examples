@@ -57,7 +57,7 @@ async def main(room_url: str, token: str):
                 vad_audio_passthrough=True,
             ),
         )
-        
+
         stt = CustomDeepgramSTTService(
             api_key=os.environ.get("DEEPGRAM_API_KEY"),
             websocket_url="wss://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxxx/deepgram/v1/listen",
@@ -65,14 +65,13 @@ async def main(room_url: str, token: str):
                 model="nova-2-general",
                 language="en-US",
                 smart_format=True,
-                vad_events=True
-            )
+                vad_events=True,
+            ),
         )
 
         tts = CartesiaTTSService(
             api_key=os.environ.get("CARTESIA_API_KEY"),
-            voice_id='97f4b8fb-f2fe-444b-bb9a-c109783a857a',
-
+            voice_id="97f4b8fb-f2fe-444b-bb9a-c109783a857a",
         )
 
         llm = OpenAILLMService(
@@ -105,10 +104,7 @@ async def main(room_url: str, token: str):
 
         task = PipelineTask(
             pipeline,
-            params=PipelineParams(
-                allow_interruptions=True,
-                enable_metrics=True
-            ),
+            params=PipelineParams(allow_interruptions=True, enable_metrics=True),
         )
 
         # When the first participant joins, the bot should introduce itself.
@@ -217,4 +213,3 @@ def create_token(room_name: str):
 #         asyncio.run(main(room["url"], room["token"]))
 #     else:
 #         logger.error("Failed to create room")
-

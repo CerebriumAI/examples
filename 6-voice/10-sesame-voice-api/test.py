@@ -10,18 +10,17 @@ url = "https://api.aws.us-east-1.cerebrium.ai/v4/[YOUR_PROJECT_ID]/10-sesame-api
 api_key = "[YOUR_API_KEY]"  # Replace with your Cerebrium API key
 
 # The text we want to convert to speech
-test_text = ("Cerebrium is a, uh, really great cloud platform for deploying your voice models. It's easy to use and "
-             "the team is very helpful.")
+test_text = (
+    "Cerebrium is a, uh, really great cloud platform for deploying your voice models. It's easy to use and "
+    "the team is very helpful."
+)
 
 # Prepare the request
 payload = json.dumps({"text": test_text})
-headers = {
-  'Authorization': f'Bearer {api_key}',
-  'Content-Type': 'application/json'
-}
+headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
 # Time the request
-print(f"Sending text to be converted: \"{test_text}\"")
+print(f'Sending text to be converted: "{test_text}"')
 start_time = time.time()
 response = requests.request("POST", url, headers=headers, data=payload)
 end_time = time.time()
@@ -32,7 +31,7 @@ if response.status_code == 200:
     print(f"Generated audio in {end_time - start_time:.2f} seconds!")
 
     # Convert base64 to audio file
-    audio_data = base64.b64decode(result['result']["audio_data"])
+    audio_data = base64.b64decode(result["result"]["audio_data"])
     audio_buffer = io.BytesIO(audio_data)
     audio, rate = sf.read(audio_buffer)
 

@@ -26,7 +26,9 @@ logger = logging.getLogger("comfyui-api")
 
 # Initialize FastAPI app
 app = FastAPI(title="ComfyUI API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+)
 
 # Define configuration
 server_address = "127.0.0.1:8188"
@@ -50,7 +52,9 @@ def websocket_connection():
         yield ws, client_id
     except Exception as e:
         logger.error(f"WebSocket connection error: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"ComfyUI server connection error: {str(e)}")
+        raise HTTPException(
+            status_code=503, detail=f"ComfyUI server connection error: {str(e)}"
+        )
     finally:
         if ws:
             try:
@@ -66,17 +70,21 @@ def load_workflow_file(file_path: str) -> dict:
             return json.load(json_file)
     except FileNotFoundError:
         logger.error(f"Workflow file not found: {file_path}")
-        raise HTTPException(status_code=500, detail=f"Workflow file not found: {file_path}")
+        raise HTTPException(
+            status_code=500, detail=f"Workflow file not found: {file_path}"
+        )
     except json.JSONDecodeError:
         logger.error(f"Invalid JSON in workflow file: {file_path}")
-        raise HTTPException(status_code=500, detail=f"Invalid JSON in workflow file: {file_path}")
+        raise HTTPException(
+            status_code=500, detail=f"Invalid JSON in workflow file: {file_path}"
+        )
 
 
 def cleanup_tempfiles(files):
     """Clean up temporary files."""
     for file in files:
         try:
-            if hasattr(file, 'name') and os.path.exists(file.name):
+            if hasattr(file, "name") and os.path.exists(file.name):
                 os.unlink(file.name)
         except Exception as e:
             logger.warning(f"Error cleaning up temp file: {str(e)}")
@@ -106,7 +114,9 @@ async def startup_event():
     if side_process is None:
         side_process = Process(
             target=setup_comfyui,
-            kwargs=dict(original_working_directory=original_working_directory, data_dir=""),
+            kwargs=dict(
+                original_working_directory=original_working_directory, data_dir=""
+            ),
             daemon=True,
         )
         side_process.start()
@@ -123,10 +133,14 @@ async def startup_event():
                     logger.info("Successfully connected to ComfyUI!")
                     break
             except Exception:
-                logger.info(f"Waiting for ComfyUI to start... ({attempt + 1}/{max_attempts})")
+                logger.info(
+                    f"Waiting for ComfyUI to start... ({attempt + 1}/{max_attempts})"
+                )
                 time.sleep(2)
         else:
-            logger.warning("Could not confirm ComfyUI is running after multiple attempts")
+            logger.warning(
+                "Could not confirm ComfyUI is running after multiple attempts"
+            )
 
 
 @app.post("/run")
@@ -157,11 +171,13 @@ async def run(workflow_values: dict, background_tasks: BackgroundTasks):
                         )
                         result.append(output)
                     except Exception as e:
-                        result.append({
-                            "node_id": node_id,
-                            "error": f"Failed to process output: {str(e)}",
-                            "format": "error"
-                        })
+                        result.append(
+                            {
+                                "node_id": node_id,
+                                "error": f"Failed to process output: {str(e)}",
+                                "format": "error",
+                            }
+                        )
 
             return {"result": result, "status": "success"}
     except Exception as e:
@@ -173,12 +189,10 @@ async def run(workflow_values: dict, background_tasks: BackgroundTasks):
 async def health_check():
     """Health check endpoint."""
     global side_process
-    process_status = "running" if side_process and side_process.is_alive() else "not running"
-    return {
-        "status": "ok",
-        "comfyui_process": process_status,
-        "timestamp": time.time()
-    }
+    process_status = (
+        "running" if side_process and side_process.is_alive() else "not running"
+    )
+    return {"status": "ok", "comfyui_process": process_status, "timestamp": time.time()}
 
 
 @app.on_event("shutdown")

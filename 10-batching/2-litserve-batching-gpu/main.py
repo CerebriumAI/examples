@@ -5,7 +5,9 @@ from transformers import pipeline
 class TextClassificationAPI(ls.LitAPI):
     def setup(self, device):
         print("setup")
-        self.model = pipeline("sentiment-analysis", model="stevhliu/my_awesome_model", device=device)
+        self.model = pipeline(
+            "sentiment-analysis", model="stevhliu/my_awesome_model", device=device
+        )
 
     def decode_request(self, request):
         print("decode_request")

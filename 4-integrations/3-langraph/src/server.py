@@ -11,6 +11,7 @@ load_dotenv()
 
 app = FastAPI()
 
+
 @app.get("/")
 async def redirect_root_to_docs():
     return RedirectResponse("/docs")
@@ -18,15 +19,14 @@ async def redirect_root_to_docs():
 
 @app.post("/generate")
 async def generate(state: State, request: Request):
-    
+
     graph = builder.compile()
     graph.name = "LangGraphDeployDemo"
     print(state)
     config = {
         "configurable": {"thread_id": "3"},
-        "messages": state.messages  # Add this line
-
-        }
+        "messages": state.messages,  # Add this line
+    }
     try:
         result = await graph.ainvoke(config)
         return {"success": True, "result": result}

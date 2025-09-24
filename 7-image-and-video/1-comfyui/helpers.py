@@ -59,12 +59,14 @@ def download_model(model_url: str, destination_path: str) -> bool:
         return False
 
 
-def download_tempfile(file_url: str, filename: str) -> Tuple[Optional[str], Optional[tempfile.NamedTemporaryFile]]:
+def download_tempfile(
+    file_url: str, filename: str
+) -> Tuple[Optional[str], Optional[tempfile.NamedTemporaryFile]]:
     """Download file to a temporary location."""
     temp_file = None
     try:
         # Extract file extension
-        file_ext = os.path.splitext(filename)[1] or '.tmp'
+        file_ext = os.path.splitext(filename)[1] or ".tmp"
 
         # Download
         response = http_session.get(file_url, timeout=REQUEST_TIMEOUT)
@@ -103,7 +105,7 @@ def add_custom_node(git_url: str) -> bool:
         logger.info(f"Cloning custom node: {git_url}")
         subprocess.run(
             ["git", "clone", git_url, target_dir, "--recursive", "--depth=1"],
-            check=True
+            check=True,
         )
 
         logger.info(f"Successfully cloned {git_url} to {target_dir}")
@@ -121,7 +123,9 @@ def setup_comfyui(original_working_directory: str, data_dir: str) -> None:
         os.makedirs(PERSISTENT_STORAGE_DIR, exist_ok=True)
 
         # Find model.json path
-        model_json_path = os.path.join(original_working_directory, data_dir, "model.json")
+        model_json_path = os.path.join(
+            original_working_directory, data_dir, "model.json"
+        )
         if not os.path.exists(model_json_path):
             alternate_paths = [
                 "model.json",
@@ -163,18 +167,16 @@ def setup_comfyui(original_working_directory: str, data_dir: str) -> None:
         logger.info("Model setup complete, starting ComfyUI server")
 
         # Run ComfyUI server
-        subprocess.run(
-            [sys.executable, "main.py"],
-            cwd=COMFYUI_DIR,
-            check=True
-        )
+        subprocess.run([sys.executable, "main.py"], cwd=COMFYUI_DIR, check=True)
 
     except Exception as e:
         logger.error(f"Error setting up ComfyUI: {str(e)}")
         raise RuntimeError(f"Failed to set up ComfyUI: {str(e)}")
 
 
-def queue_prompt(prompt: Dict[str, Any], client_id: str, server_address: str) -> Dict[str, Any]:
+def queue_prompt(
+    prompt: Dict[str, Any], client_id: str, server_address: str
+) -> Dict[str, Any]:
     """Queue a prompt with the ComfyUI server."""
     try:
         p = {"prompt": prompt, "client_id": client_id}
@@ -182,11 +184,13 @@ def queue_prompt(prompt: Dict[str, Any], client_id: str, server_address: str) ->
 
         url = f"http://{server_address}/prompt"
         req = urllib.request.Request(url, data=data)
-        req.add_header('Content-Type', 'application/json')
+        req.add_header("Content-Type", "application/json")
 
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
             result = json.loads(response.read())
-            logger.info(f"Successfully queued prompt, ID: {result.get('prompt_id', 'unknown')}")
+            logger.info(
+                f"Successfully queued prompt, ID: {result.get('prompt_id', 'unknown')}"
+            )
             return result
 
     except Exception as e:
@@ -194,15 +198,16 @@ def queue_prompt(prompt: Dict[str, Any], client_id: str, server_address: str) ->
         raise RuntimeError(f"Error queuing prompt: {str(e)}")
 
 
-def get_image(filename: str, subfolder: str, folder_type: str, server_address: str) -> bytes:
+def get_image(
+    filename: str, subfolder: str, folder_type: str, server_address: str
+) -> bytes:
     """Get an image from the ComfyUI server."""
     data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
     url_values = urllib.parse.urlencode(data)
 
     try:
         with urllib.request.urlopen(
-                f"http://{server_address}/view?{url_values}",
-                timeout=REQUEST_TIMEOUT
+            f"http://{server_address}/view?{url_values}", timeout=REQUEST_TIMEOUT
         ) as response:
             return response.read()
 
@@ -215,8 +220,7 @@ def get_history(prompt_id: str, server_address: str) -> Dict[str, Any]:
     """Get execution history for a prompt from the ComfyUI server."""
     try:
         with urllib.request.urlopen(
-                f"http://{server_address}/history/{prompt_id}",
-                timeout=REQUEST_TIMEOUT
+            f"http://{server_address}/history/{prompt_id}", timeout=REQUEST_TIMEOUT
         ) as response:
             output = json.loads(response.read())
             if prompt_id not in output:
@@ -229,7 +233,9 @@ def get_history(prompt_id: str, server_address: str) -> Dict[str, Any]:
         raise RuntimeError(f"Error retrieving execution history: {str(e)}")
 
 
-def get_images(ws, prompt: Dict[str, Any], client_id: str, server_address: str) -> Dict[str, List[Dict[str, Any]]]:
+def get_images(
+    ws, prompt: Dict[str, Any], client_id: str, server_address: str
+) -> Dict[str, List[Dict[str, Any]]]:
     """Queue prompt and wait for execution to complete, then retrieve all output images."""
     # Queue the prompt and get its ID
     prompt_id = queue_prompt(prompt, client_id, server_address)["prompt_id"]
@@ -312,13 +318,20 @@ def fill_template(workflow: Any, template_values: Dict[str, Any]) -> Any:
     """Fill template placeholders in a workflow."""
     if isinstance(workflow, dict):
         # Process dictionary
-        return {key: fill_template(value, template_values) for key, value in workflow.items()}
+        return {
+            key: fill_template(value, template_values)
+            for key, value in workflow.items()
+        }
 
     elif isinstance(workflow, list):
         # Process list
         return [fill_template(item, template_values) for item in workflow]
 
-    elif isinstance(workflow, str) and workflow.startswith("{{") and workflow.endswith("}}"):
+    elif (
+        isinstance(workflow, str)
+        and workflow.startswith("{{")
+        and workflow.endswith("}}")
+    ):
         # Process placeholder
         placeholder = workflow[2:-2].strip()
         if placeholder in template_values:
@@ -331,14 +344,18 @@ def fill_template(workflow: Any, template_values: Dict[str, Any]) -> Any:
         return workflow
 
 
-def convert_request_file_url_to_path(template_values: Dict[str, Any]) -> Tuple[Dict[str, Any], List[Any]]:
+def convert_request_file_url_to_path(
+    template_values: Dict[str, Any],
+) -> Tuple[Dict[str, Any], List[Any]]:
     """Convert URLs in template values to local file paths."""
     tempfiles = []
     new_template_values = template_values.copy()
 
     for key, value in template_values.items():
         # Handle URL strings
-        if isinstance(value, str) and (value.startswith("https://") or value.startswith("http://")):
+        if isinstance(value, str) and (
+            value.startswith("https://") or value.startswith("http://")
+        ):
             if value.endswith("/"):
                 value = value[:-1]
 
@@ -354,7 +371,9 @@ def convert_request_file_url_to_path(template_values: Dict[str, Any]) -> Tuple[D
     return new_template_values, tempfiles
 
 
-def convert_outputs_to_base64(node_id: str, file_name: str, file_data: Optional[bytes] = None) -> Dict[str, str]:
+def convert_outputs_to_base64(
+    node_id: str, file_name: str, file_data: Optional[bytes] = None
+) -> Dict[str, str]:
     """Convert output files to base64 representation."""
     try:
         if not file_data:
@@ -371,7 +390,7 @@ def convert_outputs_to_base64(node_id: str, file_name: str, file_data: Optional[
         base64_data = base64.b64encode(file_data).decode("utf-8")
 
         # Try to determine format
-        file_ext = os.path.splitext(file_name)[1].lower().strip('.')
+        file_ext = os.path.splitext(file_name)[1].lower().strip(".")
         if not file_ext:
             # Try to detect from image data
             try:
@@ -380,17 +399,8 @@ def convert_outputs_to_base64(node_id: str, file_name: str, file_data: Optional[
             except:
                 file_ext = "bin"
 
-        return {
-            "node_id": node_id,
-            "data": base64_data,
-            "format": file_ext
-        }
+        return {"node_id": node_id, "data": base64_data, "format": file_ext}
 
     except Exception as e:
         logger.error(f"Error converting output to base64: {str(e)}")
-        return {
-            "node_id": node_id,
-            "data": "",
-            "format": "error",
-            "error": str(e)
-        }
+        return {"node_id": node_id, "data": "", "format": "error", "error": str(e)}

@@ -36,7 +36,7 @@ transcripts = [
         "will have like a question block. And if you like, you know, punch it, a coin will "
         "come out. So like everyone, when they come into the park, they get like this little "
         "bracelet and then you can go punching question blocks around."
-    )
+    ),
 ]
 
 # Download the audio samples that accompany the transcripts
@@ -49,8 +49,9 @@ audio_paths = [
     hf_hub_download(
         repo_id="sesame/csm-1b",
         filename="prompts/conversational_b.wav",
-    )
+    ),
 ]
+
 
 def _load_prompt_audio(audio_path: str, target_sample_rate: int) -> torch.Tensor:
     """Helper function to load and resample audio files"""
@@ -60,6 +61,7 @@ def _load_prompt_audio(audio_path: str, target_sample_rate: int) -> torch.Tensor
         audio_tensor, orig_freq=sample_rate, new_freq=target_sample_rate
     )
     return audio_tensor
+
 
 # This is the function Cerebrium will call when we hit our endpoint
 def generate_audio(text: str):
@@ -74,7 +76,11 @@ def generate_audio(text: str):
     """
     # Create context segments from our example conversations
     segments = [
-        Segment(text=transcript, speaker=speaker, audio=_load_prompt_audio(audio_path, generator.sample_rate))
+        Segment(
+            text=transcript,
+            speaker=speaker,
+            audio=_load_prompt_audio(audio_path, generator.sample_rate),
+        )
         for transcript, speaker, audio_path in zip(transcripts, speakers, audio_paths)
     ]
 
@@ -92,6 +98,6 @@ def generate_audio(text: str):
     with open("audio.wav", "rb") as f:
         wav_data = f.read()
     os.remove("audio.wav")  # Clean up the temporary file
-    encoded_data = base64.b64encode(wav_data).decode('utf-8')
+    encoded_data = base64.b64encode(wav_data).decode("utf-8")
 
     return {"audio_data": encoded_data, "format": "wav", "encoding": "base64"}

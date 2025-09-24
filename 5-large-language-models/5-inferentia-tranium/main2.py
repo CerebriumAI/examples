@@ -2,8 +2,12 @@ import os
 import torch
 from transformers import AutoTokenizer
 from transformers_neuronx.llama.model import LlamaForSampling
-from transformers_neuronx.config import NeuronConfig, QuantizationConfig, GenerationConfig
-from transformers_neuronx.config import GenerationConfig 
+from transformers_neuronx.config import (
+    NeuronConfig,
+    QuantizationConfig,
+    GenerationConfig,
+)
+from transformers_neuronx.config import GenerationConfig
 from transformers_neuronx import GQA
 from transformers import LlamaForCausalLM, TextIteratorStreamer
 from huggingface_hub import login, logging
@@ -23,9 +27,11 @@ os.environ["HF_TRANSFER"] = "1"
 os.environ["HF_HUB_VERBOSE"] = "1"
 os.environ["HF_HUB_ENABLE_PROGRESS_BARS"] = "1"
 
+
 class Message(BaseModel):
     role: str
     content: str
+
 
 def format_chat_prompt(messages: list) -> str:
     formatted_messages = []
@@ -34,12 +40,18 @@ def format_chat_prompt(messages: list) -> str:
         formatted_messages.append(
             f"<|start_header_id|>{msg_obj.role}<|end_header_id|>\n{msg_obj.content}<|eot_id|>"
         )
-    return "<|begin_of_text|>" + "".join(formatted_messages) + "<|start_header_id|>assistant<|end_header_id|>"
+    return (
+        "<|begin_of_text|>"
+        + "".join(formatted_messages)
+        + "<|start_header_id|>assistant<|end_header_id|>"
+    )
 
 
 login(token=os.environ.get("HF_TOKEN"))
 
 llm = None
+
+
 async def run(
     messages: list,
     model: str = "meta-llama/Llama-3.1-70B-Instruct",
@@ -51,19 +63,21 @@ async def run(
 
     global llm  # Declare we're using the global llm variable
     if llm is None:
-        print("Initializing LLM...") 
+        print("Initializing LLM...")
         llm = LLM(
-            model="meta-llama/Meta-Llama-3.1-70B-Instruct", 
+            model="meta-llama/Meta-Llama-3.1-70B-Instruct",
             max_num_seqs=1,
             max_model_len=4092,
             block_size=4092,
             device="neuron",
             tensor_parallel_size=32,
-            gpu_memory_utilization=0.9
+            gpu_memory_utilization=0.9,
         )
-        print("Done initializing LLM...") 
+        print("Done initializing LLM...")
     prompt = format_chat_prompt(messages)
-    sampling_params = SamplingParams(temperature=temperature, top_p=0.95, max_tokens=max_tokens)
+    sampling_params = SamplingParams(
+        temperature=temperature, top_p=0.95, max_tokens=max_tokens
+    )
     outputs = llm.generate(prompt, sampling_params)
 
     previous_text = ""

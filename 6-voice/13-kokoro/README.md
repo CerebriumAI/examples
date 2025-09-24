@@ -7,6 +7,7 @@ This repository contains a FastAPI implementation of the Kokoro text-to-speech m
 1. Clone the repository: `git clone https://github.com/remsky/Kokoro-FastAPI.git`
 2. `cd Kokoro-FastAPI`
 3. Create a cerebrium.toml file with the following:
+
 ```
 [cerebrium.deployment]
 name = "13-kokoro"
@@ -40,4 +41,4 @@ dockerfile_path = "./docker/gpu/Dockerfile"
 4. Create a main.py - it can be empty.
 5. Run: `cerebrium deploy`
 6. Your API is up! Update test.py to have your deployment url in the format: https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxx/13-kokoro/v1
-7. Run `python test.py` to test your application 
+7. Run `python test.py` to test your application

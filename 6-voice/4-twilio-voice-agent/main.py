@@ -20,12 +20,16 @@ app.add_middleware(
 @app.post("/")
 async def start_call():
     print("POST TwiML")
-    return HTMLResponse(content=open("templates/streams.xml").read(), media_type="application/xml")
+    return HTMLResponse(
+        content=open("templates/streams.xml").read(), media_type="application/xml"
+    )
+
 
 #  health check endpoint
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

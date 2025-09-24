@@ -1,9 +1,9 @@
 {
-    "trunk": {
-      "name": "My outbound trunk",
-      "address": "<sip  name>.pstn.twilio.com",
-      "numbers": ["<twilio number>"],
-      "auth_username": "cerebrium",
-      "auth_password": "<password>"
-    }
+  "trunk": {
+    "name": "My outbound trunk",
+    "address": "<sip  name>.pstn.twilio.com",
+    "numbers": ["<twilio number>"],
+    "auth_username": "cerebrium",
+    "auth_password": "<password>"
   }
+}

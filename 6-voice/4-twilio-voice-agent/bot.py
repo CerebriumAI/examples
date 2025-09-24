@@ -29,6 +29,7 @@ twilio = Client(
     os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN")
 )
 
+
 async def main(websocket_client, stream_sid):
     transport = FastAPIWebsocketTransport(
         websocket=websocket_client,
@@ -48,12 +49,11 @@ async def main(websocket_client, stream_sid):
         api_key=os.environ.get("OPENAI_API_KEY"),
         model="gpt-4",
     )
-    
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
         voice_id="79a125e8-cd45-4c13-8a67-188112f4dd22",  # British Lady
-    )   
+    )
 
     messages = [
         {
@@ -61,7 +61,7 @@ async def main(websocket_client, stream_sid):
             "content": "You are a helpful LLM in an audio call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
         },
     ]
-    print('here', flush=True)
+    print("here", flush=True)
     context = OpenAILLMContext(messages=messages)
     context_aggregator = llm.create_context_aggregator(context)
 
@@ -82,7 +82,9 @@ async def main(websocket_client, stream_sid):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         # Kick off the conversation.
-        messages.append({"role": "system", "content": "Please introduce yourself to the user."})
+        messages.append(
+            {"role": "system", "content": "Please introduce yourself to the user."}
+        )
         await task.queue_frames([LLMMessagesFrame(messages)])
 
     @transport.event_handler("on_client_disconnected")

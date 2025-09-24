@@ -8,7 +8,7 @@ from livekit.agents import (
     WorkerType,
     cli,
     llm,
-    metrics
+    metrics,
 )
 from livekit import api
 from livekit.agents.pipeline import VoicePipelineAgent
@@ -19,20 +19,18 @@ import sys
 import logging
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 async def create_sip_participant(phone_number, room_name):
-    LIVEKIT_URL = os.getenv('LIVEKIT_URL')
-    LIVEKIT_API_KEY = os.getenv('LIVEKIT_API_KEY')
-    LIVEKIT_API_SECRET = os.getenv('LIVEKIT_API_SECRET')
-    SIP_TRUNK_ID = os.getenv('SIP_TRUNK_ID')
+    LIVEKIT_URL = os.getenv("LIVEKIT_URL")
+    LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
+    LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
+    SIP_TRUNK_ID = os.getenv("SIP_TRUNK_ID")
 
-    livekit_api = api.LiveKitAPI(
-        LIVEKIT_URL,
-        LIVEKIT_API_KEY,
-        LIVEKIT_API_SECRET
-    )
+    livekit_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
     sip_trunk_id = SIP_TRUNK_ID
     try:
         await livekit_api.sip.create_sip_participant(
@@ -41,7 +39,7 @@ async def create_sip_participant(phone_number, room_name):
                 sip_call_to=phone_number,
                 room_name=room_name,
                 participant_identity=f"sip_{phone_number}",
-                participant_name="SIP Caller"
+                participant_name="SIP Caller",
             )
         )
         await livekit_api.aclose()
@@ -49,6 +47,7 @@ async def create_sip_participant(phone_number, room_name):
     except Exception as e:
         await livekit_api.aclose()
         return f"Error: {str(e)}"
+
 
 async def entrypoint(ctx: JobContext):
 
@@ -58,13 +57,16 @@ async def entrypoint(ctx: JobContext):
     )
 
     fnc_ctx = llm.FunctionContext()
+
     @fnc_ctx.ai_callable()
     async def transfer_call(
         # by using the Annotated type, arg description and type are available to the LLM
     ):
         """Called when the receiver would like to be transferred to a real person. This function will add another participant to the call."""
         await create_sip_participant("<phone number to call>", "Test SIP Room")
-        await agent.say("Connecting you to my colleague - please hold on", allow_interruptions=True)
+        await agent.say(
+            "Connecting you to my colleague - please hold on", allow_interruptions=True
+        )
 
         await ctx.room.disconnect()
 
@@ -88,7 +90,7 @@ async def entrypoint(ctx: JobContext):
         interrupt_min_words=0,
         # minimal silence duration to consider end of turn
         min_endpointing_delay=0.3,
-        fnc_ctx=fnc_ctx
+        fnc_ctx=fnc_ctx,
     )
 
     usage_collector = metrics.UsageCollector()
@@ -110,8 +112,9 @@ async def entrypoint(ctx: JobContext):
     await agent.say("Hey, how can I help you today?", allow_interruptions=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) == 1:
-            sys.argv.append('start')
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, worker_type=WorkerType.ROOM, port=8600))
-
+        sys.argv.append("start")
+    cli.run_app(
+        WorkerOptions(entrypoint_fnc=entrypoint, worker_type=WorkerType.ROOM, port=8600)
+    )

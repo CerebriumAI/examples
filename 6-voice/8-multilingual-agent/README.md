@@ -3,6 +3,7 @@
 This repository demonstrates how to build a specialized French-speaking voice AI agent. While many voice AI solutions exist, handling multilingual applications effectively remains a challenge. This implementation focuses on achieving high accuracy in French language processing while maintaining low latency (~500ms) and reasonable costs.
 
 Our solution addresses several key challenges in multilingual voice AI:
+
 - Utilizing Cartesia's enhanced TTS capabilities with support for French accents and gendered voices
 - Implementing optimized STT (Speech-to-text) processing to minimize Word Error Rate (WER) while maintaining low latency
 - Leveraging modern LLM capabilities for French language understanding and response generation
@@ -33,4 +34,3 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 - [Pipecat](https://github.com/daily-co/pipecat) - Open source framework for voice and multimodal conversational AI
 - [Daily](https://www.daily.co/) - WebRTC platform for real-time video and audio communication
 - [Cerebrium](https://www.cerebrium.ai/) - Platform for deploying and scaling AI applications
-

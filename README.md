@@ -4,7 +4,6 @@
   </a>
 </p>
 
-
 Welcome to Cerebrium's official examples repository! This collection of examples helps you get started with building Machine Learning / AI applications on the platform. Whether you're looking to deploy LLMs, process voice data, or handle image and video tasks, you'll find practical, ready-to-use examples here.
 
 ## How to Use This Repository
@@ -14,11 +13,12 @@ Each example is a self-contained project that demonstrates a specific use case. 
 Deploy each example by cloning the repo and running the `cerebrium deploy` command in each example folder.
 
 ## Categories
+
 We've split each of the examples by category to make them easier to find.
 
 ### 1. Getting started 🚀
 
-1. [Deploy your first model](1-getting-started/1-first-cortex-deployment) 
+1. [Deploy your first model](1-getting-started/1-first-cortex-deployment)
 2. [Managing secrets and configurations](1-getting-started/2-using-cerebrium-secrets)
 3. [CPU-only workloads](1-getting-started/3-cpu-only)
 
@@ -30,10 +30,12 @@ We've split each of the examples by category to make them easier to find.
 4. [Multi-GPU inference](2-advanced-concepts/4-multi-gpu-inference)
 
 ### 3. Endpoints 🛤
+
 1. [WebSockets](3-endpoints/1-websockets)
 2. [Implement simple output streaming](3-endpoints/2-simple-streaming)
 
 ### 4. Integrations 🤝
+
 1. [Create a Langchain QA system](4-integrations/1-langchain-QA)
 2. [Create a virtual calendar assistant with Langsmith](4-integrations/2-tool-calling-langsmith)
 
@@ -56,7 +58,6 @@ We've split each of the examples by category to make them easier to find.
 9. [Transcribing with FasterWhisper](6-voice/9-faster-whisper)
 10. [Sesame Conversational Speech Model (CSM) API](6-voice/10-sesame-voice-api)
 
-
 ### 7. Image & Video 📸
 
 1. [Deploy ComfyUI on Cerebrium](7-image-and-video/1-comfyui)
@@ -68,15 +69,18 @@ We've split each of the examples by category to make them easier to find.
 7. [How to generate images faster with SDXL](7-image-and-video/7-faster-image-generation)
 
 ### 8. Migrations 🚚
+
 1. [Migrate your COG model to SDXL](8-migrations/1-cog-migration-sdxl)
 
 ### 9. Application demos 🎬
+
 1. [Create a sales training tool with Mistral](8-application-demos/1-sales-trainer)
 2. [Find products for sale using a live video stream](8-application-demos/2-ecommerce-live-stream)
 3. [AI commentator](8-application-demos/3-ai-commentator)
-3. [AI coding agent](8-application-demos/4-ai-coding-agent)
+4. [AI coding agent](8-application-demos/4-ai-coding-agent)
 
 ### 10. Batching 📦
+
 1. [Implement batching with LitServe - CPU version](10-batching/1-litserve-batching-cpu)
 2. [Implement batching with LitServe - GPU version](10-batching/2-litserve-batching-gpu)
 3. [Batching requests with vLLM](10-batching/3-vllm-batching-gpu)
@@ -88,13 +92,13 @@ We've split each of the examples by category to make them easier to find.
 2. [Create ML web interfaces with Gradio](11-python-apps/2-asgi-gradio-interface)
 
 ## How to Contribute 🤝
+
 We love contributions! Here's how you can contribute to our examples repository:
 
 - Fork the repository
 - Create a new branch for your example
 - Add your example following our template
 - Include a clear README with:
-
   - Description of the example
   - Requirements
   - Step-by-step setup instructions
@@ -104,6 +108,7 @@ We love contributions! Here's how you can contribute to our examples repository:
 Share your fork with us on our [Discord](https://discord.gg/ATj6USmeE2) community or on social media. Highly valuable examples for the community will be merged into the master repo.
 
 #### 🎁 Get Free Swag!
+
 For each successful contribution, we'll send you exclusive Cerebrium swag! To be eligible:
 
 - Your PR must be merged
@@ -112,7 +117,7 @@ For each successful contribution, we'll send you exclusive Cerebrium swag! To be
   - A blog post explaining your example
   - A tutorial video demonstrating your example
 
-#### 🦮 Contribution Guidelines 
+#### 🦮 Contribution Guidelines
 
 - Ensure your example is well-documented
 - Make sure that your example deploys successfully

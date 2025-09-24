@@ -6,10 +6,10 @@ from translator import TranslationService
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger('main')
+logger = logging.getLogger("main")
 
 
 async def run(room_url, target_language, user_name, user_id):
@@ -31,7 +31,9 @@ async def run(room_url, target_language, user_name, user_id):
 
     Daily.init()
 
-    translation_service = TranslationService(room_url, target_language, user_name, user_id)
+    translation_service = TranslationService(
+        room_url, target_language, user_name, user_id
+    )
 
     translation_service.join(room_url)
 

@@ -5,7 +5,7 @@ import numpy as np
 class SimpleBatchedAPI(ls.LitAPI):
     def setup(self, device):
         print("setup")
-        self.model = lambda x: x ** 2
+        self.model = lambda x: x**2
 
     def decode_request(self, request):
         print("decode_request")

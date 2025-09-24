@@ -240,19 +240,21 @@ def format_openai_response(chunk):
                 "delta": {
                     "role": choice.delta.role,
                     "content": choice.delta.content,
-                    "tool_calls": [
-                        {
-                            "id": tool_call.id,
-                            "type": "function",
-                            "function": {
-                                "name": tool_call.function.name,
-                                "arguments": tool_call.function.arguments,
-                            },
-                        }
-                        for tool_call in choice.delta.tool_calls
-                    ]
-                    if choice.delta.tool_calls
-                    else [],
+                    "tool_calls": (
+                        [
+                            {
+                                "id": tool_call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call.function.name,
+                                    "arguments": tool_call.function.arguments,
+                                },
+                            }
+                            for tool_call in choice.delta.tool_calls
+                        ]
+                        if choice.delta.tool_calls
+                        else []
+                    ),
                 },
                 "finish_reason": choice.finish_reason,
             }
@@ -262,9 +264,9 @@ def format_openai_response(chunk):
         "created": chunk.data.created,
         "usage": {
             "prompt_tokens": chunk.data.usage.prompt_tokens if chunk.data.usage else 0,
-            "completion_tokens": chunk.data.usage.completion_tokens
-            if chunk.data.usage
-            else 0,
+            "completion_tokens": (
+                chunk.data.usage.completion_tokens if chunk.data.usage else 0
+            ),
             "total_tokens": chunk.data.usage.total_tokens if chunk.data.usage else 0,
         },
     }
@@ -311,19 +313,21 @@ async def run(
             tool_obj = {
                 "role": "assistant",
                 "content": chunk.data.choices[0].delta.content,
-                "tool_calls": [
-                    {
-                        "id": tool_call.id,
-                        "type": "function",
-                        "function": {
-                            "name": tool_call.function.name,
-                            "arguments": tool_call.function.arguments,
-                        },
-                    }
-                    for tool_call in chunk.data.choices[0].delta.tool_calls
-                ]
-                if chunk.data.choices[0].delta.tool_calls
-                else [],
+                "tool_calls": (
+                    [
+                        {
+                            "id": tool_call.id,
+                            "type": "function",
+                            "function": {
+                                "name": tool_call.function.name,
+                                "arguments": tool_call.function.arguments,
+                            },
+                        }
+                        for tool_call in chunk.data.choices[0].delta.tool_calls
+                    ]
+                    if chunk.data.choices[0].delta.tool_calls
+                    else []
+                ),
             }
             messages.append(tool_obj)
 
@@ -429,18 +433,24 @@ def create_persona(type: str = "sales"):
 
     payload = {
         "persona_name": "Sales Coach" if type == "sales" else "Interview Coach",
-        "system_prompt": "You are the lead engineer at an AI company called Pillowsoft, and are frustrated with your infrastructure provider, AI Infra. They have ongoing platform outages that are causing issues on your platform. Your job is to find out when AI Infra will remedy these solutions. Keep your responses relatively short. Ask for clarification if a user response is ambiguous."
-        if type == "sales"
-        else "You are the lead recruiter at the AI company Pillowsoft and are recruiting for a multitude of roles. Be very polite, professional and conversational.",
-        "context": "You are on a call with an account executive from AI Infra, the provider of your platform's machine learning infrastructure. Their repeated service disruptions are causing downtime for your platform, leading to unhappy customers and affecting your business. You are seeking a solution and demanding accountability from AI Infra for when they will solve these issues."
-        if type == "sales"
-        else "You are on a call with a potential candidate who applied for a job at your company. Be very polite and upbeat. This is your first call with them so you are just trying to gather some initial data about them.",
+        "system_prompt": (
+            "You are the lead engineer at an AI company called Pillowsoft, and are frustrated with your infrastructure provider, AI Infra. They have ongoing platform outages that are causing issues on your platform. Your job is to find out when AI Infra will remedy these solutions. Keep your responses relatively short. Ask for clarification if a user response is ambiguous."
+            if type == "sales"
+            else "You are the lead recruiter at the AI company Pillowsoft and are recruiting for a multitude of roles. Be very polite, professional and conversational."
+        ),
+        "context": (
+            "You are on a call with an account executive from AI Infra, the provider of your platform's machine learning infrastructure. Their repeated service disruptions are causing downtime for your platform, leading to unhappy customers and affecting your business. You are seeking a solution and demanding accountability from AI Infra for when they will solve these issues."
+            if type == "sales"
+            else "You are on a call with a potential candidate who applied for a job at your company. Be very polite and upbeat. This is your first call with them so you are just trying to gather some initial data about them."
+        ),
         "layers": {
             "llm": {
                 "model": "mistral-large-latest",
-                "base_url": "https://api.aws.us-east-1.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_sales"
-                if type == "sales"
-                else "https://api.aws.us-east-1.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_interview",
+                "base_url": (
+                    "https://api.aws.us-east-1.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_sales"
+                    if type == "sales"
+                    else "https://api.aws.us-east-1.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_interview"
+                ),
                 "api_key": os.environ.get("CEREBRIUM_JWT"),
                 "tools": sales_tools if type == "sales" else interview_tools,
             },
@@ -450,9 +460,9 @@ def create_persona(type: str = "sales"):
                 "external_voice_id": "820a3788-2b37-4d21-847a-b65d8a68c99a",
                 "voice_settings": {
                     "speed": "fast" if type == "sales" else "normal",
-                    "emotion": ["anger:highest"]
-                    if type == "sales"
-                    else ["positivity:high"],
+                    "emotion": (
+                        ["anger:highest"] if type == "sales" else ["positivity:high"]
+                    ),
                 },
             },
             "vqa": {"enable_vision": "false"},
@@ -478,12 +488,16 @@ def create_tavus_conversation(type: str):
         "replica_id": "r79e1c033f",
         "persona_id": "pb6df328" if type == "sales" else "paea55e8",
         "callback_url": "https://webhook.site/c7957102-15a7-49e5-a116-26a9919c5c8e",
-        "conversation_name": "Sales Training with Candidate"
-        if type == "sales"
-        else "Interview with Candidate",
-        "custom_greeting": "Hi! Lets jump straight into it! We have been having a large number of issues with your platform and I want to have this call to try and solve it"
-        if type == "sales"
-        else "Hi! Nice to meet you! Please can you start with your name and telling me a bit about yourself.",
+        "conversation_name": (
+            "Sales Training with Candidate"
+            if type == "sales"
+            else "Interview with Candidate"
+        ),
+        "custom_greeting": (
+            "Hi! Lets jump straight into it! We have been having a large number of issues with your platform and I want to have this call to try and solve it"
+            if type == "sales"
+            else "Hi! Nice to meet you! Please can you start with your name and telling me a bit about yourself."
+        ),
         "properties": {
             "max_call_duration": 300,
             "participant_left_timeout": 10,

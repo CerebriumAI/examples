@@ -48,12 +48,15 @@ npm install -g @paypal/mcp
 ### 4. Run the Agent
 
 Uncomment the file
+
 ```bash
 python pipecat_agent/main.py
 ```
 
 ## 5. Deploy on Cerebrium
+
 Run
+
 ```bash
 pip install cerebrium
 cerebrium login
@@ -61,6 +64,7 @@ cerebrium deploy
 ```
 
 It should return a deployment url that you can then hit in order to join a meeting room. The request should be something like:
+
 ```
 curl --location 'https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxx/pipecat-agent/start_bot' \
 --header 'Authorization: Bearer <CEREBRIUM_API_TOKEN>' \
@@ -71,6 +75,7 @@ curl --location 'https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxx/pipecat-agen
 ## How It Works
 
 The agent uses:
+
 - **Pipecat** for the voice pipeline (speech-to-text, LLM, text-to-speech)
 - **PayPal MCP** for transaction and invoice management
 - **Daily.co** for WebRTC voice calls
@@ -82,9 +87,8 @@ The agent uses:
 ## Available PayPal Functions
 
 Through MCP, the agent can:
+
 - List transactions
 - Create invoices
 - Check payment status
 - And more PayPal API functions
-
-

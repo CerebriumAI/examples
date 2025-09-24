@@ -22,7 +22,9 @@ GRADIO_PORT = int(os.getenv("GRADIO_PORT", "7860"))
 GRADIO_URL = os.getenv("GRADIO_SERVER_URL", f"http://{GRADIO_HOST}:{GRADIO_PORT}")
 
 # Configure the Llama endpoint URL
-LLAMA_ENDPOINT = os.getenv("LLAMA_ENDPOINT", "<YOUR_MODEL_API_ENDPOINT>")  # Update with your endpoint
+LLAMA_ENDPOINT = os.getenv(
+    "LLAMA_ENDPOINT", "<YOUR_MODEL_API_ENDPOINT>"
+)  # Update with your endpoint
 
 
 class GradioServer:
@@ -37,10 +39,12 @@ class GradioServer:
         # Convert history and new message into OpenAI chat format
         messages = []
         for h in history:
-            messages.extend([
-                {"role": "user", "content": h[0]},
-                {"role": "assistant", "content": h[1]}
-            ])
+            messages.extend(
+                [
+                    {"role": "user", "content": h[0]},
+                    {"role": "assistant", "content": h[1]},
+                ]
+            )
         messages.append({"role": "user", "content": message})
 
         async with httpx.AsyncClient() as client:
@@ -52,14 +56,14 @@ class GradioServer:
                         "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
                         "stream": False,
                         "temperature": 0.7,
-                        "top_p": 0.95
+                        "top_p": 0.95,
                     },
-                    timeout=30.0
+                    timeout=30.0,
                 )
 
                 if response.status_code == 200:
                     response_data = response.json()
-                    return response_data['choices'][0]['text']
+                    return response_data["choices"][0]["text"]
                 else:
                     return f"Error: Received status code {response.status_code} from Llama endpoint"
             except Exception as e:
@@ -74,14 +78,14 @@ class GradioServer:
             examples=[
                 ["What is the capital of France?"],
                 ["Explain quantum computing in simple terms"],
-                ["Write a short poem about technology"]
+                ["Write a short poem about technology"],
             ],
         )
         interface.launch(
             server_name=self.host,
             server_port=self.port,
             root_path=f"https://api.aws.us-east-1.cerebrium.ai/v4/{os.getenv('PROJECT_ID')}/{os.getenv('APP_NAME')}/",
-            quiet=True
+            quiet=True,
         )
 
     def start(self):
@@ -152,7 +156,9 @@ async def gradio(request: Request):
 @app.on_event("startup")
 async def startup_event():
     global gradio_server
-    if not os.getenv("GRADIO_SERVER_URL"):  # Only start local server if no external URL provided
+    if not os.getenv(
+        "GRADIO_SERVER_URL"
+    ):  # Only start local server if no external URL provided
         gradio_server = GradioServer()
         if not gradio_server.start():
             sys.exit(1)

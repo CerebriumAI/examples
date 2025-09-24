@@ -68,24 +68,21 @@ To use Anthropic's chat models:
 ```
 ANTHROPIC_API_KEY=your-api-key
 ```
+
 #### OpenAI
 
 To use OpenAI's chat models:
 
 1. Sign up for an [OpenAI API key](https://platform.openai.com/signup).
 2. Once you have your API key, add it to your `.env` file:
+
 ```
 OPENAI_API_KEY=your-api-key
 ```
 
-
-
-
-
 <!--
 End setup instructions
 -->
-
 
 3. Customize whatever you'd like in the code.
 4. Open the folder LangGraph Studio!

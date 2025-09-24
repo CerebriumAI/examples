@@ -17,9 +17,11 @@ engine_args = AsyncEngineArgs(
 )
 engine = AsyncLLMEngine.from_engine_args(engine_args)
 
+
 class Message(BaseModel):
     role: str
     content: str
+
 
 async def run(
     messages: list,
@@ -30,7 +32,9 @@ async def run(
     top_p: float = 0.95,
     max_tokens: int = 4096,
 ):
-    prompt = " ".join([f"{Message(**msg).role}: {Message(**msg).content}" for msg in messages])
+    prompt = " ".join(
+        [f"{Message(**msg).role}: {Message(**msg).content}" for msg in messages]
+    )
     sampling_params = SamplingParams(temperature=temperature, top_p=top_p)
     results_generator = engine.generate(prompt, sampling_params, run_id)
 
@@ -39,7 +43,7 @@ async def run(
 
     async for output in results_generator:
         prompt_output = output.outputs
-        new_text = prompt_output[0].text[len(previous_text):]
+        new_text = prompt_output[0].text[len(previous_text) :]
         previous_text = prompt_output[0].text
 
         chunk = {
@@ -47,13 +51,7 @@ async def run(
             "object": "chat.completion.chunk",
             "created": int(time.time()),
             "model": model,
-            "choices": [
-                {
-                    "index": 0,
-                    "delta": {},
-                    "finish_reason": None
-                }
-            ]
+            "choices": [{"index": 0, "delta": {}, "finish_reason": None}],
         }
 
         # Include role in the first chunk

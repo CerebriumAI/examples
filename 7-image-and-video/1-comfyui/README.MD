@@ -5,6 +5,7 @@ This project provides a FastAPI-based wrapper around ComfyUI, making it easy to 
 ## Overview
 
 The ComfyUI API Wrapper starts a ComfyUI server in the background and exposes endpoints to:
+
 - Run Stable Diffusion workflows with custom parameters
 - Check server health status
 - Dynamically load and configure models
@@ -14,17 +15,20 @@ The API automatically handles model downloading, workflow template substitution,
 ## Installation
 
 1. Clone this repository:
+
 ```bash
 git clone https://github.com/yourusername/comfyui-api-wrapper.git
 cd comfyui-api-wrapper
 ```
 
 2. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 3. Clone ComfyUI repository (if not already included):
+
 ```bash
 git clone https://github.com/comfyanonymous/ComfyUI
 pip install -r ComfyUI/requirements.txt
@@ -33,6 +37,7 @@ pip install -r ComfyUI/requirements.txt
 4. Update your workflow template in `workflow_api.json` and models in `model.json` if needed.
 
 5. Deploy to Cerebrium:
+
 ```bash
 cerebrium deploy
 ```

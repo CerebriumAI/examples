@@ -9,6 +9,7 @@ shutdown_event = asyncio.Event()
 active_requests = 0
 active_requests_lock = asyncio.Lock()
 
+
 class Item(BaseModel):
     # Add your input parameters here
     prompt: str
@@ -31,6 +32,7 @@ async def predict(item: Item = Body(...)):
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
 
 @asynccontextmanager
 async def track_active_requests():
@@ -57,6 +59,7 @@ async def on_shutdown():
 
     logger.info("All requests completed. Proceeding with shutdown.")
     shutdown_event.set()
+
 
 """
 To deploy your model, run:

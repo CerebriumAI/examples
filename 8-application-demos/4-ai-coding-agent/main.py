@@ -50,10 +50,10 @@ class Fragment(FragmentBase):
     commentary: str = Field(description="Implementation details for the fragment")
     status: str = "pending"
 
-    @validator('status')
+    @validator("status")
     def validate_status(cls, v):
-        if v not in ['pending', 'in_progress', 'completed', 'error']:
-            raise ValueError('Invalid status')
+        if v not in ["pending", "in_progress", "completed", "error"]:
+            raise ValueError("Invalid status")
         return v
 
 
@@ -67,7 +67,9 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
 
-async def get_fragments_structure(prompt: str, websocket: WebSocket) -> List[FragmentBase]:
+async def get_fragments_structure(
+    prompt: str, websocket: WebSocket
+) -> List[FragmentBase]:
     """Generate fragment structure"""
     system_prompt = """Return a valid JSON array of Next.js component fragments.
     Each fragment should contain only the structural information (no code, descriptions or implementation details).
@@ -111,7 +113,7 @@ async def get_fragments_structure(prompt: str, websocket: WebSocket) -> List[Fra
 
     try:
         json_str = await stream_tokens(chat, websocket, "structure")
-        json_str = json_str[json_str.find('['):json_str.rfind(']') + 1]
+        json_str = json_str[json_str.find("[") : json_str.rfind("]") + 1]
 
         raw_fragments = json.loads(json_str)
         logger.info(f"Raw fragments: {raw_fragments}")
@@ -121,10 +123,9 @@ async def get_fragments_structure(prompt: str, websocket: WebSocket) -> List[Fra
 
         fragments = [FragmentBase(**f) for f in raw_fragments]
 
-        await websocket.send_json({
-            "type": "fragment_structure",
-            "content": [f.dict() for f in fragments]
-        })
+        await websocket.send_json(
+            {"type": "fragment_structure", "content": [f.dict() for f in fragments]}
+        )
         return fragments
     except Exception as e:
         logger.error(f"Structure generation error: {e}")
@@ -132,15 +133,21 @@ async def get_fragments_structure(prompt: str, websocket: WebSocket) -> List[Fra
         raise
 
 
-async def generate_commentary(fragment: FragmentBase, fragments: List[FragmentBase], prompt: str,
-                              websocket: WebSocket) -> str:
+async def generate_commentary(
+    fragment: FragmentBase,
+    fragments: List[FragmentBase],
+    prompt: str,
+    websocket: WebSocket,
+) -> str:
     """Generate implementation commentary for a fragment"""
 
-    other_fragments = "\n".join([
-        f"- {f.title}: {f.description} (in {f.file_path})"
-        for f in fragments
-        if f.id != fragment.id
-    ])
+    other_fragments = "\n".join(
+        [
+            f"- {f.title}: {f.description} (in {f.file_path})"
+            for f in fragments
+            if f.id != fragment.id
+        ]
+    )
 
     context_prompt = f"""You are a senior frontend developer explaining the implementation approach for a Next.js component.
 
@@ -188,25 +195,63 @@ async def generate_commentary(fragment: FragmentBase, fragments: List[FragmentBa
     return await stream_tokens(context_chat, websocket, f"context_{fragment.id}")
 
 
-async def generate_code(fragment: FragmentBase, fragments: List[FragmentBase], prompt: str,
-                        websocket: WebSocket) -> str:
+async def generate_code(
+    fragment: FragmentBase,
+    fragments: List[FragmentBase],
+    prompt: str,
+    websocket: WebSocket,
+) -> str:
     """Generate code for a fragment with strict import validation"""
 
     valid_shadcn_components = [
-        "accordion", "alert", "alert-dialog", "aspect-ratio", "avatar", "badge",
-        "button", "calendar", "card", "carousel", "checkbox", "collapsible",
-        "command", "context-menu", "dialog", "dropdown-menu", "form", "hover-card",
-        "input", "label", "menubar", "navigation-menu", "popover", "progress",
-        "radio-group", "scroll-area", "select", "separator", "sheet", "skeleton",
-        "slider", "switch", "table", "tabs", "textarea", "toast", "toggle",
-        "tooltip", "carousel"
+        "accordion",
+        "alert",
+        "alert-dialog",
+        "aspect-ratio",
+        "avatar",
+        "badge",
+        "button",
+        "calendar",
+        "card",
+        "carousel",
+        "checkbox",
+        "collapsible",
+        "command",
+        "context-menu",
+        "dialog",
+        "dropdown-menu",
+        "form",
+        "hover-card",
+        "input",
+        "label",
+        "menubar",
+        "navigation-menu",
+        "popover",
+        "progress",
+        "radio-group",
+        "scroll-area",
+        "select",
+        "separator",
+        "sheet",
+        "skeleton",
+        "slider",
+        "switch",
+        "table",
+        "tabs",
+        "textarea",
+        "toast",
+        "toggle",
+        "tooltip",
+        "carousel",
     ]
 
-    other_components = "\n".join([
-        f"{f.title} ({f.description}) - {f.file_path}"
-        for f in fragments
-        if f.id != fragment.id
-    ])
+    other_components = "\n".join(
+        [
+            f"{f.title} ({f.description}) - {f.file_path}"
+            for f in fragments
+            if f.id != fragment.id
+        ]
+    )
 
     code_prompt = f"""You are an expert Next.js developer. Generate code for this component:
     Title: {fragment.title}
@@ -242,16 +287,23 @@ async def generate_code(fragment: FragmentBase, fragments: List[FragmentBase], p
     return await stream_tokens(code_chat, websocket, f"code_{fragment.id}")
 
 
-async def stream_tokens(prompt: str, websocket: WebSocket, msg_type: str = "token") -> str:
+async def stream_tokens(
+    prompt: str, websocket: WebSocket, msg_type: str = "token"
+) -> str:
     """Generate and stream tokens with preprocessing to remove markdown artifacts"""
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+    streamer = TextIteratorStreamer(
+        tokenizer, skip_prompt=True, skip_special_tokens=True
+    )
 
-    Thread(target=model.generate, kwargs={
-        **inputs,
-        "max_new_tokens": 512,
-        "streamer": streamer,
-    }).start()
+    Thread(
+        target=model.generate,
+        kwargs={
+            **inputs,
+            "max_new_tokens": 512,
+            "streamer": streamer,
+        },
+    ).start()
 
     text = ""
     buffer = ""
@@ -259,7 +311,9 @@ async def stream_tokens(prompt: str, websocket: WebSocket, msg_type: str = "toke
     language_detected = False
 
     # Common language identifiers (typescript, javascript, tsx, etc.)
-    lang_pattern = re.compile(r"^(typescript|javascript|tsx|jsx|ts|js)\s*$", re.IGNORECASE)
+    lang_pattern = re.compile(
+        r"^(typescript|javascript|tsx|jsx|ts|js)\s*$", re.IGNORECASE
+    )
 
     try:
         for token in streamer:
@@ -313,10 +367,12 @@ async def stream_tokens(prompt: str, websocket: WebSocket, msg_type: str = "toke
 
 
 def deploy_to_e2b(fragments: List[Fragment]):
-    sandbox = Sandbox("22wede53y0614elkgps2", timeout=SANDBOX_TIMEOUT, api_key=E2B_API_KEY)
+    sandbox = Sandbox(
+        "22wede53y0614elkgps2", timeout=SANDBOX_TIMEOUT, api_key=E2B_API_KEY
+    )
 
     for fragment in fragments:
-        if fragment.status == 'completed' and fragment.file_path and fragment.code:
+        if fragment.status == "completed" and fragment.file_path and fragment.code:
             sandbox.files.write(fragment.file_path, fragment.code)
 
     if any(fragment.dependencies for fragment in fragments):
@@ -342,58 +398,52 @@ async def websocket_endpoint(websocket: WebSocket):
         if not prompt:
             raise ValueError("No prompt provided")
 
-        await websocket.send_json({
-            "type": "status",
-            "content": "Generating component structure..."
-        })
+        await websocket.send_json(
+            {"type": "status", "content": "Generating component structure..."}
+        )
 
         fragments = []
         fragment_bases = await get_fragments_structure(prompt, websocket)
 
-        await websocket.send_json({
-            "type": "status",
-            "content": "Structure generated. Creating components..."
-        })
+        await websocket.send_json(
+            {"type": "status", "content": "Structure generated. Creating components..."}
+        )
 
         total_fragments = len(fragment_bases)
         for idx, base in enumerate(fragment_bases, 1):
-            await websocket.send_json({
-                "type": "status",
-                "content": f"Generating component {idx}/{total_fragments}: {base.title}"
-            })
+            await websocket.send_json(
+                {
+                    "type": "status",
+                    "content": f"Generating component {idx}/{total_fragments}: {base.title}",
+                }
+            )
             commentary = await generate_commentary(base, fragments, prompt, websocket)
 
-            await websocket.send_json({
-                "type": "status",
-                "content": f"Writing code for {base.title}..."
-            })
+            await websocket.send_json(
+                {"type": "status", "content": f"Writing code for {base.title}..."}
+            )
             code = await generate_code(base, fragments, prompt, websocket)
 
             # Create complete fragment
             fragment_dict = base.dict()
             fragment = Fragment(
-                **fragment_dict,
-                code=code,
-                commentary=commentary,
-                status="completed"
+                **fragment_dict, code=code, commentary=commentary, status="completed"
             )
 
             fragments.append(fragment)
-            await websocket.send_json({
-                "type": "fragment_update",
-                "content": fragment.dict()
-            })
+            await websocket.send_json(
+                {"type": "fragment_update", "content": fragment.dict()}
+            )
 
-        await websocket.send_json({
-            "type": "status",
-            "content": "All components generated. Starting deployment..."
-        })
+        await websocket.send_json(
+            {
+                "type": "status",
+                "content": "All components generated. Starting deployment...",
+            }
+        )
         preview_url = deploy_to_e2b(fragments)
 
-        await websocket.send_json({
-            "type": "preview_url",
-            "content": preview_url
-        })
+        await websocket.send_json({"type": "preview_url", "content": preview_url})
 
     except Exception as e:
         logger.error(f"Error: {e}")

@@ -10,6 +10,7 @@ Note:
     - If you're using GPU's that do not have nvlink, inter-gpu communication will be slower, but it will still work.
     - To speedup loading of model weights, take a look at the folder in this repo which shows you how to speedup loading of model weights.
 """
+
 import os
 from typing import Optional
 
@@ -19,9 +20,9 @@ from accelerate import Accelerator
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, LlamaTokenizer, GenerationConfig
 
-os.environ[
-    "HF_HUB_ENABLE_HF_TRANSFER"
-] = "true"  # to enable faster weights download on first time build
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = (
+    "true"  # to enable faster weights download on first time build
+)
 
 # initialise accelerator. We'll use this as an easier way to get some speedup
 accelerator = Accelerator()
