@@ -6,7 +6,7 @@ import io
 import time
 
 # Replace with your actual endpoint and API key
-url = "https://api.cortex.cerebrium.ai/v4/[YOUR_PROJECT_ID]/10-sesame-api/generate_audio"
+url = "https://api.aws.us-east-1.cerebrium.ai/v4/[YOUR_PROJECT_ID]/10-sesame-api/generate_audio"
 api_key = "[YOUR_API_KEY]"  # Replace with your Cerebrium API key
 
 # The text we want to convert to speech

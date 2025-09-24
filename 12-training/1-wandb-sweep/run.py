@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CEREBRIUM_API_KEY = os.getenv("CEREBRIUM_API_KEY")
-ENDPOINT_URL = "https://api.cortex.cerebrium.ai/v4/p-xxxx/wandb-sweep/train_model?async=true"
+ENDPOINT_URL = "https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxx/wandb-sweep/train_model?async=true"
 
 def train_with_params(params: Dict[str, Any]):
     """

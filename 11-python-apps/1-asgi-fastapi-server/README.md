@@ -25,7 +25,7 @@ healthcheck_endpoint = "/health"
 ## Making a request
 
 ```bash
-curl --location 'https://api.cortex.cerebrium.ai/v4/<your-project-id>/1-asgi-fastapi-server/predict' \
+curl --location 'https://api.aws.us-east-1.cerebrium.ai/v4/<your-project-id>/1-asgi-fastapi-server/predict' \
 --header 'Authorization: Bearer <your-rest-api-key>' \
 --header 'Content-Type: application/json' \
 --data '{

@@ -80,7 +80,7 @@ class GradioServer:
         interface.launch(
             server_name=self.host,
             server_port=self.port,
-            root_path=f"https://api.cortex.cerebrium.ai/v4/{os.getenv('PROJECT_ID')}/{os.getenv('APP_NAME')}/",
+            root_path=f"https://api.aws.us-east-1.cerebrium.ai/v4/{os.getenv('PROJECT_ID')}/{os.getenv('APP_NAME')}/",
             quiet=True
         )
 

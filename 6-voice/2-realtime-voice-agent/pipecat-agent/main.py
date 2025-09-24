@@ -60,7 +60,7 @@ async def main(room_url: str, token: str):
         
         stt = CustomDeepgramSTTService(
             api_key=os.environ.get("DEEPGRAM_API_KEY"),
-            websocket_url="wss://api.cortex.cerebrium.ai/v4/p-xxxxxxx/deepgram/v1/listen",
+            websocket_url="wss://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxxx/deepgram/v1/listen",
             live_options=LiveOptions(
                 model="nova-2-general",
                 language="en-US",
@@ -78,7 +78,7 @@ async def main(room_url: str, token: str):
         llm = OpenAILLMService(
             name="LLM",
             model="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8",
-            base_url="https://api.cortex.cerebrium.ai/v4/p-xxxxxxx/llama-llm/run",
+            base_url="https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxxx/llama-llm/run",
         )
 
         messages = [

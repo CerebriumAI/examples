@@ -39,5 +39,5 @@ dockerfile_path = "./docker/gpu/Dockerfile"
 
 4. Create a main.py - it can be empty.
 5. Run: `cerebrium deploy`
-6. Your API is up! Update test.py to have your deployment url in the format: https://api.cortex.cerebrium.ai/v4/p-xxxxxx/13-kokoro/v1
+6. Your API is up! Update test.py to have your deployment url in the format: https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxx/13-kokoro/v1
 7. Run `python test.py` to test your application 

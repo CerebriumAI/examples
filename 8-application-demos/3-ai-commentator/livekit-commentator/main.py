@@ -181,7 +181,7 @@ def format_conversation_history(history):
 def generate_commentary_with_api(frames_base64, conversation_history):
     global question
 
-    API_URL = "https://api.cortex.cerebrium.ai/v4/p-02037836/realtime-video-explainer/run"
+    API_URL = "https://api.aws.us-east-1.cerebrium.ai/v4/p-02037836/realtime-video-explainer/run"
     
     headers = {
         "Authorization": f"Bearer {os.environ.get('CEREBRIUM_API_KEY')}",

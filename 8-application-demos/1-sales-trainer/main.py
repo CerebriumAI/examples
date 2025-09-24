@@ -438,9 +438,9 @@ def create_persona(type: str = "sales"):
         "layers": {
             "llm": {
                 "model": "mistral-large-latest",
-                "base_url": "https://api.cortex.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_sales"
+                "base_url": "https://api.aws.us-east-1.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_sales"
                 if type == "sales"
-                else "https://api.cortex.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_interview",
+                else "https://api.aws.us-east-1.cerebrium.ai/v4/p-d08ee35f/sales-agent/run_interview",
                 "api_key": os.environ.get("CEREBRIUM_JWT"),
                 "tools": sales_tools if type == "sales" else interview_tools,
             },

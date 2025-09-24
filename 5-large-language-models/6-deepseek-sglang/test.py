@@ -5,7 +5,7 @@ import json
 from typing import Dict, Any
 
 # Endpoint configuration
-ENDPOINT_URL = "https://api.cortex.cerebrium.ai/v4/p-xxxxxx/6-deepseek-sglang/run"
+ENDPOINT_URL = "https://api.aws.us-east-1.cerebrium.ai/v4/p-xxxxxx/6-deepseek-sglang/run"
 API_KEY = "<AUTH_TOKEN>"
 
 headers = {

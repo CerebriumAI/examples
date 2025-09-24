@@ -1,7 +1,7 @@
 # Example usage:
 
 ```bash
- curl --location 'https://api.cortex.cerebrium.ai/v4/p-xxx/1-md5-checker/return_md5' \
+ curl --location 'https://api.aws.us-east-1.cerebrium.ai/v4/p-xxx/1-md5-checker/return_md5' \
  --header 'Authorization: Bearer ' \
  --header 'Content-Type: application/json' \
  --data '{
