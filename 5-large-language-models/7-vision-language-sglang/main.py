@@ -43,7 +43,6 @@ def process_image(image_base64: str) -> Image.Image:
     image_data = base64.b64decode(image_base64)
     return Image.open(io.BytesIO(image_data))
 
-# dimensions = ["Effectiveness", "Clarity", "Appeal", "Credibility"]
 
 @function
 def analyze_ad(s, image, ad_description, dimensions):
@@ -63,14 +62,11 @@ def analyze_ad(s, image, ad_description, dimensions):
         # Use unique slot names per dimension to avoid collisions
         f += sgl.assistant("Judgment: " + sgl.gen(f"judgment_{i}", stop="END"))
 
-    # Brief one-line synthesis (separate slot to avoid clobbering)
     s += sgl.user("Provide a one-sentence synthesis of the overall evaluation, then we will output JSON.")
     s += sgl.assistant(sgl.gen("summary_one_liner", stop="."))
 
-    # Constrain output to a simple JSON object; allow punctuation in summary
     schema = r'^\{"summary": ".{1,400}", "grade": "[ABCD][+\-]?"\}$'
     s += sgl.user("Return only a 3 line parapgrah JSON object with keys summary and grade (A, B, C, D, +, -), where summary briefly synthesizes the above judgments.")
-    # Emit plain JSON (no code fence) so it appears in logs as-is
     s += sgl.assistant(sgl.gen("output", regex=schema))
 
 
@@ -78,9 +74,7 @@ def analyze_ad(s, image, ad_description, dimensions):
 def analyze_advertisement(req: AnalyzeRequest):
     try:
         image = process_image(req.image_base64)
-        # Ensure engine exists before running program (sets default engine)
         state = analyze_ad.run(image, req.ad_description, req.dimensions)
-        # The program emitted fenced JSON; extract and parse it if present
         try:
             print(state)
             output = state["output"]
@@ -95,7 +89,6 @@ def analyze_advertisement(req: AnalyzeRequest):
                     "analysis": json.loads(output[start:end]),
                     "dimensions_evaluated": req.dimensions
                 }
-        # Fallback: return raw
         return {
             "success": True,
             "analysis": output,
