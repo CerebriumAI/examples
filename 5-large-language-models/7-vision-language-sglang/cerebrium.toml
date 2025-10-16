@@ -1,0 +1,35 @@
+[cerebrium.deployment]
+name = "7-vision-language-sglang"
+python_version = "3.11"
+docker_base_image_url = "nvidia/cuda:12.8.0-devel-ubuntu22.04"
+deployment_initialization_timeout = 830
+
+[cerebrium.hardware]
+cpu = 10.0
+memory = 60.0
+compute = "ADA_L40"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+
+[cerebrium.build]
+use_uv = true
+
+[cerebrium.dependencies.pip]
+transformers = "latest"
+huggingface_hub = "latest"
+pydantic = "latest"
+pillow = "latest"
+requests = "latest"
+torch = "latest"
+"sglang[all]" = "latest"
+"sgl-kernel" = "latest"
+"flashinfer-python" = "latest"
+
+[cerebrium.dependencies.apt]
+libnuma-dev = "latest"
+
+[cerebrium.runtime.custom]
+port = 8000
+entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
