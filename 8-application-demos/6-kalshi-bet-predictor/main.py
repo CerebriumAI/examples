@@ -7,26 +7,16 @@ from dotenv import load_dotenv
 import os
 from exa_py import Exa
 
-def getKalshiQuestion(market_ticker)->Tuple[str,str]:
+
+def getKalshiMarket(market_ticker)->Tuple[str,str]:
     url = f"https://api.elections.kalshi.com/trade-api/v2/markets/{market_ticker}"
     try:
         res = requests.get(url)
         res.raise_for_status()
         obj = res.json()
-        return obj['market']['rules_primary']
+        return obj
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"Error fetching Kalshi market data: {e}")
-
-def getKalshiOdds(market_ticker)->Tuple[str, str]:
-    url = f"https://api.elections.kalshi.com/trade-api/v2/markets/{market_ticker}"
-    try:
-        res = requests.get(url)
-        res.raise_for_status()
-        obj = res.json()
-        return obj['market']['yes_ask'], obj['market']['no_ask']
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Error fetching Kalshi market data: {e}")
-
 
 class BetPredictor:
     def __init__(self, model_name: str = "Qwen/Qwen3-4B-Instruct-2507"):
@@ -102,8 +92,9 @@ class BetPredictor:
                 clean_question = line.split('.', 1)[-1].strip()
                 relevant_questions.append(clean_question)
         
-        return relevant_questions
+        print(f"Generated relevant questions: {relevant_questions}")
 
+        return relevant_questions
     
     def get_information(self, questions):
         results = [self.exa.answer(q, text=True) for q in questions]
@@ -124,7 +115,7 @@ class BetPredictor:
             "2. Percentages must sum to 100%.\n"
             "3. Do NOT include any preamble, summary, or additional text.\n"
             "4. Provide a brief but clear explanation supporting your probabilities.\n\n"
-            "AGAIN, Your response MUST ONLY be a single line in THIS EXACT FORMAT: Yes: <YES PERCENTAGE>%, No: <NO PERCENTAGE>%, Explanation: <EXPLANATION>"
+            "Again, your response MUST ONLY be a single line in THIS EXACT FORMAT: Yes: <YES PERCENTAGE>%, No: <NO PERCENTAGE>%, Explanation: <EXPLANATION>"
         )
 
         response = self._generate_response(prompt, max_new_tokens=800)
@@ -154,17 +145,20 @@ class BetPredictor:
 predictor = BetPredictor()
 
 def predict(ticker: str):
-    rules = getKalshiQuestion(ticker)
+    market = getKalshiMarket(ticker)
+    rules = market['market']['rules_primary']
+
     question = predictor.convert_rules_to_question(rules)
     
-    predYes, predNo, explanation = predictor.predict(question)
+    pred_yes, pred_no, explanation = predictor.predict(question)
 
-    realYes, realNo = getKalshiOdds(ticker)
-    
-    if realYes < predYes: # undervalued
-        buyYes = True
-    if realNo < predNo: # undervalued
-        buyNo = True
+    pred_yes = int(pred_yes[:2])
+    pred_no = int(pred_no[:2])
 
-    return {"buy_yes":buyYes, "buy_no": buyNo, "yes": predYes, "no": predNo, "explanation": explanation}
+    real_yes = int(market['market']['yes_ask'])
+    real_no = int(market['market']['no_ask'])
 
+    buy_yes = real_yes < pred_yes
+    buy_no = real_no < pred_no
+
+    return {"buy_yes":buy_yes, "buy_no": buy_no, "yes": pred_yes, "no": pred_no, "explanation": explanation}
