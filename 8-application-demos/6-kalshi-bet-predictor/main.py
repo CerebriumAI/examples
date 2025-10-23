@@ -1,164 +1,120 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from typing import Tuple
+import csv
 import requests
-import re
-from dotenv import load_dotenv
-import os
-from exa_py import Exa
+from typing import Dict, List, Tuple
+import asyncio
+import aiohttp
 
+def load_markets(csv_path: str) -> List[Tuple[str, str]]:
+    markets = []
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        next(reader)  # Skip header if present
+        for row in reader:
+            if len(row) >= 2:
+                markets.append((row[0], row[1]))
+    return markets
 
-def getKalshiMarket(market_ticker)->Tuple[str,str]:
-    url = f"https://api.elections.kalshi.com/trade-api/v2/markets/{market_ticker}"
+async def get_market_data(session: aiohttp.ClientSession, kalshi_id: str, 
+                         polymarket_slug: str, endpoint_url: str) -> Dict:
+    
+    payload = {
+        'kalshi_id': kalshi_id,
+        'polymarket_slug': polymarket_slug
+    }
+    
     try:
-        res = requests.get(url)
-        res.raise_for_status()
-        obj = res.json()
-        return obj
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Error fetching Kalshi market data: {e}")
+        async with session.post(endpoint_url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            response.raise_for_status()
+            data = await response.json()
+            
+            kalshi_data = data['Kalshi']
+            polymarket_data = data['Polymarket']
+            
+            return {
+                'kalshi_id': kalshi_id,
+                'polymarket_slug': polymarket_slug,
+                'kalshi_edge': kalshi_data['edge'],
+                'polymarket_edge': polymarket_data['edge'],
+                'kalshi_buy_yes': kalshi_data['buy_yes'],
+                'kalshi_buy_no': kalshi_data['buy_no'],
+                'polymarket_buy_yes': polymarket_data['buy_yes'],
+                'polymarket_buy_no': polymarket_data['buy_no'],
+            }
+    except Exception as e:
+        print(f"Error fetching data for {kalshi_id}/{polymarket_slug}: {e}")
+        return None
 
-class BetPredictor:
-    def __init__(self, model_name: str = "Qwen/Qwen3-4B-Instruct-2507"):
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype = torch.bfloat16,
-            device_map="auto"
-        )
-
-        load_dotenv()
-
-        self.exa = Exa(os.environ.get("EXA_API_KEY"))
-
-        print(f"Loaded model {model_name}!")
-
-    def _generate_response(self, prompt: str, max_new_tokens: int) -> str:
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        input_ids_len = inputs['input_ids'].shape[-1]
-
-        output_sequences = self.model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            pad_token_id=self.tokenizer.eos_token_id,
-            do_sample=False,
-        )
-
-        newly_generated_ids = output_sequences[0, input_ids_len:]
-        
-        response = self.tokenizer.decode(newly_generated_ids, skip_special_tokens=True).strip()
-        
-        print(f"Generated this response! {response}")
-        return response
+async def analyze_markets_async(csv_path: str, endpoint_url: str) -> List[Dict]:
+    markets = load_markets(csv_path)
     
-    def convert_rules_to_question(self, rules:str) -> str:
-        prompt = (
-            "You will receive a sentence that is a statement of the following type:"
-            "If <conditional>, then the market resolves to Yes"
-            "Convert the conditional to a yes/no question"
-            "Your response SHOULD ONLY BE a SINGLE line consisting of the yes/no question:\n"
-            "Do not add ANY preamble, conclusion, or extra text.\n\n"
-            f"STATEMENT: {rules}\n"
-        )
-
-        raw_response = self._generate_response(prompt, max_new_tokens=400)
-
-        return raw_response
-
-    def get_relevant_questions(self, question: str) -> list[str]:
-
-        prompt = (
-            "Based on the following question, generate a list of 5 relevant questions "
-            "that one could search online to gather more information. "
-            "These questions should yield information that would be helpful to answering "
-            "the following question in an objective manner.\n\n"
-            "Your response SHOULD ONLY BE the following lines, in this exact format:\n"
-            "1. <question 1>\n"
-            "2. <question 2>\n"
-            "3. <question 3>\n"
-            "4. <question 4>\n"
-            "5. <question 5>\n"
-            "Do not add ANY preamble, conclusion, or extra text.\n\n"
-            f"Question: \"{question}\"\n"
-        )
-
-        raw_response = self._generate_response(prompt, max_new_tokens=400)
-
-        relevant_questions = []
-        for line in raw_response.split('\n'):
-            line = line.strip()
-            if line and line[0].isdigit():
-                clean_question = line.split('.', 1)[-1].strip()
-                relevant_questions.append(clean_question)
+    print(f"Fetching data for {len(markets)} markets all at once...")
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = [get_market_data(session, kalshi_id, polymarket_slug, endpoint_url) 
+                for kalshi_id, polymarket_slug in markets]
         
-        print(f"Generated relevant questions: {relevant_questions}")
-
-        return relevant_questions
+        results = await asyncio.gather(*tasks)
     
-    def get_information(self, questions):
-        results = [self.exa.answer(q, text=True) for q in questions]
-        answers = [r.answer for r in results]
-        return answers
+    return [r for r in results if r is not None]
 
-    def get_binary_answer_with_percentage(self, information: str, question: str) -> Tuple[str, str, str]:
-        prompt = (
-            "Analyze the provided information below to answer the given binary question. "
-            "Based on the information, determine the probability that the answer is 'Yes' or 'No'.\n\n"
-            "--- Information ---\n"
-            f"{information}\n\n"
-            "--- Question ---\n"
-            f"{question}\n\n"
-            "IMPORTANT INSTRUCTIONS:\n"
-            "1. Your response MUST ONLY be a single line in THIS EXACT FORMAT:\n"
-            "   Yes: <YES PERCENTAGE>%, No: <NO PERCENTAGE>%, Explanation: <EXPLANATION>\n"
-            "2. Percentages must sum to 100%.\n"
-            "3. Do NOT include any preamble, summary, or additional text.\n"
-            "4. Provide a brief but clear explanation supporting your probabilities.\n\n"
-            "Again, your response MUST ONLY be a single line in THIS EXACT FORMAT: Yes: <YES PERCENTAGE>%, No: <NO PERCENTAGE>%, Explanation: <EXPLANATION>"
-        )
-
-        response = self._generate_response(prompt, max_new_tokens=800)
-
-        match = re.search(r"Yes: (.*?), No: (.*?), Explanation: (.*)", response, re.DOTALL)
-
-        if match:
-            yes, no, explanation = match.groups()
-            return yes.strip(), no.strip(), explanation.strip()
-        else:
-            raise ValueError(f"Failed to parse LLM response: {response}")
+def compute_statistics(results: List[Dict]) -> None:
+    print("\n" + "="*80)
+    print("STATISTICS")
+    print("="*80)
     
-    def predict(self, question):
-        relevant_questions = self.get_relevant_questions(question)
-        answers = self.get_information(relevant_questions)
-
-        information = ""
-        for i, v in enumerate(relevant_questions):
-            information += f"INFORMATION {i+1}: \n"
-            information += f"QUESTION {i+1}: {v}\n"
-            information += f"ANSWER {i+1}: {answers[i]} \n\n"
-        
-        yes, no, explanation = self.get_binary_answer_with_percentage(information, question)
-        return yes, no, explanation
-
-
-predictor = BetPredictor()
-
-def predict(ticker: str):
-    market = getKalshiMarket(ticker)
-    rules = market['market']['rules_primary']
-
-    question = predictor.convert_rules_to_question(rules)
+    if not results:
+        print("No results to analyze")
+        return
     
-    pred_yes, pred_no, explanation = predictor.predict(question)
+    total_markets = len(results)
+    
+    kalshi_edges = [r['kalshi_edge'] for r in results]
+    total_kalshi_edge = sum(kalshi_edges)
+    
+    polymarket_edges = [r['polymarket_edge'] for r in results]
+    total_polymarket_edge = sum(polymarket_edges)
+    
+    kalshi_better_count = sum(1 for r in results if r['kalshi_edge'] > r['polymarket_edge'])
+    polymarket_better_count = sum(1 for r in results if r['polymarket_edge'] > r['kalshi_edge'])
+    equal_count = total_markets - kalshi_better_count - polymarket_better_count
+    
+    edge_differences = [abs(r['kalshi_edge'] - r['polymarket_edge']) for r in results]
+    avg_edge_difference = sum(edge_differences) / total_markets
+    max_edge_difference = max(edge_differences)
+    
+    # Results
+    print(f"\nTotal markets analyzed: {total_markets}")
+    print("\n" + "-"*80)
+    print("COMPARISON")
+    print("-"*80)
+    print(f"Markets with greater Kalshi edge:      {kalshi_better_count} ({kalshi_better_count/total_markets*100:.1f}%)")
+    print(f"Markets with greater Polymarket edge:  {polymarket_better_count} ({polymarket_better_count/total_markets*100:.1f}%)")
+    print(f"Markets with equal edge:               {equal_count} ({equal_count/total_markets*100:.1f}%)")
+    print(f"\nAverage edge difference: {avg_edge_difference:.4f}")
+    print(f"Max edge difference:     {max_edge_difference:.4f}")
+    
+    # Overall winner
+    print("\n" + "="*80)
+    if total_kalshi_edge > total_polymarket_edge:
+        advantage = total_kalshi_edge - total_polymarket_edge
+        print(f"OVERALL: Kalshi has greater total edge (+{advantage:.4f})")
+    elif total_polymarket_edge > total_kalshi_edge:
+        advantage = total_polymarket_edge - total_kalshi_edge
+        print(f"OVERALL: Polymarket has greater total edge (+{advantage:.4f})")
+    else:
+        print(f"OVERALL: Both platforms have equal total edge")
+    print("="*80)
 
-    pred_yes = int(pred_yes[:2])
-    pred_no = int(pred_no[:2])
+def main():
+    CSV_PATH = 'markets.csv' 
+    ENDPOINT_URL = 'https://{cerebrium}/predict' # Your hosted endpoint
+    
+    print("Starting async market analysis...")
+    results = asyncio.run(analyze_markets_async(CSV_PATH, ENDPOINT_URL))
+    
+    print(f"\nSuccessfully fetched {len(results)} markets")
+    
+    compute_statistics(results)
 
-    real_yes = int(market['market']['yes_ask'])
-    real_no = int(market['market']['no_ask'])
-
-    buy_yes = real_yes < pred_yes
-    buy_no = real_no < pred_no
-
-    return {"buy_yes":buy_yes, "buy_no": buy_no, "yes": pred_yes, "no": pred_no, "explanation": explanation}
+if __name__ == "__main__":
+    main()

@@ -3,7 +3,7 @@ name = "kalshi-bet-predictor"
 python_version = "3.11"
 docker_base_image_url = "debian:bookworm-slim"
 disable_auth = true
-include = ['./*', 'main.py', 'cerebrium.toml']
+include = ['./*', 'predictor.py', 'cerebrium.toml']
 exclude = ['.*']
 
 [cerebrium.dependencies.paths]
@@ -15,7 +15,7 @@ memory = 36
 compute = "ADA_L40"
 
 [cerebrium.scaling]
-min_replicas = 1
+min_replicas = 0
 max_replicas = 2
 cooldown = 30
 replica_concurrency = 1
