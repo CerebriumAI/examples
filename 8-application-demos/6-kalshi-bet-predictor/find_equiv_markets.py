@@ -5,21 +5,20 @@ import faiss
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any
 
-# --- CONFIGURATION ---
-SIMILARITY_THRESHOLD = 0.70
-MAX_MARKET_LIMIT = 40000
+# --- Config ---
+SIMILARITY_THRESHOLD = 0.70 # threshold for cosine simlarity
+MAX_MARKET_LIMIT = 40000 # max number of active & open markets to gather
 TOP_K = 5  # number of top Polymarket markets to check for each Kalshi market
 KALSHI_API_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 POLYMARKET_API_URL = "https://clob.polymarket.com/markets"
-OUTPUT_FILE = "equivalent_markets.csv"
+OUTPUT_FILE = "markets.csv"
 
-# ---------------------- API FETCH FUNCTIONS ----------------------
+# ---------------------- API Fetch Functions ----------------------
 
 def get_kalshi_markets() -> List[Dict[str, Any]]:
     print("Fetching Kalshi markets...")
     markets_list = []
     cursor = ""
-
     try:
         while True:
             params = {'limit': 1000}
@@ -47,7 +46,7 @@ def get_kalshi_markets() -> List[Dict[str, Any]]:
                     })
 
             cursor = data['cursor']
-            print(f"{cursor} | {len(markets_list)}")
+            print(f"Found {len(markets_list)} active and open markets")
 
             if len(markets_list) > MAX_MARKET_LIMIT or not cursor:
                 break
@@ -65,7 +64,7 @@ def get_kalshi_market(ticker):
     return title['market']['title']
 
 def get_polymarket_markets() -> List[Dict[str, Any]]:
-    print("Fetching Polymarket markets (CLOB API)...")
+    print("Fetching Polymarket markets...")
     markets_list = []
     next_cursor = None
 
@@ -94,7 +93,7 @@ def get_polymarket_markets() -> List[Dict[str, Any]]:
                     })
 
             next_cursor = data.get('next_cursor')
-            print(f"cursor {next_cursor} | {len(markets_list)}")
+            print(f"Found {len(markets_list)} active and open markets")
 
             if len(markets_list) > MAX_MARKET_LIMIT or not next_cursor or next_cursor == 'LTE=':
                 break
@@ -107,10 +106,10 @@ def get_polymarket_markets() -> List[Dict[str, Any]]:
         return []
 
 
-# ---------------------- FAISS-BASED MATCHING ----------------------
+# ---------------------- Matching ----------------------
 
 def find_similar_markets(kalshi_markets, polymarket_markets, threshold=0.9, top_k=TOP_K):
-    print("\nLoading NLP model (SentenceTransformer)...")
+    print("\nLoading NLP model...")
     model = SentenceTransformer('all-MiniLM-L6-v2')
 
     kalshi_titles = [m['title'] for m in kalshi_markets]
@@ -120,11 +119,11 @@ def find_similar_markets(kalshi_markets, polymarket_markets, threshold=0.9, top_
         print("Not enough market data to compare.")
         return []
 
-    print("Encoding market titles into embeddings...")
+    print("Encoding titles into embeddings...")
     kalshi_embeddings = model.encode(kalshi_titles, convert_to_numpy=True, normalize_embeddings=True)
     poly_embeddings = model.encode(poly_titles, convert_to_numpy=True, normalize_embeddings=True)
 
-    print(f"Building FAISS index for {len(poly_embeddings)} Polymarket markets...")
+    print(f"Building vector index for {len(poly_embeddings)} Polymarket markets...")
     dim = poly_embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)  # Inner product for cosine similarity
     index.add(poly_embeddings)
@@ -150,7 +149,7 @@ def find_similar_markets(kalshi_markets, polymarket_markets, threshold=0.9, top_
     return potential_matches
     
 def interactive_save(matches: List[Dict[str, Any]]):
-    print("\n--- Interactive Review Mode ---")
+    print("\n--- Review Mode ---")
     print("Press 'y' to save a match, anything else to skip.\n")
     
     file_exists = os.path.exists(OUTPUT_FILE)

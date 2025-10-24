@@ -8,6 +8,7 @@ def load_markets(csv_path: str) -> List[Tuple[str, str]]:
     markets = []
     with open(csv_path, 'r') as f:
         reader = csv.reader(f)
+        next(reader) # skip header
         for row in reader:
             if len(row) >= 2:
                 markets.append((row[0], row[1]))
@@ -112,8 +113,8 @@ def compute_statistics(results: List[Dict]) -> None:
     print("="*80)
 
 def main():
-    CSV_PATH = '<path to your .csv file>' 
-    ENDPOINT_URL = '<your hosted endpoint>'
+    CSV_PATH = '<PATH TO YOUR .csv FILE>' 
+    ENDPOINT_URL = '<YOUR HOSTED ENDPOINT>'
     
     print("Starting async market analysis...")
     results = asyncio.run(analyze_markets_async(CSV_PATH, ENDPOINT_URL))
