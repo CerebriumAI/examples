@@ -13,8 +13,6 @@ KALSHI_API_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 POLYMARKET_API_URL = "https://clob.polymarket.com/markets"
 OUTPUT_FILE = "markets.csv"
 
-# ---------------------- API Fetch Functions ----------------------
-
 def get_kalshi_markets() -> List[Dict[str, Any]]:
     print("Fetching Kalshi markets...")
     markets_list = []
@@ -106,14 +104,12 @@ def get_polymarket_markets() -> List[Dict[str, Any]]:
         return []
 
 
-# ---------------------- Matching ----------------------
-
-def find_similar_markets(kalshi_markets, polymarket_markets, threshold=0.9, top_k=TOP_K):
+def find_similar_markets(kalshi_markets, poly_markets, threshold=0.9, top_k=TOP_K):
     print("\nLoading NLP model...")
     model = SentenceTransformer('all-MiniLM-L6-v2')
 
     kalshi_titles = [m['title'] for m in kalshi_markets]
-    poly_titles = [m['title'] for m in polymarket_markets]
+    poly_titles = [m['title'] for m in poly_markets]
 
     if not kalshi_titles or not poly_titles:
         print("Not enough market data to compare.")
@@ -136,11 +132,11 @@ def find_similar_markets(kalshi_markets, polymarket_markets, threshold=0.9, top_
         for j in range(top_k):
             score = float(scores[i][j])
             if score >= threshold:
-                poly_market = polymarket_markets[indices[i][j]]
+                poly_market = poly_markets[indices[i][j]]
                 potential_matches.append({
                     'score': score,
                     'kalshi_market': kalshi_market,
-                    'polymarket_market': poly_market
+                    'poly_market': poly_market
                 })
         if i % 100 == 0:
             print(f"Processed {i}/{len(kalshi_markets)} Kalshi markets...")
@@ -156,20 +152,20 @@ def interactive_save(matches: List[Dict[str, Any]]):
     with open(OUTPUT_FILE, "a", newline='', encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         if not file_exists:
-            writer.writerow(["kalshi_ticker", "polymarket_slug"])
+            writer.writerow(["kalshi_ticker", "poly_slug"])
 
         for i, match in enumerate(matches):
             kalshi_ticker = match['kalshi_market']['ticker']
-            poly_slug = match['polymarket_market']['url'].split("event/")[1]
+            poly_slug = match['poly_market']['url'].split("event/")[1]
             kalshi_title = get_kalshi_market(kalshi_ticker)
-            poly_title = match['polymarket_market']['title']
+            poly_title = match['poly_market']['title']
             score = match['score']
 
             print(f"\nMatch #{i+1} (Score: {score:.4f})")
             print(f"[KALSHI]     {kalshi_title}")
             print(f"[POLYMARKET] {poly_title}")
             print(f"  > Kalshi URL:    {match['kalshi_market']['url']}")
-            print(f"  > Polymarket URL:{match['polymarket_market']['url']}")
+            print(f"  > Polymarket URL:{match['poly_market']['url']}")
 
             choice = input("Save this match? (y/n): ").strip().lower()
             if choice == 'y':
@@ -182,13 +178,13 @@ def interactive_save(matches: List[Dict[str, Any]]):
 
 def main():
     kalshi_markets = get_kalshi_markets()
-    polymarket_markets = get_polymarket_markets()
+    poly_markets = get_polymarket_markets()
 
-    if not kalshi_markets or not polymarket_markets:
+    if not kalshi_markets or not poly_markets:
         print("\nCould not fetch markets from one or both platforms. Exiting.")
         return
     
-    matches = find_similar_markets(kalshi_markets, polymarket_markets, SIMILARITY_THRESHOLD)
+    matches = find_similar_markets(kalshi_markets, poly_markets, SIMILARITY_THRESHOLD)
     print(f"\n--- Found {len(matches)} Potential Matches ---")
     
     if not matches:
