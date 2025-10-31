@@ -68,7 +68,7 @@ def evaluate(analyst, question):
     # Generate questions using OpenAI API
     relevant_questions = analyst.get_relevant_questions(question)
     # Use Exa semantic search to retrieve answers to questions
-    answers = analyst.get_information(relevant_questions)
+    answers = analyst.get_web_info(relevant_questions)
 
     information = ""
     for i, v in enumerate(relevant_questions):

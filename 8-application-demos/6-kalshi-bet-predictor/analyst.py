@@ -5,6 +5,7 @@ import os
 import json
 from exa_py import Exa
 from openai import OpenAI
+from pydantic import BaseModel
 
 class BetAnalyst:
     def __init__(self, model_name: str = "gpt-5-nano"):
@@ -25,24 +26,34 @@ class BetAnalyst:
 
         print(f"Using model: {model_name}")
 
-    def _generate_response(self, prompt: str, response_format: dict | None = None) -> str:
-
-        request_args = {
-            "model": self.model_name,
-            "input": prompt,
-        }
-
-        if response_format is not None:
-            request_args["response_format"] = response_format
-
+    def _generate_response(self, prompt: str, text_format = None):
         try:
-            response = self.client.responses.create(**request_args)
+            response = self.client.responses.create(
+                model=self.model_name,
+                input=prompt,
+            )
 
-            output = response.output_text.strip()
-            print(f"Generated this response: {output}")
-            return output
+            output_text = response.output_text.strip()
+            print(f"Generated raw response: {output_text}")
+
+            if text_format is not None:
+                parsed = self.client.responses.parse(
+                    model=self.model_name,
+                    input=[
+                        {
+                            "role": "user",
+                            "content": output_text
+                        },
+                    ],
+                    text_format=text_format,
+                )
+                print(f"Parsed structured response: {parsed.output_parsed}")
+                return parsed.output_parsed
+
+            return output_text
+
         except Exception as e:
-            raise RuntimeError(f"Error during API Call: {e}")
+            raise RuntimeError(f"Error during API call: {e}") from e
     
     def convert_market_to_resolution(self, rules:str) -> str:
         prompt = (
@@ -117,30 +128,16 @@ class BetAnalyst:
             "4. Provide a brief but clear explanation supporting your probabilities.\n\n"
         )
         
-        sentiment_schema = {
-            "type": "object",
-            "properties": {
-                "yes_percentage": {
-                    "type": "number",
-                    "description": "Confidence in positive sentiment (0-100)"
-                },
-                "no_percentage": {
-                    "type": "number",
-                    "description": "Confidence in negative sentiment (0-100)"
-                },
-                "explanation": {
-                    "type": "string",
-                    "description": "Brief explanation for the sentiment analysis"
-                }
-            },
-            "required": ["yes_percentage", "no_percentage", "explanation"]
-        }
+        class Response(BaseModel):
+            yes_percentage: str
+            no_percentage: str
+            explanation: str
 
-        response = self._generate_response(prompt, sentiment_schema)
+        response = self._generate_response(prompt, Response)
+        print(f"HELLO {response}")
 
         try:
-            parsed_data = json.loads(response)
-            return parsed_data.get('yes_percentage'), parsed_data.get('no_percentage'), parsed_data.get('explanation')
+            return response.yes_percentage, response.no_percentage, response.explanation
         except json.JSONDecodeError:
             raise RuntimeError(f"Failed to parse output as JSON: {response}")
     

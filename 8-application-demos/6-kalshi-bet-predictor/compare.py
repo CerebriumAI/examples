@@ -109,12 +109,12 @@ def compute_statistics(results: List[Dict]) -> None:
         print(f"OVERALL: Polymarket has greater total edge (+{advantage:.4f}) cents")
         print(f"OVERALL: Polymarket has an average edge of (+{advantage/total_markets:.4f}) cents per market")
     else:
-        print(f"OVERALL: Both platforms have equal total edge")
+        print("OVERALL: Both platforms have equal total edge")
     print("="*80)
 
 def main():
     CSV_PATH = "<PATH_TO_YOUR_CSV_FILE>"
-    ENDPOINT_URL = '<YOUR_CEREBRIUM_PREDICT_URL>'
+    ENDPOINT_URL = "<YOUR_CEREBRIUM_PREDICT_URL>"
     
     print("Starting async market analysis...")
     results = asyncio.run(analyze_markets_async(CSV_PATH, ENDPOINT_URL))
