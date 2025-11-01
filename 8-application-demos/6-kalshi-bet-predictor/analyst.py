@@ -1,4 +1,3 @@
-
 from typing import Tuple
 from dotenv import load_dotenv
 import os
@@ -54,30 +53,8 @@ class BetAnalyst:
 
         except Exception as e:
             raise RuntimeError(f"Error during API call: {e}") from e
-    
-    def convert_market_to_resolution(self, rules:str) -> str:
-        prompt = (
-            "A market resolution statement usually describes the conditions under which a market would resolve to \"Yes\" or \"No\". "
-            "Your task is to extract and rewrite the core factual question that determines whether the market will resolve to \"Yes.\"\n"
-            "Input format: A sentence describing how a market will resolve.\n"
-            "Example: \"Will the market resolve to Yes if Curtis Sliwa drops out of the NYC Mayoral race before Nov 4, 2025?\"\n"
-            "Output format: A clear, grammatically correct factual question that reflects the underlying condition of the resolution, removing any meta-language about the market or its resolution.\n"
-            "The condition will start with \"if [event], then the market will resolve to \"Yes\" and you must convert it to \"Will [event]?\"\n"
-            "Examples:\n"
-            "Input: \"If Curtis Sliwa drops out of the NYC Mayoral race before Nov 4, 2025, then the market resolves to Yes\"\n"
-            "Output: \"Will Curtis Sliwa drop out of the NYC Mayoral race before Nov 4, 2025?\"\n"
-            "Input: \"If Donald Trump wins the 2024 U.S. presidential election, then the market resolves to Yes\"\n"
-            "Output: \"Will Donald Trump win the 2024 U.S. presidential election?\"\n"
-            "Only output the rewritten factual question with no explanations or commentary.\n"
-            f"STATEMENT: {rules}"
-        )
-
-        raw_response = self._generate_response(prompt)
-
-        return raw_response
 
     def get_relevant_questions(self, question: str) -> list[str]:
-
         prompt = (
             "Based on the following question, generate a list of 5 relevant questions "
             "that one could search online to gather more information. "
