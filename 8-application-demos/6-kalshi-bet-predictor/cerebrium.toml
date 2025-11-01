@@ -7,7 +7,7 @@ include = ['./*', 'main.py', 'cerebrium.toml']
 exclude = ['.*']
 
 [cerebrium.dependencies.paths]
-pip = "requirements.txt"
+pip = "cerebrium_requirements.txt"
 
 [cerebrium.hardware]
 cpu = 4
