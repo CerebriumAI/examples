@@ -5,6 +5,7 @@ import asyncio
 import aiohttp
 
 def load_markets(csv_path: str) -> List[Tuple[str, str]]:
+    # Loads market pairs (Kalshi ticker, Polymarket slug) from a CSV file.
     markets = []
     with open(csv_path, 'r') as f:
         reader = csv.reader(f)
@@ -16,7 +17,7 @@ def load_markets(csv_path: str) -> List[Tuple[str, str]]:
 
 async def get_market_data(session: aiohttp.ClientSession, kalshi_ticker: str, 
                          poly_slug: str, endpoint_url: str) -> Dict:
-    
+    # Asynchronously fetches and processes edge data for a single market pair from a specified API endpoint.
     payload = json.dumps({
         'kalshi_ticker': kalshi_ticker,
         'poly_slug': poly_slug
@@ -52,6 +53,7 @@ async def get_market_data(session: aiohttp.ClientSession, kalshi_ticker: str,
         return None
 
 async def analyze_markets_async(csv_path: str, endpoint_url: str) -> List[Dict]:
+    # Orchestrates the asynchronous fetching of data for all markets listed in the CSV.
     markets = load_markets(csv_path)
     
     print(f"Fetching data for {len(markets)} markets all at once...")
@@ -61,10 +63,12 @@ async def analyze_markets_async(csv_path: str, endpoint_url: str) -> List[Dict]:
                 for kalshi_ticker, poly_slug in markets]
         
         results = await asyncio.gather(*tasks)
-    
+        
+    # Filter out None results from failed requests
     return [r for r in results if r is not None]
 
 def compute_statistics(results: List[Dict]) -> None:
+    # Calculates and prints summary statistics comparing Kalshi and Polymarket edge data.
     print("\n" + "="*80)
     print("STATISTICS")
     print("="*80)

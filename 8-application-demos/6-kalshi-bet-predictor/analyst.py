@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 class BetAnalyst:
     def __init__(self, model_name: str = "gpt-5-nano"):
-        
+        """Initializes the API clients and loads necessary API keys from environment variables"""
         load_dotenv()
         
         exa_api_key = os.environ.get("EXA_API_KEY")
@@ -26,6 +26,7 @@ class BetAnalyst:
         print(f"Using model: {model_name}")
 
     def _generate_response(self, prompt: str, text_format = None):
+        """Sends a prompt to the OpenAI API and optionally parses the output into a structured format"""
         try:
             response = self.client.responses.create(
                 model=self.model_name,
@@ -36,6 +37,7 @@ class BetAnalyst:
             print(f"Generated raw response: {output_text}")
 
             if text_format is not None:
+                # If a Pydantic model (text_format) is provided, re-parse the raw output into that structure.
                 parsed = self.client.responses.parse(
                     model=self.model_name,
                     input=[
@@ -55,6 +57,7 @@ class BetAnalyst:
             raise RuntimeError(f"Error during API call: {e}") from e
 
     def get_relevant_questions(self, question: str) -> list[str]:
+        """Generates a list of related search queries based on an initial user question"""
         prompt = (
             "Based on the following question, generate a list of 5 relevant questions "
             "that one could search online to gather more information. "
@@ -76,6 +79,7 @@ class BetAnalyst:
         for line in raw_response.split('\n'):
             line = line.strip()
             if line and line[0].isdigit():
+                # Parse lines like "1. What is..." into "What is..."
                 clean_question = line.split('.', 1)[-1].strip()
                 relevant_questions.append(clean_question)
         
@@ -85,11 +89,13 @@ class BetAnalyst:
 
     
     def get_web_info(self, questions):
+        """Uses the Exa API to find answers for a list of questions."""
         results = [self.exa.answer(q, text=True) for q in questions]
         answers = [r.answer for r in results]
         return answers
 
     def get_binary_answer_with_percentage(self, information: str, question: str) -> Tuple[str, str, str]:
+        """Analyzes provided information to return a Yes/No probability and explanation for a given question"""
         prompt = (
             "Analyze the provided information below to answer the given binary question. "
             "Based on the information, determine the probability that the answer is 'Yes' or 'No'.\n\n"
@@ -105,6 +111,7 @@ class BetAnalyst:
             "4. Provide a brief but clear explanation supporting your probabilities.\n\n"
         )
         
+        # Define the expected Pydantic structure for the _generate_response 'text_format' parameter
         class Response(BaseModel):
             yes_percentage: str
             no_percentage: str

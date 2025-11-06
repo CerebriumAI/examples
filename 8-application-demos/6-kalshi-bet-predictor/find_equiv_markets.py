@@ -14,12 +14,13 @@ POLYMARKET_API_URL = "https://clob.polymarket.com/markets"
 OUTPUT_FILE = "markets.csv"
 
 def get_kalshi_markets() -> List[Dict[str, Any]]:
+    # Fetches all active, binary markets from the Kalshi API via pagination
     print("Fetching Kalshi markets...")
     markets_list = []
     cursor = ""
     try:
         while True:
-            params = {'limit': 1000}
+            params = {'limit': 1000} # Request 1000 markets per page.
             if cursor:
                 params['cursor'] = cursor
 
@@ -57,11 +58,13 @@ def get_kalshi_markets() -> List[Dict[str, Any]]:
         return []
     
 def get_kalshi_market(ticker):
+    # Retrieves the full title for a single Kalshi market by its ticker
     title = requests.get(f"{KALSHI_API_URL}/{ticker}")
     title = title.json()
     return title['market']['title']
 
 def get_polymarket_markets() -> List[Dict[str, Any]]:
+    # Fetches all active, non-closed markets from the Polymarket API via pagination
     print("Fetching Polymarket markets...")
     markets_list = []
     next_cursor = None
@@ -94,6 +97,7 @@ def get_polymarket_markets() -> List[Dict[str, Any]]:
             print(f"Found {len(markets_list)} active and open markets")
 
             if len(markets_list) > MAX_MARKET_LIMIT or not next_cursor or next_cursor == 'LTE=':
+                # 'LTE=' is Polymarket's cursor value indicating the end of pagination.
                 break
 
         print(f"Found {len(markets_list)} open markets on Polymarket.")
@@ -105,7 +109,9 @@ def get_polymarket_markets() -> List[Dict[str, Any]]:
 
 
 def find_similar_markets(kalshi_markets, poly_markets, threshold=0.9, top_k=TOP_K):
+    # Uses a sentence transformer and FAISS to find markets with similar titles above a given threshold.
     print("\nLoading NLP model...")
+    # 'all-MiniLM-L6-v2' is a small and fast model
     model = SentenceTransformer('all-MiniLM-L6-v2')
 
     kalshi_titles = [m['title'] for m in kalshi_markets]
@@ -145,6 +151,7 @@ def find_similar_markets(kalshi_markets, poly_markets, threshold=0.9, top_k=TOP_
     return potential_matches
     
 def interactive_save(matches: List[Dict[str, Any]]):
+    # Presents potential matches to the user for manual review and saves confirmed pairs to a CSV file
     print("\n--- Review Mode ---")
     print("Press 'y' to save a match, anything else to skip.\n")
     
