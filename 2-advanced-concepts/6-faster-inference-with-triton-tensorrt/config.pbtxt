@@ -1,0 +1,44 @@
+name: "llama3_2"
+backend: "python"
+max_batch_size: 0
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+
+input [
+  {
+    name: "text_input"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "max_tokens"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "temperature"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "top_p"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    optional: true
+  }
+]
+
+output [
+  {
+    name: "text_output"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
