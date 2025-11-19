@@ -4,7 +4,7 @@ python_version = "3.12"
 disable_auth = true
 include = ['./*', 'cerebrium.toml']
 exclude = ['.*']
-deployment_initialization_timeout = 830
+deployment_initialization_timeout = 830 
 
 [cerebrium.hardware]
 cpu = 4.0
@@ -15,10 +15,10 @@ provider = "aws"
 region = "us-east-1"
 
 [cerebrium.scaling]
-min_replicas = 0
-max_replicas = 2
-cooldown = 60
-replica_concurrency = 5
+min_replicas = 2          
+max_replicas = 5        
+cooldown = 300            
+replica_concurrency = 10  
 scaling_metric = "concurrency_utilization"
 
 [cerebrium.runtime.custom]

@@ -1,6 +1,6 @@
 name: "llama3_2"
 backend: "python"
-max_batch_size: 0
+max_batch_size: 32
 
 instance_group [
   {
