@@ -28,12 +28,12 @@ RUN mkdir -p \
     /persistent-storage/engines
 
 # Copy application files
-COPY --chmod=755 download_model.py start_triton.sh /app/
+COPY --chmod=755 download_model.py /app/
 COPY model.py /app/model_repository/llama3_2/1/
 COPY config.pbtxt /app/model_repository/llama3_2/
 
 # Expose Triton ports
 EXPOSE 8000 8001 8002
 
-# Start Triton server
-CMD ["/app/start_triton.sh"]
+# Start Triton server directly
+CMD ["tritonserver", "--model-repository=/app/model_repository", "--http-port=8000", "--grpc-port=8001", "--metrics-port=8002"]

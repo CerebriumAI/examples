@@ -1,6 +1,10 @@
 name: "llama3_2"
 backend: "python"
-max_batch_size: 32
+max_batch_size: 128
+
+dynamic_batching {
+  max_queue_delay_microseconds: 800
+}
 
 instance_group [
   {

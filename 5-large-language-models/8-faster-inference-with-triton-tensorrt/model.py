@@ -11,10 +11,29 @@ import torch
 from tensorrt_llm import LLM, SamplingParams, BuildConfig
 from tensorrt_llm.plugin.plugin import PluginConfig
 from transformers import AutoTokenizer
+from pathlib import Path
 
 # Model configuration
 MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 MODEL_DIR = f"/persistent-storage/models/{MODEL_ID}"
+
+
+def ensure_model_downloaded():
+    """Check if model exists, download if not available."""
+    model_path = Path(MODEL_DIR)
+    
+    # Check if model directory exists and has content
+    if not model_path.exists() or not any(model_path.iterdir()):
+        print("Model not found, downloading...")
+        try:
+            # Import download function from download_model
+            from download_model import download_model
+            download_model()
+        except Exception as e:
+            print(f"Error downloading model: {e}")
+            raise
+    else:
+        print("✓ Model already exists")
 
 
 class TritonPythonModel:
@@ -30,6 +49,9 @@ class TritonPythonModel:
         
         Loads tokenizer and initializes TensorRT-LLM with PyTorch backend.
         """
+        # Ensure model is downloaded before loading
+        ensure_model_downloaded()
+        
         print("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
         
@@ -42,7 +64,7 @@ class TritonPythonModel:
         build_config = BuildConfig(
             plugin_config=plugin_config,
             max_input_len=4096,
-            max_batch_size=32,  # Matches Triton max_batch_size in config.pbtxt
+            max_batch_size=128,  # Matches Triton max_batch_size in config.pbtxt
         )
         
         self.llm = LLM(
