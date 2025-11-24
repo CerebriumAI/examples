@@ -1,0 +1,32 @@
+[cerebrium.deployment]
+name = "tensorrt-triton-demo"
+python_version = "3.12"
+disable_auth = true
+include = ['./*', 'cerebrium.toml']
+exclude = ['.*']
+deployment_initialization_timeout = 830 
+
+[cerebrium.hardware]
+cpu = 4.0
+memory = 40.0
+compute = "AMPERE_A10"
+gpu_count = 1
+provider = "aws"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 1        
+max_replicas = 5         
+cooldown = 300            
+replica_concurrency = 128  
+scaling_metric = "concurrency_utilization"
+
+[cerebrium.dependencies.pip]
+huggingface_hub = "latest"
+transformers = "latest"
+
+[cerebrium.runtime.custom]
+port = 8000
+healthcheck_endpoint = "/v2/health/live"
+readycheck_endpoint = "/v2/health/ready"
+dockerfile_path = "./Dockerfile"
