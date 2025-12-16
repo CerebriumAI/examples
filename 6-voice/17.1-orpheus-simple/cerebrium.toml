@@ -1,0 +1,33 @@
+[cerebrium.deployment]
+name = "17-orpheus-server"
+python_version = "3.11"
+docker_base_image_url = "debian:bookworm-slim"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+pre_build_commands = ["apt update && apt install -y git", "git clone https://github.com/canopyai/Orpheus-TTS.git && pip install flask wheel && cd Orpheus-TTS && pip install orpheus-speech && pip install vllm==0.7.3 && export VLLM_PREFILL_CHUNK_SIZE=1024"]
+
+[cerebrium.hardware]
+cpu = 12.0
+memory = 12.0
+compute = "HOPPER_H100"
+provider = "crusoe"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 30
+replica_concurrency = 25
+scaling_metric = "concurrency_utilization"
+
+[cerebrium.runtime.custom]
+port = 5000
+entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+
+[cerebrium.apt.dependancies]
+ffmpeg = "latest"
+
+[cerebrium.pip.dependancies]
+pydub = "latest"
+pydantic = "latest"
+
