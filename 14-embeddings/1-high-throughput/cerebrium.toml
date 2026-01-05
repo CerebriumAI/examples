@@ -1,0 +1,36 @@
+[cerebrium.deployment]
+name = "1-high-throughput"
+python_version = "3.11"
+docker_base_image_url = "michaelf34/infinity:0.0.77"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.hardware]
+cpu = 6.0
+memory = 12.0
+compute = "AMPERE_A10"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+cooldown = 30
+replica_concurrency = 500
+scaling_metric = "concurrency_utilization"
+
+[cerebrium.dependencies.pip]
+numpy = "latest"
+"infinity-emb[all]" = "0.0.77"
+optimum = ">=1.24.0,<2.0.0"
+transformers = "<4.49"
+click = "==8.1.8"
+fastapi = "latest"
+uvicorn = "latest"
+pandas = "latest"
+
+[cerebrium.runtime.custom]
+port = 5000
+entrypoint = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+healthcheck_endpoint = "/health"
+readycheck_endpoint = "/ready"
