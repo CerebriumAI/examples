@@ -271,4 +271,4 @@ def run_length_sweep(
 
 
 if __name__ == "__main__":
-    run_length_sweep(1, 3, 3, "llm_results.csv") # from length 1 to 6, 200 iterations each
+    run_length_sweep(1, 6, 200, "llm_results.csv") # from length 1 to 6, 200 iterations each
