@@ -64,7 +64,7 @@ def create_trainset(filename="./results/dataset.jsonl", num_samples=20000):
 
     with open(filename, "w") as f:
         for _ in range(num_samples):
-            length = secrets.randbelow(5) + 5  
+            length = secrets.randbelow(5) + 5 # length between 5 and 9
             plain_text = getRandomString(length)
             analysis, cipher = positional_mirror_cipher_with_logic(plain_text)
             
@@ -94,4 +94,4 @@ def create_testset(filename="./results/testset.json", num_samples=200):
 
 if __name__ == "__main__":
     create_trainset()
-    # create_testset()
+    create_testset()

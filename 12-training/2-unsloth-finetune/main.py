@@ -144,9 +144,11 @@ def evaluate(input_filename: str = "testset.json", output_filename: str = "finet
         for j, full_text in enumerate(decoded):
             response_section = full_text.split("### Response:\n")[-1].strip()
             
+            # Trained to output "Final Cipher:" to indicate answer
             if "Final Cipher:" in response_section:
                 model_cipher = response_section.split("Final Cipher:")[-1].strip()
             else:
+                # Fallback: assume the last line is the cipher
                 model_cipher = response_section.split("\n")[-1].strip()
 
             truth = chunk_truth[j]

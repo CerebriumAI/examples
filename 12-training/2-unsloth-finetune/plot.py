@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
 import pandas as pd
@@ -26,7 +25,6 @@ def load_results(csv_path: Path, expected_columns: set[str]) -> pd.DataFrame:
 
 
 def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
-    """Groups by length and calculates the accuracy percentage."""
     grouped = df.groupby("length")
     accuracy = grouped["is_correct"].mean().reset_index()
     accuracy.rename(columns={"is_correct": "accuracy"}, inplace=True)
@@ -39,7 +37,6 @@ def plot_comparison(
     ft_acc: pd.DataFrame, 
     output_path: Path | None = None
 ) -> None:
-    """Plots both LLM and Fine-tune accuracy on the same graph."""
     fig, ax = plt.subplots(figsize=(10, 6))
 
     ax.plot(
@@ -60,10 +57,16 @@ def plot_comparison(
         alpha=0.8
     )
 
-    ax.set_xlabel("Sequence Length")
+    ax.set_xscale("log")
+
+    ax.set_xlabel("Sequence Length (Log Scale)")
     ax.set_ylabel("Accuracy (%)")
     ax.set_title("Cipher Accuracy Comparison: LLM vs. Fine-tuned")
-    ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
+
+    ax.grid(True, which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+    from matplotlib.ticker import ScalarFormatter
+    ax.xaxis.set_major_formatter(ScalarFormatter())
     
     all_lengths = sorted(list(set(llm_acc["length"]) | set(ft_acc["length"])))
     ax.set_xticks(all_lengths)

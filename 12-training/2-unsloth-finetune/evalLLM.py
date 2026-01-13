@@ -226,9 +226,9 @@ def evaluate(
 
 
 def run_length_sweep(
-    mn: int = 4,
-    mx: int = 10,
-    iterations_per_length: int = 2,
+    mn: int = 1,
+    mx: int = 6,
+    iterations_per_length: int = 200,
     csv_path: str = "llm_results.csv",
 ) -> None:
     lengths = [i for i in range(mn, mx + 1)]
@@ -271,4 +271,4 @@ def run_length_sweep(
 
 
 if __name__ == "__main__":
-    run_length_sweep(1, 6, 200, "llm_results.csv") # from length 1 to 6, 200 iterations each
+    run_length_sweep(1, 6, 200, "./results/llm_results.csv") # from length 1 to 6, 200 iterations each
