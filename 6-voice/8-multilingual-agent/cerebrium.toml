@@ -6,8 +6,6 @@ exclude = ["./example_exclude"]
 disable_auth = true
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "AMPERE_A10"
 cpu = 2
 memory = 10.0

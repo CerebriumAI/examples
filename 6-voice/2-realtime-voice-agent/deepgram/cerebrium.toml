@@ -6,7 +6,6 @@ disable_auth = true
 
 [cerebrium.hardware]
 cpu = 4
-region = "us-east-1"
 memory = 32
 compute = "AMPERE_A10"
 gpu_count = 1

@@ -16,8 +16,6 @@ exclude = ['.*']
 cpu = 4.0
 memory = 8.0
 compute = "CPU"
-provider = "aws"
-region = "us-east-1"
 
 [cerebrium.scaling]
 min_replicas = 0

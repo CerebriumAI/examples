@@ -10,8 +10,6 @@ docker_base_image_url = "nvidia/cuda:12.1.1-runtime-ubuntu22.04"
 shell_commands = ["export HF_HOME=/cortex/.cache/huggingface", "python3 -c \"import torch; from diffusers import StableDiffusionPipeline; StableDiffusionPipeline.from_pretrained('stabilityai/stable-diffusion-2-1', torch_dtype=torch.float16)\""]
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "AMPERE_A10"
 cpu = 2
 memory = 16.0

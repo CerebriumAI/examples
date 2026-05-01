@@ -15,8 +15,6 @@ shell_commands = [
 ]
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "AMPERE_A10"
 cpu = 3
 memory = 16.0

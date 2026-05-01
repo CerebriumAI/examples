@@ -18,8 +18,6 @@ shell_commands = [
 ]
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "INF2"
 cpu = 6
 memory = 60.0
