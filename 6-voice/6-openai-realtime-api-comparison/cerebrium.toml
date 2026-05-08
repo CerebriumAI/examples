@@ -7,8 +7,6 @@ exclude = ["./example_exclude"]
 shell_commands = ["pip install git+https://github.com/pipecat-ai/pipecat.git@khk/openai-realtime-beta#egg=pipecat-ai[silero,daily,openai,deepgram]"]
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "CPU"
 cpu = 2
 memory = 12.0

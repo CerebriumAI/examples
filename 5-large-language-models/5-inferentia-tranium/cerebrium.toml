@@ -11,8 +11,6 @@ pre_build_commands = [
 ]
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "TRN1"
 cpu = 42
 memory = 330.0

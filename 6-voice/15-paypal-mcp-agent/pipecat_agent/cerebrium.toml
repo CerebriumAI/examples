@@ -9,8 +9,6 @@ include = ["./*", "main.py", "cerebrium.toml"]
 exclude = ["./example_exclude"]
 
 [cerebrium.hardware]
-region = "us-east-1"
-provider = "aws"
 compute = "CPU"
 cpu = 6
 memory = 14.0

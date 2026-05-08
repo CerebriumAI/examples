@@ -15,8 +15,6 @@ cpu = 2
 memory = 8.0
 compute = "CPU"
 gpu_count = 1
-provider = "aws"
-region = "us-east-1"
 
 [cerebrium.scaling]
 min_replicas = 0
