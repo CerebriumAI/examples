@@ -34,7 +34,7 @@ cerebrium cp gemma4-coding-Q4_K_M.gguf /ollama/gemma4-coding-Q4_K_M.gguf
 
 ## Deploy
 
-From this directory (with the [Cerebrium CLI](https://docs.cerebrium.ai) logged in):
+From this directory (with the [Cerebrium CLI](https://cerebrium.ai/docs) logged in):
 
 ```bash
 cerebrium deploy
