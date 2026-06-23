@@ -5,6 +5,10 @@ This module implements a Triton Inference Server Python backend that uses
 TensorRT-LLM's PyTorch backend for optimized LLM inference. 
 """
 
+import http.client
+import os
+import urllib.request
+
 import numpy as np
 import triton_python_backend_utils as pb_utils
 import torch
@@ -16,24 +20,49 @@ from pathlib import Path
 # Model configuration
 MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 MODEL_DIR = f"/persistent-storage/models/{MODEL_ID}"
+CHECKPOINT_URL = "http://169.254.169.253:8234/checkpoint"
+
+
+def _trigger_snapshot() -> None:
+    print("[init] requesting GPU snapshot", flush=True)
+    try:
+        req = urllib.request.Request(CHECKPOINT_URL, method="POST")
+        urllib.request.urlopen(req, timeout=300)
+        print("[init] snapshot complete", flush=True)
+    except http.client.RemoteDisconnected:
+        # TCP connections disconnect on restore and throw remote
+        print("[init] snapshot complete (RemoteDisconnected)", flush=True)
+    except Exception as exc:
+        print(f"[init] snapshot failed: {type(exc).__name__}: {exc}", flush=True)
+
+
+def _has_model_weights(model_path: Path) -> bool:
+    return any(model_path.glob("*.safetensors")) or any(model_path.glob("*.bin"))
 
 
 def ensure_model_downloaded():
     """Check if model exists, download if not available."""
     model_path = Path(MODEL_DIR)
-    
-    # Check if model directory exists and has content
-    if not model_path.exists() or not any(model_path.iterdir()):
-        print("Model not found, downloading...")
+
+    if model_path.exists() and _has_model_weights(model_path):
         try:
-            # Import download function from download_model
-            from download_model import download_model
-            download_model()
-        except Exception as e:
-            print(f"Error downloading model: {e}")
-            raise
-    else:
-        print("✓ Model already exists")
+            AutoTokenizer.from_pretrained(MODEL_DIR)
+            print("✓ Model already exists")
+            return
+        except Exception as exc:
+            print(f"Model cache corrupt or incomplete, re-downloading: {exc}")
+            import shutil
+
+            shutil.rmtree(model_path)
+
+    print("Model not found, downloading...")
+    try:
+        from download_model import download_model
+
+        download_model()
+    except Exception as e:
+        print(f"Error downloading model: {e}")
+        raise
 
 
 class TritonPythonModel:
@@ -49,13 +78,13 @@ class TritonPythonModel:
         
         Loads tokenizer and initializes TensorRT-LLM with PyTorch backend.
         """
+        print("[init] starting", flush=True)
+
         # Ensure model is downloaded before loading
         ensure_model_downloaded()
         
-        print("Loading tokenizer...")
+        print("[init] building TensorRT-LLM engine", flush=True)
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-        
-        print("Initializing TensorRT-LLM...")
         
         plugin_config = PluginConfig.from_dict({
             "paged_kv_cache": True,  # Efficient memory usage for KV cache
@@ -72,7 +101,15 @@ class TritonPythonModel:
             build_config=build_config,
             tensor_parallel_size=torch.cuda.device_count(),
         )
-        print("✓ Model ready")
+        print("[init] TensorRT-LLM engine ready", flush=True)
+
+        # Warm CUDA so the snapshot includes a populated context.
+        self.llm.generate(
+            ["Hello"],
+            SamplingParams(max_tokens=1),
+        )
+        _trigger_snapshot()
+        print("[init] handler ready", flush=True)
     
     def execute(self, requests):
         """

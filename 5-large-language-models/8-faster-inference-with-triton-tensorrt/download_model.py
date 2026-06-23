@@ -14,7 +14,7 @@ MODEL_DIR = Path("/persistent-storage/models") / MODEL_ID
 
 def download_model():
     """Download model from HuggingFace if not already present."""
-    hf_token = os.environ.get("HF_AUTH_TOKEN")
+    hf_token = os.environ.get("HF_AUTH_TOKEN") or os.environ.get("HF_TOKEN")
     
     if not hf_token:
         print("WARNING: HF_AUTH_TOKEN not set, model download may fail")
