@@ -1,0 +1,46 @@
+[cerebrium.deployment]
+name = "snapshot-qwen-vl-sglang"
+python_version = "3.11"
+docker_base_image_url = "nvidia/cuda:12.8.0-devel-ubuntu22.04"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+deployment_initialization_timeout = 830  # Cerebrium max.
+
+[cerebrium.hardware]
+cpu = 10.0
+memory = 60.0
+compute = "ADA_L40"
+region = "eu-north-1"
+provider = "aws"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+cooldown = 30
+replica_concurrency = 1
+scaling_metric = "concurrency_utilization"
+
+[cerebrium.build]
+use_uv = true
+
+[cerebrium.dependencies.pip]
+transformers = "latest"
+huggingface_hub = "latest"
+hf_transfer = "latest"
+pillow = "latest"
+requests = "latest"
+# Pin to the CUDA 12.8 generation. sglang 0.5.6+ pins torch==2.9.1 and ships
+# kernels built for CUDA 13 (need libnvrtc.so.13), which the cu12.8 base lacks.
+# sglang 0.5.5 pins torch==2.8.0 (cu128) + sgl-kernel 0.3.16 (cu128) — all aligned
+# with this base. Let sglang[all] pull its matching sgl-kernel/flashinfer; pinning
+# them separately grabs mismatched-ABI/CUDA wheels.
+torch = "2.8.0"
+"sglang[all]" = "0.5.5"
+
+[cerebrium.dependencies.apt]
+libnuma-dev = "latest"
+
+
+[cerebrium.runtime]
+container_runtime = "v2"  # Required for Cerebrium memory checkpointing.

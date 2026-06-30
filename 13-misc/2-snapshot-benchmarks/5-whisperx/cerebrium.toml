@@ -1,0 +1,42 @@
+[cerebrium.deployment]
+name = "snapshot-whisperx"
+python_version = "3.11"
+# cuDNN 8 base: CTranslate2 (faster-whisper backend, pinned <4.5 by whisperx)
+# needs libcudnn_ops_infer.so.8. The cuDNN-9 images renamed that lib, so we use
+# a cuDNN-8 image. torch still loads its own bundled cuDNN 9 via RPATH.
+docker_base_image_url = "nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.hardware]
+cpu = 10.0
+memory = 24.0
+compute = "AMPERE_A10"
+region = "eu-north-1"
+provider = "aws"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+cooldown = 10
+replica_concurrency = 1
+scaling_metric = "concurrency_utilization"
+
+[cerebrium.dependencies.pip]
+# Pin torch/torchaudio/ctranslate2 so the resolver doesn't backtrack across
+# every torch release (whisperx only constrains torch>=2.5.1, which otherwise
+# blows up dependency resolution).
+torch = "2.7.1"
+torchaudio = "2.7.1"
+ctranslate2 = "4.4.0"
+whisperx = "3.4.0"
+numpy = "2.0.2"
+scipy = "1.15.0"
+requests = "latest"
+
+[cerebrium.dependencies.apt]
+ffmpeg = "latest"
+
+[cerebrium.runtime]
+container_runtime = "v2"  # Required for Cerebrium memory checkpointing.

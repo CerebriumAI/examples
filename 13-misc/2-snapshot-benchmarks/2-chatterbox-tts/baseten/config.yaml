@@ -1,0 +1,10 @@
+model_name: snapshot-chatterbox-tts
+python_version: py311
+requirements:
+  - chatterbox-tts
+  - torchaudio
+resources:
+  accelerator: L4
+  use_gpu: true
+runtime:
+  predict_concurrency: 1

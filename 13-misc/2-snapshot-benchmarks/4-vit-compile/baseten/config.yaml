@@ -1,0 +1,21 @@
+model_name: snapshot-vit-compile
+python_version: py311
+requirements:
+  - torch
+  - torchvision
+  - transformers
+  - accelerate
+  - pillow
+  - requests
+resources:
+  accelerator: L4
+  use_gpu: true
+runtime:
+  predict_concurrency: 1
+secrets:
+  hf_access_token: null
+model_cache:
+  - repo_id: google/vit-base-patch16-224
+    revision: 3f49326eb077187dfe1c2a2bb15fbd74e6ab91e3
+    use_volume: true
+    volume_folder: vit-base

@@ -1,0 +1,23 @@
+model_name: snapshot-whisperx
+# whisperx 3.5.0+ uses ctranslate2>=4.5.0, which supports cuDNN 9 — so use a
+# standard cuDNN-9 PyTorch image (it already ships Python at /opt/conda, which
+# Truss requires before build_commands run) and install whisperx on top.
+base_image:
+  image: pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
+  python_executable_path: /opt/conda/bin/python
+python_version: py310
+secrets:
+  hf_access_token: null
+requirements: []
+build_commands:
+  - apt-get update && apt-get install -y --no-install-recommends ffmpeg git && rm -rf /var/lib/apt/lists/*
+  - /opt/conda/bin/pip install --upgrade pip
+  # Pin the whole torch trio to the matching 2.7.1 set. Otherwise pip leaves the
+  # base image's torchaudio/torchvision 2.4 in place while torch jumps to 2.7,
+  # causing libtorchaudio.so / torchvision ABI "undefined symbol" errors.
+  - /opt/conda/bin/pip install torch==2.7.1 torchaudio==2.7.1 torchvision==0.22.1 whisperx==3.6.0 requests
+resources:
+  accelerator: L4
+  use_gpu: true
+runtime:
+  predict_concurrency: 1

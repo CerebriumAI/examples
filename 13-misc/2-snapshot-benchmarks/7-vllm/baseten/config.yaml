@@ -1,0 +1,17 @@
+model_name: snapshot-vllm
+python_version: py311
+requirements:
+  - vllm
+  - pydantic
+resources:
+  accelerator: L4
+  use_gpu: true
+runtime:
+  predict_concurrency: 1
+secrets:
+  hf_access_token: null
+model_cache:
+  - repo_id: Qwen/Qwen2.5-0.5B-Instruct
+    revision: 7ae557604adf67be50417f59c2c2f167def9a775
+    use_volume: true
+    volume_folder: qwen25-05b

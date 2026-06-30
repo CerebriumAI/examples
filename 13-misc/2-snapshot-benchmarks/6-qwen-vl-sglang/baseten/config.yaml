@@ -1,0 +1,26 @@
+model_name: snapshot-qwen-vl-sglang
+# SGLang needs Python + a CUDA toolchain. Latest sglang pins torch==2.9.1 and
+# ships deep_gemm/sgl-kernel built for CUDA 13 (needs libnvrtc.so.13), so the
+# base must be CUDA 13 — a 12.x base fails with "libnvrtc.so.13: cannot open".
+# This pytorch devel image matches sglang's torch 2.9.1 exactly (no torch swap).
+base_image:
+  image: pytorch/pytorch:2.9.1-cuda13.0-cudnn9-devel
+  python_executable_path: /opt/conda/bin/python
+python_version: py311
+secrets:
+  hf_access_token: null
+requirements: []
+build_commands:
+  - apt-get update && apt-get install -y --no-install-recommends git libnuma-dev && rm -rf /var/lib/apt/lists/*
+  - /opt/conda/bin/pip install --upgrade pip
+  - /opt/conda/bin/pip install transformers huggingface_hub pillow requests "sglang[all]" flashinfer-python
+resources:
+  accelerator: H100
+  use_gpu: true
+runtime:
+  predict_concurrency: 1
+model_cache:
+  - repo_id: Qwen/Qwen2-VL-7B-Instruct
+    revision: eed13092ef92e448dd6875b2a00151bd3f7db0ac
+    use_volume: true
+    volume_folder: qwen2-vl-7b
