@@ -1,0 +1,21 @@
+model_name: snapshot-parakeet
+python_version: py311
+requirements:
+  - nemo_toolkit[asr]==2.3.2
+  - cuda-python==12.8.0
+  - requests
+system_packages:
+  - ffmpeg
+  - libsndfile1
+resources:
+  accelerator: L4
+  use_gpu: true
+runtime:
+  predict_concurrency: 1
+secrets:
+  hf_access_token: null
+model_cache:
+  - repo_id: nvidia/parakeet-tdt-0.6b-v2
+    revision: 1b149a3589351c96ddb101709fe7dd9c7069572f
+    use_volume: true
+    volume_folder: parakeet-tdt

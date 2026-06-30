@@ -1,0 +1,28 @@
+[cerebrium.deployment]
+name = "snapshot-vllm"
+python_version = "3.11"
+docker_base_image_url = "nvidia/cuda:12.8.0-devel-ubuntu22.04"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+
+[cerebrium.hardware]
+cpu = 10.0
+memory = 16.0
+compute = "AMPERE_A10"
+region = "eu-north-1"
+provider = "aws"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+cooldown = 10
+replica_concurrency = 1
+scaling_metric = "concurrency_utilization"
+
+[cerebrium.dependencies.pip]
+vllm = "latest"
+pydantic = "latest"
+
+[cerebrium.runtime]
+container_runtime = "v2"  # Required for Cerebrium memory checkpointing.
