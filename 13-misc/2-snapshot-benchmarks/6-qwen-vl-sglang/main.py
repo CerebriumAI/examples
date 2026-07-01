@@ -130,11 +130,8 @@ print("releasing memory occupation before checkpoint", flush=True)
 engine.release_memory_occupation()
 print("released memory occupation", flush=True)
 #
-# # --- Trigger Cerebrium's memory checkpoint -----------------------------------
-# # Cerebrium equivalent of Modal's `enable_memory_snapshot` + GPU snapshot. On the
-# # creation run the POST returns the checkpoint response; on a restored replica
-# # the snapshotted TCP connection is dead and the call raises RemoteDisconnected.
-# print("calling checkpoint", flush=True)
+
+print("calling checkpoint", flush=True)
 try:
     req = urllib.request.Request("http://169.254.169.253:8234/checkpoint", method="POST")
     with urllib.request.urlopen(req) as response:

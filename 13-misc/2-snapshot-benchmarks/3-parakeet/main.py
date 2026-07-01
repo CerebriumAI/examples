@@ -12,9 +12,6 @@ model = nemo_asr.models.ASRModel.from_pretrained(
     model_name="nvidia/parakeet-tdt-0.6b-v2"
 )
 
-# --- Trigger Cerebrium's memory checkpoint -------------------------------------
-# Cerebrium equivalent of Modal's memory + GPU snapshot. Subsequent cold starts
-# restore the model from the snapshot instead of re-downloading/re-loading it.
 try:
     req = urllib.request.Request("http://169.254.169.253:8234/checkpoint", method="POST")
     urllib.request.urlopen(req)
