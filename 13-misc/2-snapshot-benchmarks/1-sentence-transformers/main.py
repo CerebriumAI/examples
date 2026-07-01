@@ -10,7 +10,7 @@ model = SentenceTransformer("BAAI/bge-small-en-v1.5", device="cuda")
 try:
     req = urllib.request.Request("http://169.254.169.253:8234/checkpoint", method="POST")
     urllib.request.urlopen(req)
-    print("Checkpointed successfully")    
+    print("Checkpointed successfully")
 except http.client.RemoteDisconnected:
     # TCP connections disconnect on restore and throw remote
     pass

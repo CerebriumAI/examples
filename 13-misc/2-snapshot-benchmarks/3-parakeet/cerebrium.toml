@@ -5,12 +5,15 @@ docker_base_image_url = "nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04"
 disable_auth = true
 include = ['./*', 'main.py', 'cerebrium.toml']
 exclude = ['.*']
+# NeMo's load + lazy init runs past the default 10-min readiness window on a
+# no-snapshot cold start, so give it the Cerebrium max.
+deployment_initialization_timeout = 830
 
 [cerebrium.hardware]
-cpu = 6.0
+cpu = 10.0
 memory = 24.0
 compute = "AMPERE_A10"
-region = "eu-north-1"
+region = "us-east-1"
 provider = "aws"
 
 [cerebrium.scaling]
@@ -25,5 +28,5 @@ scaling_metric = "concurrency_utilization"
 "cuda-python" = "12.8.0"
 requests = "latest"
 
-[cerebrium.runtime]
-container_runtime = "v2"  # Required for Cerebrium memory checkpointing.
+[cerebrium.experimental]
+checkpointing = true
