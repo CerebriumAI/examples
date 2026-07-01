@@ -9,7 +9,7 @@ exclude = ['.*']
 cpu = 10.0
 memory = 16.0
 compute = "AMPERE_A10"
-region = "eu-north-1"
+region = "us-east-1"
 provider = "aws"
 
 [cerebrium.scaling]
@@ -23,5 +23,5 @@ scaling_metric = "concurrency_utilization"
 chatterbox-tts = "latest"
 torchaudio = "latest"
 
-[cerebrium.runtime]
-container_runtime = "v2"
+[cerebrium.experimental]
+checkpointing = true

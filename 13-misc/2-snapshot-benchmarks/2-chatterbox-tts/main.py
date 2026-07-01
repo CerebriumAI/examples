@@ -9,6 +9,7 @@ from chatterbox.tts import ChatterboxTTS
 
 model = ChatterboxTTS.from_pretrained(device="cuda")
 
+# --- Snapshot disabled for no-snapshot benchmark (re-enable later) ------------
 try:
     req = urllib.request.Request("http://169.254.169.253:8234/checkpoint", method="POST")
     urllib.request.urlopen(req)

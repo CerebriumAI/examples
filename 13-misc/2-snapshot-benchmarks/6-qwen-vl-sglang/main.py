@@ -1,13 +1,32 @@
-import base64
-import io
+import multiprocessing
 import os
+
+multiprocessing.set_start_method("spawn", force=True)
+
+import base64
 import signal
 import tempfile
 
 # Faster HF weight download — the ~16GB Qwen2-VL-7B download is the bulk of the
-# cold-start init, which must finish (load + checkpoint) within Cerebrium's
-# 830s init cap. Must be set before huggingface_hub is imported.
+# cold-start init, which must finish (load + checkpoint) within Cerebrium's 830s
+# init cap. Must be set before huggingface_hub is imported.
 os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "0")
+
+# --- gVisor checkpoint-friendliness ------------------------------------------
+# Put IPC sockets on the gVisor-internal tmpfs (mounted by the shim) so they
+# survive checkpoint/restore. /tmp is on overlayfs and gets remapped on restore.
+os.environ.setdefault("VLLM_RPC_BASE_PATH", "/run/cuda-ckpt")
+os.makedirs("/run/cuda-ckpt", exist_ok=True)
+# NCCL HeartbeatMonitor spams "Broken pipe" on the TCPStore after restore.
+# Disable monitoring (HEARTBEAT_TIMEOUT_SEC=0 means "fire immediately", so use a
+# long timeout instead).
+os.environ.setdefault("TORCH_NCCL_ENABLE_MONITORING", "0")
+os.environ.setdefault("TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC", "3600")
+# torch._inductor eagerly forks N compile workers (N=os.cpu_count()) after CUDA
+# init; each inherits nvidia FDs without a CUDA context, which cuda-checkpoint
+# can't release and gVisor's nvproxy panics on. Compile synchronously (no fork).
+os.environ.setdefault("TORCHINDUCTOR_COMPILE_THREADS", "1")
 
 # Cerebrium's Cortex runtime imports main.py from a worker thread, but SGLang's
 # engine launch calls signal.signal(SIGQUIT, ...), which Python only allows on
@@ -26,7 +45,6 @@ def _safe_signal(signalnum, handler):
 signal.signal = _safe_signal
 
 import http.client
-import urllib.error
 import urllib.request
 
 import requests
@@ -37,12 +55,29 @@ from transformers import AutoProcessor
 MODEL_PATH = "Qwen/Qwen2-VL-7B-Instruct"
 
 # --- Cold-start work that we want the snapshot to capture ----------------------
-# Spinning up the SGLang engine (loading the 7B vision weights onto the GPU and
-# capturing CUDA graphs) is the expensive part of the cold start. We use the
-# in-process offline `sgl.Engine` so the load happens at import time, before the
-# checkpoint, rather than in a separate server process.
+# Spinning up the SGLang engine (loading the 7B vision weights onto the GPU) is
+# the expensive part of the cold start. We use the in-process offline
+# `sgl.Engine` so the load happens at import time, before the checkpoint, rather
+# than in a separate server process.
+#
+# disable_cuda_graph mirrors vLLM's enforce_eager: torch.compile / CUDA graph
+# capture fail inside gVisor, so they must be turned off for the checkpoint to
+# succeed.
 processor = AutoProcessor.from_pretrained(MODEL_PATH)
-engine = sgl.Engine(model_path=MODEL_PATH, mem_fraction_static=0.8)
+engine = sgl.Engine(
+    model_path=MODEL_PATH,
+    mem_fraction_static=0.8,
+    # Memory-saver lets us free the GPU before the checkpoint and reload after
+    # restore (see release/resume below). This mirrors the Modal variant
+    # (--enable-memory-saver --enable-weights-cpu-backup) and the vLLM Cerebrium
+    # variant's sleep(1)/wake_up(): the snapshot then captures CPU-backed weights
+    # instead of ~16GB of resident GPU state, so restore becomes a fast CPU->GPU
+    # copy rather than a full GPU-memory checkpoint restore through gVisor.
+    enable_memory_saver=True,
+    # Without this, release discards the weights instead of backing them up to
+    # CPU RAM, and the restored weights are garbage.
+    enable_weights_cpu_backup=True,
+)
 
 
 def _build_prompt(prompt: str) -> str:
@@ -69,54 +104,51 @@ def _infer(image_path: str, prompt: str, max_tokens: int):
 
 
 # Warm up generation with a tiny in-memory image BEFORE the checkpoint. This
-# captures the CUDA graphs into the snapshot (so restores are fast) and verifies
-# the engine actually generates — if generation hangs, init fails loudly here
-# instead of silently hanging the first request.
+# populates the weights/KV cache and JIT-compiles hot kernels into the snapshot
+# (so restores are fast) and verifies the engine actually generates — if
+# generation hangs, init fails loudly here instead of silently hanging the first
+# request.
 with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as _wf:
     Image.new("RGB", (64, 64), (127, 127, 127)).save(_wf, format="JPEG")
     _warmup_path = _wf.name
 try:
     _infer(_warmup_path, "Warmup.", max_tokens=2)
-    print("Warmup generation OK")
+    print("Warmup generation OK", flush=True)
 finally:
     os.remove(_warmup_path)
 
-# --- Trigger Cerebrium's memory checkpoint -------------------------------------
-# Cerebrium equivalent of Modal's `enable_memory_snapshot` + GPU snapshot.
-# Log the endpoint's actual response so we can see what it reports, and tell
-# snapshot-creation (first run, returns HTTP body) apart from snapshot-restore
-# (the snapshotted TCP socket is dead on resume -> RemoteDisconnected).
-CHECKPOINT_BASE = "http://169.254.169.253:8234"
-
-
-def _checkpoint_status():
-    """Read the REAL checkpoint outcome. POST /checkpoint returns a hardcoded
-    'in_progress' even after the (synchronous) checkpoint finishes, so the only
-    way to know success/error is GET /checkpoint/status."""
-    try:
-        sreq = urllib.request.Request(CHECKPOINT_BASE + "/checkpoint/status", method="GET")
-        with urllib.request.urlopen(sreq) as sresp:
-            return sresp.read().decode("utf-8", "replace").strip()
-    except Exception as e:
-        return f"<status query failed: {type(e).__name__}: {e}>"
-
-
-print("Calling checkpoint endpoint...", flush=True)
+# --- Snapshot disabled for no-snapshot benchmark (re-enable later) ------------
+# The release/checkpoint/resume cycle below only exists to take and restore the
+# GPU snapshot. With it commented out the weights stay resident on the GPU and
+# the replica serves straight after warmup — a true cold-start (no-snapshot) path.
+#
+# # Free the GPU before the checkpoint: back the weights up to CPU RAM and release
+# # the GPU allocation (KV cache + weights). The snapshot then captures the CPU
+# # copy instead of resident GPU memory, so restore is a fast CPU->GPU reload
+# # (resume below) rather than a full GPU-memory restore through gVisor.
+print("releasing memory occupation before checkpoint", flush=True)
+engine.release_memory_occupation()
+print("released memory occupation", flush=True)
+#
+# # --- Trigger Cerebrium's memory checkpoint -----------------------------------
+# # Cerebrium equivalent of Modal's `enable_memory_snapshot` + GPU snapshot. On the
+# # creation run the POST returns the checkpoint response; on a restored replica
+# # the snapshotted TCP connection is dead and the call raises RemoteDisconnected.
+# print("calling checkpoint", flush=True)
 try:
-    req = urllib.request.Request(CHECKPOINT_BASE + "/checkpoint", method="POST")
-    with urllib.request.urlopen(req) as resp:
-        body = resp.read().decode("utf-8", "replace").strip()
-        print(f"Checkpoint POST: HTTP {resp.status} body={body!r}", flush=True)
-    # POST blocks until the runsc checkpoint finishes but always reports
-    # 'in_progress'. Query the real status to learn checkpointed vs error.
-    print(f"Checkpoint REAL status: {_checkpoint_status()}", flush=True)
+    req = urllib.request.Request("http://169.254.169.253:8234/checkpoint", method="POST")
+    with urllib.request.urlopen(req) as response:
+        print("Checkpointed successfully", flush=True)
+        print("Response:", response.read().decode("utf-8"), flush=True)
 except http.client.RemoteDisconnected:
-    # Resumed from the snapshot: the checkpoint socket no longer exists.
-    print("RESTORED FROM SNAPSHOT (RemoteDisconnected on checkpoint socket)", flush=True)
-except urllib.error.HTTPError as e:
-    print(f"Checkpoint HTTPError {e.code}: {e.read().decode('utf-8', 'replace')!r}", flush=True)
-except Exception as e:
-    print(f"Checkpoint endpoint error: {type(e).__name__}: {e}", flush=True)
+    # TCP connections disconnect on restore and throw RemoteDisconnected.
+    pass
+#
+# # Reload the weights from the CPU backup onto the GPU after restore (and on the
+# # creation run, right after checkpointing) so the replica can serve immediately.
+print("resuming memory occupation", flush=True)
+engine.resume_memory_occupation()
+print("resumed memory occupation", flush=True)
 
 # Reachable https demo image (HF-hosted). The http COCO host and the Alibaba
 # Beijing OSS host are slow/blocked from this region and stall the image fetch.

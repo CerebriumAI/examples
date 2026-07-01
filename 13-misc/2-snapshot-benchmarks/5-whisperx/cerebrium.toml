@@ -13,7 +13,7 @@ exclude = ['.*']
 cpu = 10.0
 memory = 24.0
 compute = "AMPERE_A10"
-region = "eu-north-1"
+region = "us-east-1"
 provider = "aws"
 
 [cerebrium.scaling]
@@ -24,9 +24,6 @@ replica_concurrency = 1
 scaling_metric = "concurrency_utilization"
 
 [cerebrium.dependencies.pip]
-# Pin torch/torchaudio/ctranslate2 so the resolver doesn't backtrack across
-# every torch release (whisperx only constrains torch>=2.5.1, which otherwise
-# blows up dependency resolution).
 torch = "2.7.1"
 torchaudio = "2.7.1"
 ctranslate2 = "4.4.0"
@@ -38,5 +35,5 @@ requests = "latest"
 [cerebrium.dependencies.apt]
 ffmpeg = "latest"
 
-[cerebrium.runtime]
-container_runtime = "v2"  # Required for Cerebrium memory checkpointing.
+[cerebrium.experimental]
+checkpointing = true

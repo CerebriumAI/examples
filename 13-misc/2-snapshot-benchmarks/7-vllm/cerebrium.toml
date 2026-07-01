@@ -1,16 +1,23 @@
 [cerebrium.deployment]
 name = "snapshot-vllm"
 python_version = "3.11"
-docker_base_image_url = "nvidia/cuda:12.8.0-devel-ubuntu22.04"
+docker_base_image_url = "nvidia/cuda:12.1.1-runtime-ubuntu22.04"
 disable_auth = true
 include = ['./*', 'main.py', 'cerebrium.toml']
-exclude = ['.*']
+exclude = ['.*', '__pycache__', '*.pyc']
+use_uv = true
+# The model load + warmup + checkpoint must all finish inside this window.
+deployment_initialization_timeout = 830
+# curl/iproute2/netcat for poking the checkpoint agent and debugging the sandbox.
+pre_build_commands = [
+    "apt-get update && apt-get install -y curl iproute2 netcat-openbsd",
+]
 
 [cerebrium.hardware]
 cpu = 10.0
-memory = 16.0
+memory = 40.0
 compute = "AMPERE_A10"
-region = "eu-north-1"
+region = "us-east-1"
 provider = "aws"
 
 [cerebrium.scaling]
@@ -21,8 +28,11 @@ replica_concurrency = 1
 scaling_metric = "concurrency_utilization"
 
 [cerebrium.dependencies.pip]
-vllm = "latest"
+# Pin vLLM: "latest" (v0.24.0) crashes at engine init because kernel_warmup
+# unconditionally imports MiniMax-M3 Triton kernels that fail to JIT-decorate.
+vllm = "0.11.2"
 pydantic = "latest"
+huggingface_hub = "0.36.0"
 
-[cerebrium.runtime]
-container_runtime = "v2"  # Required for Cerebrium memory checkpointing.
+[cerebrium.experimental]
+checkpointing = true

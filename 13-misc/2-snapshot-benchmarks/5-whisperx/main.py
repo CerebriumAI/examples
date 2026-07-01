@@ -32,8 +32,6 @@ COMPUTE_TYPE = "float16"
 # start. We run it at import time so it happens once, before the checkpoint.
 model = whisperx.load_model("large-v2", device=DEVICE, compute_type=COMPUTE_TYPE)
 
-# --- Trigger Cerebrium's memory checkpoint -------------------------------------
-# Cerebrium equivalent of Modal's `enable_memory_snapshot` + GPU snapshot.
 try:
     req = urllib.request.Request("http://169.254.169.253:8234/checkpoint", method="POST")
     urllib.request.urlopen(req)
