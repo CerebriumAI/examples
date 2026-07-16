@@ -1,0 +1,41 @@
+[cerebrium.deployment]
+name = "sglang-llm"
+python_version = "3.12"
+docker_base_image_url = "modalresearch/sglang:nightly-dev-cu13-20260619-patched"
+disable_auth = true
+include = ['./*', 'main.py', 'cerebrium.toml']
+exclude = ['.*']
+deployment_initialization_timeout = 830
+pre_build_commands = []
+
+[cerebrium.build]
+use_uv = true
+
+[cerebrium.dependencies.pip]
+autoinference-utils = "0.2.2"
+hf-transfer = "latest"
+huggingface_hub = "latest"
+
+[cerebrium.dependencies.apt]
+libnuma-dev = "latest"
+ninja-build = "latest"
+ffmpeg = "latest"
+
+[cerebrium.hardware]
+cpu = 10.0
+memory = 100.0
+compute = "BLACKWELL_B200"
+gpu_count = 1
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 2
+cooldown = 300
+replica_concurrency = 16
+scaling_metric = "concurrency_utilization"
+response_grace_period = 1800
+
+[cerebrium.runtime.custom]
+port = 8000
+healthcheck_endpoint = "/health"
+entrypoint = ["python3", "main.py"]
