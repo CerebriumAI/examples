@@ -1,0 +1,29 @@
+[cerebrium.deployment]
+name = "4-websocket-graceful-shutdown"
+python_version = "3.12"
+include = ["./*"]
+exclude = [".*"]
+
+[cerebrium.hardware]
+cpu = 1
+memory = 1.0
+compute = "CPU"
+gpu_count = 0
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 2
+cooldown = 30
+replica_concurrency = 1
+response_grace_period = 660
+
+[cerebrium.dependencies.pip]
+fastapi = "latest"
+uvicorn = "latest"
+websockets = "latest"
+
+[cerebrium.runtime.custom]
+port = 8000
+entrypoint = ["python", "main.py"]
+healthcheck_endpoint = "/health"
+readycheck_endpoint = "/ready"
