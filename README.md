@@ -78,6 +78,7 @@ We've split each of the examples by category to make them easier to find.
 2. [Find products for sale using a live video stream](8-application-demos/2-ecommerce-live-stream)
 3. [AI commentator](8-application-demos/3-ai-commentator)
 4. [AI coding agent](8-application-demos/4-ai-coding-agent)
+6. [Browser agent with Playwright](8-application-demos/6-browser-agent)
 
 ### 10. Batching 📦
 
