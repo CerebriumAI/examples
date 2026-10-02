@@ -1,23 +1,47 @@
-# launch the offline engine
+import http.client
+import json
+import os
+import time
+import urllib.request
+
 from huggingface_hub import login
 from sglang import Runtime
-from pydantic import BaseModel
-import json
-from typing import List, Dict, Any
-import time
-import os
+
+CHECKPOINT_URL = "http://169.254.169.253:8234/checkpoint"
 
 os.environ["HF_TRANSFER"] = "1"
 os.environ["HF_HUB_VERBOSE"] = "1"
 os.environ["HF_HUB_ENABLE_PROGRESS_BARS"] = "1"
 
+
+def _trigger_snapshot() -> None:
+    print("[init] requesting GPU snapshot", flush=True)
+    try:
+        req = urllib.request.Request(CHECKPOINT_URL, method="POST")
+        urllib.request.urlopen(req, timeout=300)
+        print("[init] snapshot complete", flush=True)
+    except http.client.RemoteDisconnected:
+        # TCP connections disconnect on restore and throw remote
+        print("[init] snapshot complete (RemoteDisconnected)", flush=True)
+    except Exception as exc:
+        print(f"[init] snapshot failed: {type(exc).__name__}: {exc}", flush=True)
+
+
+print("[init] starting", flush=True)
 login(token=os.environ.get("HF_TOKEN"))
 
-# model_id = "deepseek-ai/DeepSeek-R1" ##uncomment for R1
+# model_id = "deepseek-ai/DeepSeek-R1"  # uncomment for R1
 model_id = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+
+print("[init] building SGLang runtime", flush=True)
 runtime = Runtime(
-    model_path=model_id, tp_size=1
-)  # change tp_size=8 if serving R1 on H200
+    model_path=model_id,
+    tp_size=1,  # change tp_size=8 if serving R1 on H200
+)
+print("[init] SGLang runtime ready", flush=True)
+
+_trigger_snapshot()
+print("[init] handler ready", flush=True)
 
 
 async def run(
@@ -29,7 +53,6 @@ async def run(
     top_p: float = 0.95,
     max_tokens: int = 4096,
 ):
-
     sampling_params = {"temperature": temperature, "top_p": top_p}
     tokenizer = runtime.get_tokenizer()
 
@@ -38,24 +61,15 @@ async def run(
     )
 
     stream = runtime.add_request(prompt, sampling_params)
-    full_text = ""
     first_chunk = True
 
     async for output in stream:
-        full_text += output
-
         chunk = {
             "id": run_id,
             "object": "chat.completion.chunk",
             "created": int(time.time()),
             "model": model,
-            "choices": [
-                {
-                    "index": 0,
-                    "delta": {},
-                    "finish_reason": None,
-                }
-            ],
+            "choices": [{"index": 0, "delta": {}, "finish_reason": None}],
         }
 
         if first_chunk:

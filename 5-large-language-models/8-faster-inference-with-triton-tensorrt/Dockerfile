@@ -1,6 +1,7 @@
 FROM nvcr.io/nvidia/tritonserver:25.10-trtllm-python-py3
 
 # Environment variables
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV PYTHONPATH=/usr/local/lib/python3.12/dist-packages:$PYTHONPATH
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV DEBIAN_FRONTEND=noninteractive
