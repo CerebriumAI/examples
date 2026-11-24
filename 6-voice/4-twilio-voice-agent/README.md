@@ -1,6 +1,6 @@
 # Real-time Voice AI Agent
 
-This repository contains the code to build the demo application [here](https://fastvoiceagent.cerebrium.ai/). We create
+This repository contains the code to build a demo application. We create
 a real-time voice AI agent that can respond to any query via speech, in speech, in ~500ms. This is an extremely flexible
 implementation where you have the ability to swap in any Large Language model, Text-to-speech (TTS) model and
 Speech-to-text (STT) model of your liking. This is extremely useful for use cases involving voice such as customer
